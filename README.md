@@ -88,6 +88,10 @@ uv run pytest --cov
 Each technology of the stack, and why it was chosen, is explained in [docs/stack.md](docs/stack.md).
 Features are specified under [specs/](specs/) before they are built.
 
+Contributions are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). To report a vulnerability in
+MailVigil itself, use the private channel described in [SECURITY.md](SECURITY.md), never a public
+issue.
+
 ## License
 
 [Apache License 2.0](LICENSE).

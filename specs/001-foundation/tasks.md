@@ -1,6 +1,6 @@
 ---
 feature: Foundation — package skeleton, local quality gate, CI and supply-chain hygiene
-status: approved
+status: in progress
 date: 2026-10-27
 related:
   - 001-foundation/requirements.md
@@ -38,9 +38,10 @@ in pull request #1 (already checked) and Stages 1 and 2 are the work left to mak
   `importlib.metadata.version` to raise `PackageNotFoundError`, `importlib.reload(mailvigil)`, assert
   `__version__ == "0.0.0.dev0"`, and reload again in teardown (`monkeypatch` plus `finally`) so the
   other tests see the real value. — RF-01, RF-10
-- [ ] `.gitignore`: change `reports/` to `/reports/` so a synthetic `tests/reports/` is not hidden;
+- [x] `.gitignore`: change `reports/` to `/reports/` so a synthetic `tests/reports/` is not hidden;
   confirm with `git check-ignore` that `reports/a.xml` is ignored and `tests/reports/a.xml` is not.
-  — RF-09
+  Done with the pre-public security audit, which also ignores `*.xml`, `*.zip` and `*.gz` (Google
+  sends reports as `.zip`) with `tests/` negations. — RF-09
 - [ ] Quality gate (`uv run ruff check .`, `uv run black --check .`, `uv run mypy`,
   `uv run pytest --cov`). — result recorded when run: ___
 

@@ -76,8 +76,10 @@ jobs:
       - name: Build the sdist and the wheel
         run: uv build
 
+      # Same 7-day cooldown as pip-audit: a release of the tool that was just published (and may be
+      # compromised) does not run in CI until it has aged.
       - name: The metadata renders on PyPI
-        run: uvx twine check --strict dist/*
+        run: uvx --exclude-newer "7 days" twine check --strict dist/*
 
       # Zero runtime dependencies is the product promise (offline, standard library only): a
       # `Requires-Dist` line in the wheel means someone added a dependency by accident.
