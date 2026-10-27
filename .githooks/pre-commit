@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+#
+# Versioned git pre-commit hook — the local quality gate of MailVigil.
+#
+# Runs the canonical sequence in CHECK mode (it never edits files: formatting
+# already happens while editing, through the Claude hook or the editor) and
+# aborts the commit if any step fails. The private repository has no branch
+# protection on the Free plan, so this hook and a green CI are the real gate.
+#
+# Activate once per clone:
+#   git config core.hooksPath .githooks
+#
+# Requires the environment synced with `uv sync`.
+
+set -euo pipefail
+
+#######################################
+# Run the quality sequence: ruff, black, mypy, pytest.
+# Globals:
+#   None
+# Arguments:
+#   None
+# Returns:
+#   0 if every step passes; the failing step's exit code otherwise (set -e).
+#######################################
+main() {
+  echo "[pre-commit] ruff check..."
+  uv run ruff check .
+
+  echo "[pre-commit] black --check..."
+  uv run black --check .
+
+  echo "[pre-commit] mypy..."
+  uv run mypy
+
+  echo "[pre-commit] pytest..."
+  uv run pytest -q --cov --cov-report=term:skip-covered
+
+  echo "[pre-commit] OK."
+}
+
+main "$@"
