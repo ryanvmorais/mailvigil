@@ -47,17 +47,23 @@ in pull request #1 (already checked) and Stages 1 and 2 are the work left to mak
 
 ## Stage 2 — Acceptance on GitHub
 
-Blocked until the account's Actions minutes are available again (they reset on the 1st, or the
-maintainer raises the spending limit). Nothing in this stage changes code unless a job fails.
+Unblocked on 2026-10-27, when the repository became public (Actions minutes are free there; while
+it was private the account's quota was exhausted and every job failed in 3 s). Nothing in this stage
+changes code unless a job fails.
 
-- [ ] Open the Stage 1 pull request; confirm `Quality (Python 3.12)`, `Quality (Python 3.15)`,
-  `Package` and `Security (pip-audit)` all run and pass. — RF-03, RF-04, RF-05, RF-06, RNF-02
+- [x] Confirm `Quality (Python 3.12)`, `Quality (Python 3.15)`, `Package` and `Security
+  (pip-audit)` all run and pass. Done on PR #3 (rerun, run 40602354923): the four passed, so the
+  pinned SHAs and the 3.15 leg work on GitHub. The Stage 1 pull request still has to be opened.
+  — RF-03, RF-04, RF-05, RF-06, RNF-02
 - [ ] Prove the `package` guard bites: on a throwaway branch add a runtime dependency to
   `[project].dependencies`, confirm the job fails with "MailVigil must stay dependency-free", then
   delete the branch (no PR merged). — RF-05, RNF-01
-- [ ] Trigger `Weekly pip-audit` with `workflow_dispatch` and confirm it passes. — RF-06, ADR-4
+- [x] Trigger `Weekly pip-audit` with `workflow_dispatch` and confirm it passes. Done on
+  2026-10-27: run 40602805245 passed in 15 s. — RF-06, ADR-4
 - [ ] Confirm Dependabot is active (Insights → Dependency graph → Dependabot, or its first Sunday
-  PRs) for `uv` and `github-actions`, with the 7-day cooldown and the grouping. — RF-06, ADR-3
+  PRs) for `uv` and `github-actions`, with the 7-day cooldown and the grouping. The version-update
+  runs for `uv` and `github-actions` already succeeded on 2026-10-27; the cooldown and the grouping
+  show on the first Sunday PRs (2026-11-01). — RF-06, ADR-3
 - [ ] Mark the spec `done`, update the roadmap row in `specs/README.md`, and record the first green
   run in "Resolved decisions" 6 of `requirements.md`. — RF-03 to RF-06
 - [ ] Quality gate. — result recorded when run: ___ (the CI run URL)
