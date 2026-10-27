@@ -1,0 +1,28 @@
+# Feature request form — consumed by GitHub when opening a new issue.
+# A feature that is accepted becomes a spec under specs/ before it is built.
+name: "Feature request"
+description: "Suggest something MailVigil should do"
+labels:
+  - "enhancement"
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: "The problem"
+      description: "What are you trying to do, and what gets in the way today?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: "What you would like"
+      description: "How you imagine it working, from the command line."
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: "Alternatives"
+      description: "Optional. Other tools or workarounds you tried."

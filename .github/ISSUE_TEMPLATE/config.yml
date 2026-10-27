@@ -1,0 +1,5 @@
+# Issue form configuration — consumed by GitHub.
+# No blank issues: the two forms cover bugs and features. The "report a vulnerability" contact
+# link is added when the repository becomes public, together with SECURITY.md and Private
+# Vulnerability Reporting (both are unavailable while it is private on the Free plan).
+blank_issues_enabled: false
