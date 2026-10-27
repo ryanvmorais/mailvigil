@@ -1,0 +1,132 @@
+# =============================================================================
+# Project configuration (PEP 621) — built with Hatchling, managed with uv.
+#
+#   [project]                        metadata (no runtime dependencies, by design)
+#   [dependency-groups] dev          lint / type / test tooling (installed by default)
+#   [tool.*]                         config for ruff, black, mypy, coverage, pytest
+#
+# Exact versions of the whole graph are pinned in uv.lock (`uv lock`); the lines
+# below are lower-bound floors only.
+# =============================================================================
+
+[project]
+name = "mailvigil"
+version = "0.1.0.dev0"
+description = "Reads DMARC aggregate reports and tells you, in plain language, if it is safe to move to p=reject."
+readme = "README.md"
+# 3.12 is the floor so that anyone still on it can install the tool; 3.12 reaches end of life on
+# 2028-10-31, review then. CI tests the floor and the newest stable release.
+requires-python = ">=3.12"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Ryan Morais" }]
+keywords = [
+    "dmarc",
+    "dmarc-reports",
+    "rua",
+    "email",
+    "email-security",
+    "spf",
+    "dkim",
+    "cli",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "License :: OSI Approved :: Apache Software License",
+    "Natural Language :: English",
+    "Natural Language :: Portuguese (Brazilian)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
+    "Topic :: Communications :: Email",
+    "Topic :: Security",
+    "Typing :: Typed",
+]
+# Zero runtime dependencies is the product promise: the whole tool runs on the standard library.
+dependencies = []
+
+[project.scripts]
+mailvigil = "mailvigil.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/ryanvmorais/mailvigil"
+Repository = "https://github.com/ryanvmorais/mailvigil"
+Issues = "https://github.com/ryanvmorais/mailvigil/issues"
+
+[dependency-groups]
+dev = [
+    "black>=26.10.1",
+    "mypy>=2.4.0",
+    "pytest>=9.2.0",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.17.3",
+]
+
+# --- Packaging (Hatchling) ---------------------------------------------------
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mailvigil"]
+
+# The source distribution is the package plus what a packager needs to read the project. The
+# tests, the specs, the CI and the local caches live in the repository only.
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/README.md",
+    "/LICENSE",
+]
+
+# --- Lint (ruff: replaces flake8 + isort, reads pyproject natively) ----------
+[tool.ruff]
+line-length = 100
+# The lint target is the floor, so syntax newer than 3.12 fails here instead of on a user's machine.
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+# pycodestyle, pyflakes, isort, pyupgrade, bugbear, flake8-simplify,
+# flake8-comprehensions, ruff-native.
+select = ["E", "F", "I", "UP", "B", "SIM", "C4", "RUF"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["mailvigil"]
+
+# --- Format (black) ---------------------------------------------------------
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+
+# --- Types (mypy, strict) --------------------------------------------------
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+# Type-checking covers the shipped package only; `tests/` is exercised by pytest.
+files = ["src"]
+
+# --- Coverage (pytest-cov) -------------------------------------------------
+# Not part of the default `pytest` run: `uv run pytest --cov` measures it.
+[tool.coverage.run]
+source = ["src/mailvigil"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+
+# --- Tests (pytest) --------------------------------------------------------
+[tool.pytest.ini_options]
+# -ra: summary line for every non-passing test; -q: quiet, the pre-commit prints the whole run.
+addopts = "-ra -q"
+testpaths = ["tests"]
+# Lets tests import helpers from the repository root (tests/ is a plain directory, not installed).
+pythonpath = ["."]

@@ -1,0 +1,114 @@
+# CI pipeline (GitHub Actions). Three independent jobs, each mirroring a slice of the local
+# quality gate (.githooks/pre-commit) so that a green check means the same as a clean checkout:
+#   quality   ruff, black, mypy and pytest on 3.12 (the floor) and 3.15 (the newest stable)
+#   package   `uv build`: the metadata renders on PyPI, the wheel has no runtime dependency, and
+#             it installs and runs in a clean environment (the release ships this exact build)
+#   security  pip-audit over uv.lock (known CVEs in the locked graph)
+#
+# The repository is private on the Free plan (2,000 Actions minutes a month, budget US$ 0: CI stops
+# when it runs out), so it runs on pull requests and by hand, never on a push to main.
+name: CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+# Read-only by default; a job that needs more declares it itself (none does today).
+permissions:
+  contents: read
+
+# A new push to the same pull request cancels the run that is now obsolete.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Quality (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        # The floor is tested, not just declared (requires-python in pyproject.toml).
+        python-version: ["3.12", "3.15"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Show Python version
+        run: uv run python -c "import sys; print(sys.version)"
+
+      - name: Ruff
+        run: uv run ruff check .
+
+      - name: Black
+        run: uv run black --check .
+
+      - name: Mypy
+        run: uv run mypy
+
+      - name: Pytest
+        run: uv run pytest --cov
+
+  package:
+    name: Package
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          python-version: "3.12"
+
+      - name: Build the sdist and the wheel
+        run: uv build
+
+      - name: The metadata renders on PyPI
+        run: uvx twine check --strict dist/*
+
+      # Zero runtime dependencies is the product promise (offline, standard library only): a
+      # `Requires-Dist` line in the wheel means someone added a dependency by accident.
+      - name: The wheel declares no runtime dependency
+        run: |
+          if unzip -p dist/*.whl '*.dist-info/METADATA' | grep -E '^Requires-Dist:'; then
+            echo "::error::the wheel declares a runtime dependency; MailVigil must stay dependency-free"
+            exit 1
+          fi
+
+      - name: The wheel installs in a clean environment and runs
+        run: |
+          uv venv --python 3.12 "$RUNNER_TEMP/clean"
+          uv pip install --python "$RUNNER_TEMP/clean" dist/*.whl
+          "$RUNNER_TEMP/clean/bin/mailvigil" --version
+
+  security:
+    name: Security (pip-audit)
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+
+      - name: Export uv.lock to requirements
+        run: uv export --frozen --no-emit-project --no-hashes --all-groups --all-extras -o requirements-audit.txt
+
+      # --no-deps: the export already has the full, locked graph; without it pip-audit would
+      # resolve again and audit a set that is not the lock's.
+      - name: pip-audit (known CVEs)
+        run: uvx --exclude-newer "7 days" pip-audit --requirement requirements-audit.txt --no-deps --disable-pip
