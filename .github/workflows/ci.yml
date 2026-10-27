@@ -5,11 +5,14 @@
 #             it installs and runs in a clean environment (the release ships this exact build)
 #   security  pip-audit over uv.lock (known CVEs in the locked graph)
 #
-# The repository is private on the Free plan (2,000 Actions minutes a month, budget US$ 0: CI stops
-# when it runs out), so it runs on pull requests and by hand, never on a push to main.
+# The repository is public, so Actions minutes are free: it runs on pull requests, on every push
+# to main (the merge commit is checked too) and by hand.
 name: CI
 
 on:
+  # The merge commit is checked too, so main is never red by surprise.
+  push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 

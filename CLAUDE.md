@@ -8,8 +8,9 @@ MailVigil is an open-source command-line tool that reads DMARC aggregate reports
 `.zip`, `.gz` or `.xml`) and says, in plain language, who is sending mail as a domain and whether
 it is safe to move the policy to `p=reject`. Python `>=3.12`, standard library only (zero runtime
 dependencies), offline. It is pre-0.1: only the package skeleton and `mailvigil --version` exist;
-everything else is specified in [specs/](specs/) first. The repository is private until the
-first version is ready (the maintainer makes it public, not Claude).
+everything else is specified in [specs/](specs/) first. The repository has been public since
+2026-10-27 (the maintainer made it public, not Claude); nothing is announced or published to PyPI
+until the first version is ready.
 
 Conversation with the maintainer (Ryan) and plan files are in Portuguese; everything in the
 repository is English.
@@ -61,7 +62,7 @@ specs/               # spec-driven development: requirements → design → task
 docs/stack.md        # each technology of the stack, why it was chosen, what to study first
 .githooks/           # versioned pre-commit hook (core.hooksPath)
 .claude/             # Claude Code hooks: format on edit, validate at turn end, guard uv.lock
-.github/             # CI, weekly pip-audit, Dependabot, issue and PR templates
+.github/             # CI, CodeQL, dependency review, weekly pip-audit, Dependabot, issue/PR templates
 uv.lock              # never edit by hand (generated; a hook blocks it)
 ```
 
@@ -94,16 +95,18 @@ uv.lock              # never edit by hand (generated; a hook blocks it)
 ## Quality and automation
 
 - **Gate:** `ruff` → `black --check` → `mypy` (strict, over `src`) → `pytest --cov`. The same
-  sequence runs in `.githooks/pre-commit` and in `.github/workflows/ci.yml`. The repository is
-  private on the Free plan (no branch protection), so the hook and a green CI are the real gate.
+  sequence runs in `.githooks/pre-commit` and in `.github/workflows/ci.yml`. The repository allows
+  squash merges only, and the `proteger-main` ruleset requires a pull request, linear history and
+  the `Quality (Python 3.12)`, `Quality (Python 3.15)` and `Package` checks; `pip-audit`, CodeQL and
+  dependency review are not required, so a new CVE cannot block the PR that fixes it.
 - **Claude Code hooks** (`.claude/`, run with `python`): `project_format` (PostToolUse: ruff `--fix`
   + black on the edited `.py`), `validate` (Stop: ruff + mypy when a `.py` under `src/` or `tests/`
   changed; pytest is left to the pre-commit hook because it is heavy), `guard_generated`
   (PreToolUse: blocks editing `uv.lock`), `session_start` (warns about a missing `.venv` or an
   inactive `core.hooksPath`).
-- **CI minutes:** private + Free plan = 2,000 min/month and a US$ 0 budget, so CI stops when it
-  runs out. CI runs on pull requests and by hand only. Review the triggers when the repository
-  becomes public.
+- **CI minutes:** free, because the repository is public. CI runs on pull requests, on pushes to
+  `main` and by hand; CodeQL (as a workflow, not the default setup) on `main`, PRs and weekly;
+  dependency review on PRs. Review the triggers if the repository ever goes private again.
 - **Weekly `pip-audit.yml`** audits `uv.lock` every Monday 09:00 (São Paulo). A red run means a
   known CVE in the lock: answer with `/atualizar-dependencias`.
 

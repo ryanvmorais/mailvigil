@@ -1,0 +1,31 @@
+# Dependency review on pull requests: fails when a PR adds or bumps a dependency with a known
+# vulnerability. It reads the dependency graph GitHub builds from uv.lock, so it needs no install.
+# The weekly pip-audit.yml covers what is already in the lock; this covers what a PR is about to
+# add. Not a required check (the ruleset only requires the quality jobs): a CVE published after a
+# PR opened must not block the PR that fixes it.
+name: Dependency review
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dependency-review:
+    name: Dependency review
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Review the dependency changes
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: high
