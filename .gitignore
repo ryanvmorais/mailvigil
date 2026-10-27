@@ -22,14 +22,19 @@ venv/
 htmlcov/
 
 # --- 4. REAL DMARC REPORTS ---
-# Real reports carry source IPs and domains: never commit them. Test and README samples are
-# synthetic and live under tests/ (the negation below keeps them tracked).
-*.xml.gz
-*.xml.zip
-reports/
+# Real reports carry source IPs and domains: never commit them. Providers send them as .zip
+# (Google), .gz or plain .xml, so all three are ignored, not only the double extensions. Test and
+# README samples are synthetic and live under tests/ (the negations below keep them tracked).
+*.xml
+*.zip
+*.gz
+/reports/
 # Exception: synthetic sample reports under tests/ are committed on purpose.
-!tests/**/*.xml.gz
-!tests/**/*.xml.zip
+!tests/**/*.xml
+# Exception: a synthetic zipped report, the way Google sends them.
+!tests/**/*.zip
+# Exception: a synthetic gzipped report.
+!tests/**/*.gz
 
 # --- 5. SECRETS AND LOCAL CONFIG ---
 # Machine-specific overrides. There is no committed .env; the tool reads a TOML config.
