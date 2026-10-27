@@ -1,0 +1,56 @@
+# Bug report form — consumed by GitHub when opening a new issue.
+# The PR that fixes it closes the issue with "Closes #N".
+name: "Bug report"
+description: "Something in MailVigil does not work as it should"
+labels:
+  - "bug"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. A vulnerability in MailVigil itself (for example a crafted report
+        that crashes or abuses it) is **not** a public issue: report it privately through
+        GitHub's private vulnerability reporting on the Security tab. A wrong verdict or a wrong
+        classification of a report is a normal bug.
+
+        **Never paste a real DMARC report.** It carries IP addresses and domains. Reduce it to a
+        small synthetic one that still shows the problem.
+
+  - type: textarea
+    id: what-happens
+    attributes:
+      label: "What happens"
+      description: "The wrong behaviour you observed."
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: "What should happen"
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: "How to reproduce"
+      description: "The exact command and a minimal synthetic report that triggers it."
+      placeholder: |
+        1. Run `mailvigil ...`
+        2. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: "Environment"
+      description: "Optional. MailVigil version, Python version, OS."
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: "Output or logs"
+      description: "Optional. Remove domains, IP addresses and anything else you do not want public."
+      render: shell
