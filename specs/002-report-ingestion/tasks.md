@@ -43,19 +43,21 @@ public entry point.
 
 ## Stage 2 — The only parser: refuse declarations (RF-03)
 
-- [ ] `tests/test_reports_xmlsafe.py`, written first: `DOCTYPE`; `ENTITY` in an internal subset; an
+- [x] `tests/test_reports_xmlsafe.py`, written first: `DOCTYPE`; `ENTITY` in an internal subset; an
   external entity (`SYSTEM "file:///…"`, never resolved); each of those in UTF-8, UTF-8 with a byte
   order mark and UTF-16, all refused with `FORBIDDEN_DECLARATION`; a document with an XML
   declaration and a comment accepted; a clean UTF-16 document accepted; malformed XML refused with
   `MALFORMED_XML` and a `line L, column C` detail. — RF-03, RF-10
-- [ ] `src/mailvigil/reports/xmlsafe.py`: `parse_xml(xml: bytes) -> Element` with the expat
+- [x] `src/mailvigil/reports/xmlsafe.py`: `parse_xml(xml: bytes) -> Element` with the expat
   handlers and the `TreeBuilder` glue of ADR-1, `buffer_text = True`, and the namespace translation
   (no namespace or `urn:ietf:params:xml:ns:dmarc-2.0` → local name; other namespace →
   `{uri}local`). Tests for the namespace translation go in the same file. Keep the module free of
   anything but parsing, so it can be read alone. — RF-03, RF-04, ADR-1, ADR-5
-- [ ] Settle the typing of the expat handlers (design Risk 4) inside this module only, with the
+- [x] Settle the typing of the expat handlers (design Risk 4) inside this module only, with the
   narrowest annotation or `cast` that satisfies `mypy` strict, and a `# why` comment. — RNF-04
-- [ ] Quality gate. — result recorded when run: ___
+  (needed neither: the stubs type the handler attributes loosely, so plain lambdas pass strict)
+- [x] Quality gate. — result recorded when run: all green on 2026-10-27; 43 passed, coverage 100%
+  (Python 3.12). Mutation check: with both declaration handlers removed, the refusal tests fail.
 
 ## Stage 3 — Reading one attachment (RF-01, RF-02)
 
