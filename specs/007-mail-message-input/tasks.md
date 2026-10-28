@@ -60,7 +60,7 @@ fails, the code is wrong.
 
 ## Stage 2 — The message reader (RF-01 to RF-05, RF-09, RNF-01 to RNF-04, ADR-1 to ADR-4, ADR-9)
 
-- [ ] `tests/test_reports_mail.py`, `read_message`, written first: one report attached as `.zip`,
+- [x] `tests/test_reports_mail.py`, `read_message`, written first: one report attached as `.zip`,
   `.gz` and `.xml` (each built with `EmailMessage.add_attachment`) gives one `Attachment` with the
   right `name`, `kind` and the bytes put in; upper-case suffix; a name written as an encoded word
   (RFC 2047) and as an extended parameter (RFC 2231) is decoded before the suffix is checked; no
@@ -69,7 +69,7 @@ fails, the code is wrong.
   text body, an image and a calendar part give nothing; two candidates come in message order; a
   forwarded `message/rfc822` is not entered; a `multipart/signed` wrapper is read; base64 and
   quoted-printable. — RF-01, RF-03, ADR-4, ADR-9
-- [ ] Same file, hostile input: more than `MAX_LINES` lines made of blank lines and, separately, of
+- [x] Same file, hostile input: more than `MAX_LINES` lines made of blank lines and, separately, of
   headers is `message_too_complex`, and a spy on `BytesFeedParser.feed` shows the parser was never
   fed (no stopwatch in the test); a parts bomb (`MAX_PARTS + 1` empty parts); nesting past
   `MAX_DEPTH`, and nesting of 2,000 levels, which must be `message_too_complex` and never
@@ -78,10 +78,10 @@ fails, the code is wrong.
   whose bytes the reader later refuses; an attachment name with control characters and a
   bidirectional override comes out cleaned and at most 255 characters. — RF-04, RF-05, RF-09, ADR-1,
   ADR-2
-- [ ] Same file, `read_message_file`: a file over `MAX_MESSAGE_BYTES` is `message_too_large` before
+- [x] Same file, `read_message_file`: a file over `MAX_MESSAGE_BYTES` is `message_too_large` before
   it is opened (a spy on `Path.open`); a file that grows between the `stat` and the read is still
   refused; a directory and a missing file are `unreadable`; an exact-size file passes. — RF-05
-- [ ] Same file, `iter_mailbox`: several messages in order with their numbers from 1; text before
+- [x] Same file, `iter_mailbox`: several messages in order with their numbers from 1; text before
   the first separator is dropped; the three separator shapes of ADR-3 (`From - Tue Oct 28 10:00:00
   2025`, with a sender and with a `+0000` zone) split, and `From me to you` inside a body does not;
   a line longer than the read size does not split a message nor start one when its tail begins with
@@ -89,17 +89,25 @@ fails, the code is wrong.
   is still read; a file with no separator and the size of the whole mailbox is one refused message,
   and the peak memory stays near the limit (a `tracemalloc` bound, generous); an empty stream
   yields nothing; `\r\n` line endings. — RF-02, RF-05, ADR-3
-- [ ] `src/mailvigil/reports/mail.py`: the four constants, `Attachment`, `read_message_file`,
+- [x] `src/mailvigil/reports/mail.py`: the four constants, `Attachment`, `read_message_file`,
   `read_message` (line pre-check, chunked `BytesFeedParser` with the counting factory, iterative
   walk, suffix then content type, `get_payload(decode=True)`, the caught exceptions of the design)
   and `iter_mailbox` with `_FROM_LINE`. Imports `errors`, `reader`, `text` only. Docstrings with
   `Args:` / `Returns:` / `Raises:`; `# why` comments on the factory seam, the pre-check and the
   separator regex. — RF-01 to RF-05, RNF-01 to RNF-03, ADR-1 to ADR-4, ADR-9
-- [ ] `src/mailvigil/reports/__init__.py`: re-export the new names of the design. `README.md` of
+- [x] `src/mailvigil/reports/__init__.py`: re-export the new names of the design. `README.md` of
   the package docs is not touched here. — RF-08, ADR-8
-- [ ] Quality gate of the stage: `uv run ruff check .` → `uv run black --check .` → `uv run mypy` →
+- [x] Quality gate of the stage: `uv run ruff check .` → `uv run black --check .` → `uv run mypy` →
   `uv run pytest --cov`. Record the result here. Run the suite on 3.12 and on the newest Python
   available locally, because ADR-1 leans on a seam of the `email` package.
+  **Result (2026-10-28):** `ruff` clean, `black` unchanged, `mypy` strict clean on 23 source files,
+  `pytest --cov` 1,157 tests passed on 3.12 with coverage 100% (1,601 statements, 362 branches), and
+  the same suite passed on 3.15.1. Two small moves outside the list: `MAX_TEXT` now lives in
+  `text.py` (so `mail.py` does not import the parser, as the design says; `parser.py` still exposes
+  it) and `reader._KINDS` became the public `KIND_BY_SUFFIX`. `read_message` also refuses a `raw`
+  over `MAX_MESSAGE_BYTES`, for a caller that has bytes and not a file (spec 009). A mailbox with no
+  separator at all is read as one message (small: read; over the cap: refused), which reconciles
+  "text before the first separator is dropped" with RF-05.
 
 ## Stage 3 — Wiring: discovery, ingestion, CLI (RF-01, RF-02, RF-06, RF-07, RF-08, RNF-04, ADR-5, ADR-6)
 
