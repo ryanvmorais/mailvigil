@@ -542,7 +542,10 @@ def _left_out(
     for file in skipped[:_LIMIT]:
         phrase = text.reasons[file.reason]
         # The phrase is the part that must survive, so it is the name that is cut.
-        name = fit(file.path.name or str(file.path), _WIDTH - 4 - len(phrase) - 2)
+        label = file.path.name or str(file.path)
+        if file.part:
+            label += " " + file.part
+        name = fit(label, _WIDTH - 4 - len(phrase) - 2)
         lines.append(f"    {name}: {phrase}")
     if len(skipped) > _LIMIT:
         lines.append("    " + text.skipped_more.format(n=len(skipped) - _LIMIT))

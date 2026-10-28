@@ -29,6 +29,10 @@ class Reason(StrEnum):
         NOT_A_REPORT (str): Wrong root element, foreign namespace or a missing required block.
         UNSUPPORTED_VERSION (str): The report ``version`` is not ``1.0``.
         INVALID_FIELD (str): A count, a period or a ``pct`` that cannot be trusted.
+        MESSAGE_TOO_LARGE (str): A mail message over the size cap, on disk or inside a mailbox.
+        MESSAGE_TOO_COMPLEX (str): A mail message with too many lines, parts or levels of parts.
+        NO_REPORT_ATTACHMENT (str): A mail file the user named that holds no report attachment.
+        MALFORMED_MESSAGE (str): The mail parser failed on a message in a way no other reason names.
     """
 
     UNSUPPORTED_EXTENSION = "unsupported_extension"
@@ -43,6 +47,10 @@ class Reason(StrEnum):
     NOT_A_REPORT = "not_a_report"
     UNSUPPORTED_VERSION = "unsupported_version"
     INVALID_FIELD = "invalid_field"
+    MESSAGE_TOO_LARGE = "message_too_large"
+    MESSAGE_TOO_COMPLEX = "message_too_complex"
+    NO_REPORT_ATTACHMENT = "no_report_attachment"
+    MALFORMED_MESSAGE = "malformed_message"
 
 
 class ReportRefused(Exception):

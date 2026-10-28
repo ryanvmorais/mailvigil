@@ -164,11 +164,14 @@ class SkippedFile:
         path (Path): The file as the caller or the folder listing gave it.
         reason (Reason): The machine-readable cause.
         detail (str): A short English explanation, for logs.
+        part (str): For a mail file, the message and the attachment that were refused (``#3
+            report.zip``), cleaned like any text from a third party; empty for a loose file.
     """
 
     path: Path
     reason: Reason
     detail: str
+    part: str = ""
 
 
 @dataclass(frozen=True, slots=True)

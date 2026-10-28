@@ -164,18 +164,19 @@ def section(text: str, title: str) -> list[str]:
     raise AssertionError(f"no section starts with {title!r}")
 
 
-def skipped(name: str, reason: Reason = Reason.NOT_A_REPORT) -> SkippedFile:
+def skipped(name: str, reason: Reason = Reason.NOT_A_REPORT, part: str = "") -> SkippedFile:
     """
     Build a skipped file.
 
     Args:
         name (str): The file name.
         reason (Reason, optional): Why it was refused. Default: ``NOT_A_REPORT``.
+        part (str, optional): The message and attachment of a mail file. Default: none.
 
     Returns:
         SkippedFile: The skipped file.
     """
-    return SkippedFile(path=Path("reports") / name, reason=reason, detail="")
+    return SkippedFile(path=Path("reports") / name, reason=reason, detail="", part=part)
 
 
 # ---------------------------------------------------------------------------
@@ -607,6 +608,26 @@ def test_twelve_skipped_files_print_ten_and_a_remainder() -> None:
     assert sum(1 for line in lines if line.startswith("    f")) == 10
     assert "    ... and 2 more" in lines
     assert "    f10.xml" not in "\n".join(lines)
+
+
+def test_a_skipped_attachment_of_a_mail_file_shows_its_part_after_the_name() -> None:
+    summary = make_summary(
+        skipped=(skipped("box.mbox", Reason.NOT_AN_ARCHIVE, "#3 r.zip"), skipped("a.eml")),
+        skipped_by_reason=((Reason.NOT_A_REPORT, 1), (Reason.NOT_AN_ARCHIVE, 1)),
+    )
+    lines = section(render(summary), "Left out")
+    assert "    box.mbox #3 r.zip: not a valid archive" in lines
+    assert "    a.eml: not a DMARC report" in lines
+
+
+def test_a_long_part_cuts_the_name_and_keeps_the_phrase_within_80_columns() -> None:
+    summary = make_summary(
+        skipped=(skipped("m" * 90 + ".mbox", Reason.MESSAGE_TOO_LARGE, "#1234 " + "a" * 200),),
+        skipped_by_reason=((Reason.MESSAGE_TOO_LARGE, 1),),
+    )
+    lines = section(render(summary), "Left out")
+    assert all(len(line) <= 80 for line in lines)
+    assert lines[2].endswith(": message too large")
 
 
 def test_a_skipped_file_name_with_an_escape_sequence_is_shown_cleaned() -> None:

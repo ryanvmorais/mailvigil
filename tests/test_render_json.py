@@ -336,18 +336,20 @@ def test_a_skipped_file_carries_its_name_without_its_folder_and_no_detail() -> N
         SkippedFile(Path("private") / "folder" / "a.xml", Reason.MALFORMED_XML, "bad tag"),
         SkippedFile(Path("private") / "folder" / "b.zip", Reason.NOT_AN_ARCHIVE, "bad zip"),
         SkippedFile(Path("c.xml"), Reason.MALFORMED_XML, "bad tag"),
+        SkippedFile(Path("box.mbox"), Reason.NOT_AN_ARCHIVE, "bad zip", "#2 r.zip"),
     )
 
     document = summary_document(make_summary(skipped=skipped), None)
 
     assert document["skipped"] == [
-        {"name": "a.xml", "reason": "malformed_xml"},
-        {"name": "b.zip", "reason": "not_an_archive"},
-        {"name": "c.xml", "reason": "malformed_xml"},
+        {"name": "a.xml", "part": None, "reason": "malformed_xml"},
+        {"name": "b.zip", "part": None, "reason": "not_an_archive"},
+        {"name": "c.xml", "part": None, "reason": "malformed_xml"},
+        {"name": "box.mbox", "part": "#2 r.zip", "reason": "not_an_archive"},
     ]
     assert document["skipped_by_reason"] == [
         {"reason": "malformed_xml", "count": 2},
-        {"reason": "not_an_archive", "count": 1},
+        {"reason": "not_an_archive", "count": 2},
     ]
     assert "private" not in dumps(document)
     assert "bad tag" not in dumps(document)

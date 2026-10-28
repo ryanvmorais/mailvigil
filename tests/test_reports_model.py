@@ -69,6 +69,15 @@ def test_every_model_type_is_frozen() -> None:
             setattr(instance, field, "changed")
 
 
+def test_a_skipped_file_built_the_old_way_has_an_empty_part() -> None:
+    """``part`` names the message and attachment; a loose file has none (ADR-7 of spec 007)."""
+    loose = SkippedFile(Path("a.zip"), Reason.UNREADABLE, "")
+    from_message = SkippedFile(Path("box.mbox"), Reason.NOT_AN_ARCHIVE, "", "#3 report.zip")
+
+    assert loose.part == ""
+    assert from_message.part == "#3 report.zip"
+
+
 def test_every_model_type_uses_slots() -> None:
     """Slots keep a typo in a field name from silently creating an attribute."""
     record = Record()
