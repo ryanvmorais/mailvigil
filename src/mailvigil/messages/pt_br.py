@@ -270,6 +270,7 @@ _FETCH = FetchMessages(
         "{n} mensagem foi salva antes de parar.",
         "{n} mensagens foram salvas antes de parar.",
     ),
+    password_file_exposed="aviso: {path} pode ser lido por outros usuarios; rode chmod 600 nele",
     reasons=MappingProxyType(
         {
             FetchReason.HOST_UNREACHABLE: "nao foi possivel alcancar o servidor",

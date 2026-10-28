@@ -313,6 +313,8 @@ class FetchMessages:
         key_directory (str): The label of the folder the messages were saved in.
         saved_before_stop (Plural): The second line of a refusal after some work; ``{n}`` is the
             files saved, which are valid.
+        password_file_exposed (str): The warning for a password file other users can read;
+            ``{path}`` is the file as the user typed it.
         reasons (Mapping[FetchReason, str]): One phrase per refusal of a run.
     """
 
@@ -325,6 +327,7 @@ class FetchMessages:
     key_left: str
     key_directory: str
     saved_before_stop: Plural
+    password_file_exposed: str
     reasons: Mapping[FetchReason, str]
 
 
