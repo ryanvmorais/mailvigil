@@ -1,6 +1,6 @@
 ---
 feature: Config and senders — a TOML file with the domain and a DKIM selector to service name map
-status: in progress
+status: done
 date: 2026-10-27
 related:
   - 003-config-and-senders/requirements.md
@@ -100,15 +100,15 @@ first and alone), the loader, then identification, then the close.
 
 ## Stage 4 — Close the spec
 
-- [ ] Hostile-input audit (RF-08): list the cases of the requirement and point each to its test; add
+- [x] Hostile-input audit (RF-08): list the cases of the requirement and point each to its test; add
   whichever is missing. — RF-08
-- [ ] Zero-dependency guard: `uv build`, then check the wheel metadata has no `Requires-Dist` and
+- [x] Zero-dependency guard: `uv build`, then check the wheel metadata has no `Requires-Dist` and
   holds `text.py`, `config.py` and `senders.py`, importable from the built wheel. — RNF-01
-- [ ] Run `/atualizar-docs`: the README gains the file format (with the quoted-dotted-selector note
+- [x] Run `/atualizar-docs`: the README gains the file format (with the quoted-dotted-selector note
   and the advice to start with an empty `[senders]`), its "Configuration" row and `CLAUDE.md`'s
   architecture block gain the new modules, and `docs/stack.md` gains `tomllib`, `difflib` and
   `types.MappingProxyType`. The README status stays "library built, not wired to the CLI" until the
   command exists. — docs
-- [ ] Mark the three files `done` and move the roadmap row of `003` in `specs/README.md` to `done`.
+- [x] Mark the three files `done` and move the roadmap row of `003` in `specs/README.md` to `done`.
   — all
-- [ ] Quality gate and CI. — result recorded when run
+- [x] Quality gate and CI. — result recorded when run: local gate all green on 2026-10-27 (ruff, black, mypy, 329 passed, coverage 100%, Python 3.12); the wheel declares no `Requires-Dist` and holds `text.py`, `config.py` and `senders.py`; the CI result is read on the pull request.

@@ -29,13 +29,40 @@ out DMARC, and it runs entirely on your machine: your reports are never sent to 
 |---|---|---|---|
 | Input | Read a folder or files (`.zip`, `.gz`, `.xml`), filter by domain | v0.1 | Library built, not wired to the CLI yet |
 | Hostile input | Cap decompressed size (zip bombs) and refuse XML with `DOCTYPE` or `ENTITY` (entity expansion) | v0.1 | Library built, not wired to the CLI yet |
-| Configuration | A TOML file with your domain and a map from DKIM selector to service name | v0.1 | Planned |
+| Configuration | A TOML file with your domain and a map from DKIM selector to service name; a signature only counts under your own domain | v0.1 | Library built, not wired to the CLI yet |
 | Summary | Per sender and per situation (ok, fragile, failing), failures highlighted | v0.1 | Planned |
 | Verdict | "Ready for `reject`?" with a declared criterion (minimum window, minimum volume, no legitimate failures) | v0.1 | Planned |
 | Output | `--json` and stable exit codes for scripts and CI | v0.1 | Planned |
 
 Out of scope for now: a web dashboard, Elasticsearch, fetching reports over IMAP and sending
 e-mail.
+
+## Configuration
+
+MailVigil names a sender from the DKIM selector in its reports, using a map you write. The file is
+TOML, and the names below are invented:
+
+```toml
+domain = "example.com"
+
+[senders]
+newsletter = "Example Mailer (newsletters)"
+mailbox = "Example Mail (staff mailboxes)"
+"k1.v2" = "Example Campaigns"
+```
+
+- **Start with an empty `[senders]`** and fill it from what the first summary shows as unknown.
+- **A selector must identify one service.** Names such as `default` are shared by unrelated
+  services, so MailVigil ships no built-in table and shows an unlisted sender as unknown.
+- **A selector with a dot is written in quotes** (`"k1.v2"`). Without them TOML reads `k1.v2` as a
+  nested table and MailVigil refuses the file.
+- **A selector alone is not trusted.** It names a service only on a passing DKIM signature under
+  your domain or one of its subdomains; the same selector under another domain is reported as a
+  foreign domain.
+- **The file is strict.** An unknown key (`domian`), a duplicate selector or a control character in
+  a name is an error with a reason, never a silent guess, because a typo would change the answer.
+
+The loader exists in the library (`mailvigil.config`), but no command reads the file yet.
 
 ## MailVigil vs. other tools
 
