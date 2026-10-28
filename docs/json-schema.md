@@ -1,0 +1,481 @@
+# JSON output reference
+
+`mailvigil summary --json` and `mailvigil verdict --json` print one JSON document on standard
+output, a newline, and nothing on standard error. This page lists every field, the promise about
+how the fields may change, and one example per command. The examples are the real output for
+invented data, and a test compares them with the code, so this page cannot drift from it.
+
+## The promise
+
+- Every document starts with `schema_version` (an integer, `1` today), `command` and `domain`.
+- A field is only **added** inside a `schema_version`; a consumer must ignore keys it does not know.
+- A field is **renamed, removed or given another type** only with a new `schema_version`.
+- Keys come in a fixed order, and lists come in the order stated below; the same reports give the
+  same bytes, in any order of files, with no timestamp and no path of the machine.
+- The document is data: integers, booleans, identifiers and values copied from the reports (already
+  sanitized). It has no sentence, no language and no rounded percentage: a share is the two integers
+  it is made of, and the threshold.
+- A value the model may not have is `null`, never missing and never an empty string.
+- Non-ASCII characters are written as `\uXXXX` escapes, so the text is ASCII whatever the console.
+- `--json` does not change the exit code, and neither will `--lang`.
+
+## Exit codes
+
+| Code | Meaning | Commands |
+|---|---|---|
+| `0` | An answer was printed; for `verdict`, the answer is `ready` | both |
+| `1` | The run was refused: invalid configuration or domain, or no report kept | both |
+| `2` | Usage error | both |
+| `3` | `verdict` printed `too early` | `verdict` |
+| `4` | `verdict` printed `not ready` | `verdict` |
+
+A refused run (`1`) prints no document: standard output is empty and the one line goes to standard
+error. A `too early` or `not ready` verdict still prints the full document.
+
+## The `summary` document
+
+### `summary`
+
+The keys, in order.
+
+| Key | Type | Meaning |
+|---|---|---|
+| `schema_version` | integer | `1` |
+| `command` | string | `"summary"` |
+| `domain` | string | The domain the reports are about |
+| `config` | object | See `summary.config` |
+| `reports` | object | See `summary.reports` |
+| `period` | object or null | See `period`; null without reports |
+| `policy` | object or null | See `policy`; null without reports |
+| `earlier_p` | list of strings | Other `p` values seen in the period, oldest first |
+| `totals` | object | See `counts`: all the messages |
+| `recognized_messages` | integer | Messages of recognized senders |
+| `senders` | list of `sender` | Every row, the biggest first, with no display limit |
+| `failing` | list of `source` | Every failing source, the worst first, with no display limit |
+| `skipped` | list of `skipped` | The refused files, ordered by path |
+| `skipped_by_reason` | list of `skipped_by_reason` | The refusals per reason, the most frequent first |
+| `duplicates` | integer | Reports dropped as already seen |
+| `other_domain` | integer | Reports dropped for belonging to another domain |
+
+### `summary.config`
+
+| Key | Type | Meaning |
+|---|---|---|
+| `source` | string or null | The configuration file as typed on the command line; null when there was none |
+| `selectors` | integer | How many DKIM selectors the configuration maps |
+
+### `summary.reports`
+
+| Key | Type | Meaning |
+|---|---|---|
+| `count` | integer | The reports kept |
+| `reporters` | integer | The distinct reporting organizations |
+
+### `period`
+
+| Key | Type | Meaning |
+|---|---|---|
+| `first_day` | string | The first UTC day covered, `YYYY-MM-DD` |
+| `last_day` | string | The last UTC day any report touches, `YYYY-MM-DD` |
+| `days_spanned` | integer | `first_day` to `last_day`, inclusive |
+| `days_with_reports` | integer | The days in that span that at least one report touches |
+
+### `policy`
+
+The policy published in the latest report.
+
+| Key | Type | Meaning |
+|---|---|---|
+| `p` | string | The policy: `none`, `quarantine`, `reject` or `?` when the report does not say |
+| `sp` | string or null | The subdomain policy; null when absent |
+| `np` | string or null | The policy for non-existent subdomains; null when absent |
+| `pct` | integer | The sampling percentage, 0 to 100 |
+
+### `counts`
+
+Messages per situation.
+
+| Key | Type | Meaning |
+|---|---|---|
+| `ok` | integer | DKIM and SPF both passed |
+| `dkim_only` | integer | Only DKIM passed |
+| `spf_only` | integer | Only SPF passed |
+| `failing` | integer | Neither passed |
+| `total` | integer | The four together |
+
+### `sender`
+
+One row of the senders table.
+
+| Key | Type | Meaning |
+|---|---|---|
+| `outcome` | string | `known`, `foreign_domain`, `failing_signature` or `unknown` |
+| `service` | string or null | The service name when `known`, otherwise null |
+| `source_ip` | string or null | The address when not `known`, otherwise null |
+| `selectors` | list of strings | The configured selectors seen on a row that is not `known`, sorted |
+| `counts` | object | See `counts` |
+
+### `source`
+
+One address whose messages failed. It is the same object in both documents.
+
+| Key | Type | Meaning |
+|---|---|---|
+| `outcome` | string | What identification said, as in `sender` |
+| `service` | string or null | The service name when `known`, otherwise null |
+| `source_ip` | string | The address the failing messages came from |
+| `messages` | integer | The failing messages, at least 1 |
+| `selectors` | list of strings | The configured selectors seen on this source when it is not `known`, sorted |
+| `dkim` | list of strings | Why DKIM did not count, sorted: `fail`, `unaligned` or `none` |
+| `spf` | list of strings | The same vocabulary for SPF |
+| `override_reasons` | list of strings | The receiver's override types, sorted and unique |
+
+### `skipped`
+
+| Key | Type | Meaning |
+|---|---|---|
+| `name` | string | The file name, without its folder |
+| `reason` | string | Why it was refused, for example `malformed_xml` or `file_too_large` |
+
+### `skipped_by_reason`
+
+| Key | Type | Meaning |
+|---|---|---|
+| `reason` | string | A refusal reason |
+| `count` | integer | How many files were refused for it |
+
+## The `verdict` document
+
+### `verdict`
+
+The keys, in order.
+
+| Key | Type | Meaning |
+|---|---|---|
+| `schema_version` | integer | `1` |
+| `command` | string | `"verdict"` |
+| `domain` | string | The domain the verdict is about |
+| `answer` | string | `ready`, `too_early` or `not_ready`; the same whether or not the policy already enforces |
+| `enforcing` | string or null | The latest published `p`; null without reports |
+| `deciding` | string or null | The id of the rule that decided the answer; null exactly when `answer` is `ready` |
+| `rules` | list of `rule` | Always five, in the order of the table below |
+| `recognized_failing` | list of `source` | Every failing source of a recognized sender, the worst first |
+| `unrecognized_failing` | list of `source` | Every other failing source, the worst first |
+| `notes` | list of `note` | What is worth saying and does not change the answer |
+| `left_out` | object | See `left_out` |
+
+### `rule`
+
+| Key | Type | Meaning |
+|---|---|---|
+| `id` | string | The stable word of the rule |
+| `kind` | string | `data` (is there enough evidence) or `problem` (is something wrong already) |
+| `measured` | integer | The value found |
+| `whole` | integer | The denominator of a share; 0 when the rule is not a share |
+| `needed` | integer | The threshold |
+| `unit` | string | What `measured` and `needed` count |
+| `comparison` | string | `at_least` or `at_most` |
+| `passed` | boolean | Whether the rule passes |
+| `missing` | integer | How much a failed data rule lacks, in days or messages; 0 otherwise |
+
+The five rules, in order:
+
+| `id` | `kind` | `unit` | `comparison` | `measured`, `whole`, `needed` |
+|---|---|---|---|---|
+| `period_covered` | `data` | `days` | `at_least` | days spanned, 0, days required |
+| `days_with_report` | `data` | `percent_of_days` | `at_least` | days with a report, days spanned, percent required |
+| `messages_seen` | `data` | `messages` | `at_least` | messages seen, 0, messages required |
+| `recognized_failures` | `problem` | `messages` | `at_most` | failing messages of recognized senders, 0, 0 |
+| `unrecognized_failures` | `problem` | `per_mille_of_messages` | `at_most` | failing messages of other sources, all messages, tenths of a percent allowed |
+
+A share is `measured` over `whole`, compared with integers: rule 2 passes when
+`100 * measured >= needed * whole`, and rule 5 when `1000 * measured <= needed * whole`.
+
+### `note`
+
+| Key | Type | Meaning |
+|---|---|---|
+| `kind` | string | `fragile`, `partial_policy`, `policy_changed`, `subdomain_policy` or `currently_quarantine` |
+| `numbers` | list of integers | The figures of the note: `fragile` has fragile messages, those that pass by SPF only and all messages; `partial_policy` has `pct` |
+| `texts` | list of strings or nulls | The words of the note: `policy_changed` has the earlier `p` values, oldest first; `subdomain_policy` has `sp` and `np`, with null for the one that is absent |
+
+### `left_out`
+
+What the summary did not count. It never changes the answer.
+
+| Key | Type | Meaning |
+|---|---|---|
+| `skipped` | integer | Files that were refused |
+| `duplicates` | integer | Reports dropped as already seen |
+| `other_domain` | integer | Reports that belong to another domain |
+
+## Examples
+
+Both use invented data: `example.com`, a made-up service and the documentation address ranges.
+
+### A summary
+
+```json
+{
+  "schema_version": 1,
+  "command": "summary",
+  "domain": "example.com",
+  "config": {
+    "source": "mailvigil.toml",
+    "selectors": 1
+  },
+  "reports": {
+    "count": 29,
+    "reporters": 2
+  },
+  "period": {
+    "first_day": "2026-09-01",
+    "last_day": "2026-09-29",
+    "days_spanned": 29,
+    "days_with_reports": 29
+  },
+  "policy": {
+    "p": "none",
+    "sp": "reject",
+    "np": null,
+    "pct": 100
+  },
+  "earlier_p": [],
+  "totals": {
+    "ok": 6300,
+    "dkim_only": 975,
+    "spf_only": 0,
+    "failing": 48,
+    "total": 7323
+  },
+  "recognized_messages": 6300,
+  "senders": [
+    {
+      "outcome": "known",
+      "service": "Example Mailer",
+      "source_ip": null,
+      "selectors": [],
+      "counts": {
+        "ok": 6300,
+        "dkim_only": 0,
+        "spf_only": 0,
+        "failing": 0,
+        "total": 6300
+      }
+    },
+    {
+      "outcome": "known",
+      "service": "Example Mail",
+      "source_ip": null,
+      "selectors": [],
+      "counts": {
+        "ok": 0,
+        "dkim_only": 950,
+        "spf_only": 0,
+        "failing": 0,
+        "total": 950
+      }
+    },
+    {
+      "outcome": "unknown",
+      "service": null,
+      "source_ip": "203.0.113.5",
+      "selectors": [],
+      "counts": {
+        "ok": 0,
+        "dkim_only": 0,
+        "spf_only": 0,
+        "failing": 40,
+        "total": 40
+      }
+    },
+    {
+      "outcome": "failing_signature",
+      "service": null,
+      "source_ip": "198.51.100.99",
+      "selectors": [
+        "s1"
+      ],
+      "counts": {
+        "ok": 0,
+        "dkim_only": 25,
+        "spf_only": 0,
+        "failing": 0,
+        "total": 25
+      }
+    },
+    {
+      "outcome": "unknown",
+      "service": null,
+      "source_ip": "2001:db8::7",
+      "selectors": [],
+      "counts": {
+        "ok": 0,
+        "dkim_only": 0,
+        "spf_only": 0,
+        "failing": 8,
+        "total": 8
+      }
+    }
+  ],
+  "failing": [
+    {
+      "outcome": "unknown",
+      "service": null,
+      "source_ip": "203.0.113.5",
+      "messages": 40,
+      "selectors": [],
+      "dkim": [
+        "fail"
+      ],
+      "spf": [
+        "fail"
+      ],
+      "override_reasons": [
+        "forwarded"
+      ]
+    },
+    {
+      "outcome": "unknown",
+      "service": null,
+      "source_ip": "2001:db8::7",
+      "messages": 8,
+      "selectors": [],
+      "dkim": [
+        "none"
+      ],
+      "spf": [
+        "none"
+      ],
+      "override_reasons": []
+    }
+  ],
+  "skipped": [
+    {
+      "name": "broken.xml",
+      "reason": "malformed_xml"
+    }
+  ],
+  "skipped_by_reason": [
+    {
+      "reason": "malformed_xml",
+      "count": 1
+    }
+  ],
+  "duplicates": 1,
+  "other_domain": 0
+}
+```
+
+### A verdict
+
+```json
+{
+  "schema_version": 1,
+  "command": "verdict",
+  "domain": "example.com",
+  "answer": "not_ready",
+  "enforcing": "none",
+  "deciding": "unrecognized_failures",
+  "rules": [
+    {
+      "id": "period_covered",
+      "kind": "data",
+      "measured": 29,
+      "whole": 0,
+      "needed": 28,
+      "unit": "days",
+      "comparison": "at_least",
+      "passed": true,
+      "missing": 0
+    },
+    {
+      "id": "days_with_report",
+      "kind": "data",
+      "measured": 29,
+      "whole": 29,
+      "needed": 80,
+      "unit": "percent_of_days",
+      "comparison": "at_least",
+      "passed": true,
+      "missing": 0
+    },
+    {
+      "id": "messages_seen",
+      "kind": "data",
+      "measured": 7006,
+      "whole": 0,
+      "needed": 1000,
+      "unit": "messages",
+      "comparison": "at_least",
+      "passed": true,
+      "missing": 0
+    },
+    {
+      "id": "recognized_failures",
+      "kind": "problem",
+      "measured": 0,
+      "whole": 0,
+      "needed": 0,
+      "unit": "messages",
+      "comparison": "at_most",
+      "passed": true,
+      "missing": 0
+    },
+    {
+      "id": "unrecognized_failures",
+      "kind": "problem",
+      "measured": 56,
+      "whole": 7006,
+      "needed": 5,
+      "unit": "per_mille_of_messages",
+      "comparison": "at_most",
+      "passed": false,
+      "missing": 0
+    }
+  ],
+  "recognized_failing": [],
+  "unrecognized_failing": [
+    {
+      "outcome": "unknown",
+      "service": null,
+      "source_ip": "203.0.113.5",
+      "messages": 56,
+      "selectors": [],
+      "dkim": [
+        "fail"
+      ],
+      "spf": [
+        "fail"
+      ],
+      "override_reasons": [
+        "forwarded"
+      ]
+    }
+  ],
+  "notes": [
+    {
+      "kind": "fragile",
+      "numbers": [
+        950,
+        0,
+        7006
+      ],
+      "texts": []
+    },
+    {
+      "kind": "subdomain_policy",
+      "numbers": [],
+      "texts": [
+        "reject",
+        null
+      ]
+    }
+  ],
+  "left_out": {
+    "skipped": 0,
+    "duplicates": 0,
+    "other_domain": 2
+  }
+}
+```

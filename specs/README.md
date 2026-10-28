@@ -60,7 +60,7 @@ merged or split, when its spec is opened.
 | [`003-config-and-senders`](003-config-and-senders/) | TOML config with the domain and the DKIM selector → service name map, and sender identification | `v0.1` | **done** |
 | [`004-summary`](004-summary/) | per-sender and per-situation summary (ok, fragile, failing), failures highlighted, and the first command (`mailvigil summary`) | `v0.1` | **done** |
 | [`005-reject-verdict`](005-reject-verdict/) | "ready for `reject`?" with a declared criterion (minimum window, minimum volume, no legitimate failures); the thresholds are decided there | `v0.1` | **done** |
-| `006-output-and-exit-codes` | `--json`, stable exit codes, English and Portuguese text (locale or `--lang`) | `v0.1` | planned |
+| [`006-output-and-exit-codes`](006-output-and-exit-codes/) | `--json`, stable exit codes, English and Portuguese text (locale or `--lang`) | `v0.1` | **in progress** |
 
 Out of scope for now: a web dashboard, Elasticsearch, fetching reports over IMAP and sending
 e-mail.
@@ -76,5 +76,7 @@ e-mail.
 
 > ⚠️ **Exit codes and `--json` are public contract** once released. Changing them is a breaking
 > change (spec 006).
+> Since stage 1 of 006 the codes are no longer provisional and `--json` exists on `summary` and
+> `verdict`; the table lives in `cli.py` and the schema in `docs/json-schema.md`.
 
 There is no gold-standard spec yet; once `001-foundation` is `done`, use it as the format reference.

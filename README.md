@@ -33,7 +33,7 @@ out DMARC, and it runs entirely on your machine: your reports are never sent to 
 | Configuration | A TOML file with your domain and a map from DKIM selector to service name; a signature only counts under your own domain | v0.1 | Built (`mailvigil summary`) |
 | Summary | Per sender and per situation (ok, fragile, failing), failures highlighted | v0.1 | Built (`mailvigil summary`) |
 | Verdict | "Ready for `reject`?" with a declared criterion: 28 days covered, reports on 80% of the days, 1000 messages, no failure from a recognized sender, at most 0.5% of the messages failing from unrecognized sources | v0.1 | Built (`mailvigil verdict`) |
-| Output | `--json` and stable exit codes for scripts and CI | v0.1 | Planned |
+| Output | `--json` and stable exit codes for scripts and CI | v0.1 | Built (`--json` on `summary` and `verdict`) |
 
 Out of scope for now: a web dashboard, Elasticsearch, fetching reports over IMAP and sending
 e-mail.
@@ -98,6 +98,9 @@ uv run mailvigil summary --domain example.com report.xml.gz
 
 # Ask if the domain is ready for p=reject (same arguments as summary)
 uv run mailvigil verdict --config mailvigil.toml reports/
+
+# The same answers as one JSON document, for a script or a CI job
+uv run mailvigil verdict --config mailvigil.toml reports/ --json
 ```
 
 The commands print their text and nothing else; they only read your files and touch no network.
@@ -179,10 +182,43 @@ command names it.
 When files were refused, duplicated or from another domain, the verdict adds one line saying so;
 `mailvigil summary` shows why. They never change the answer.
 
-Exit codes: `summary` returns 0 when it printed the summary. `verdict` returns 0 for ready, 3 for
-too early and 4 for not ready; 1 means the reports or the configuration were refused and 2 is a
-usage error. They are provisional: they become a stable contract with the output spec, at the
-first release.
+### Exit codes
+
+The exit code is a contract: a script can tell "yes", "wait" and "no" from "I could not run"
+without reading the text. `--json` does not change it.
+
+| Code | Meaning | Commands |
+|---|---|---|
+| `0` | An answer was printed; for `verdict`, the answer is `ready` | both |
+| `1` | The run was refused: invalid configuration or domain, or no report kept | both |
+| `2` | Usage error (an unknown option, a missing argument) | both |
+| `3` | `verdict` printed `too early`: wait for more reports | `verdict` |
+| `4` | `verdict` printed `not ready`: a source fails | `verdict` |
+
+Note that `1` is a refusal and `4` is "not ready"; a script that treats every non-zero code alike
+mixes them up:
+
+```bash
+mailvigil verdict reports/ --domain example.com --json > verdict.json
+case $? in
+  0) echo "ready for p=reject" ;;
+  3) echo "too early: keep collecting reports" ;;
+  4) echo "not ready: see verdict.json" ;;
+  *) echo "mailvigil could not run" >&2 ;;
+esac
+```
+
+A change to this table is a breaking change.
+
+### JSON
+
+`--json` on `summary` or `verdict` prints one JSON document and a newline on standard output,
+and nothing on standard error. The document is data, not text: integers, booleans, identifiers and
+the report values, with no sentence and no rounded percentage. It carries every sender and every
+failing source, without the limits the text keeps, and a value that may not exist (no period yet,
+no `sp`) is `null`. A refused run prints no document: the one line goes to standard error, as
+without `--json`, and the exit code is `1`. `docs/json-schema.md` lists every field and the
+compatibility promise.
 
 Installing with `pipx install mailvigil` or `uv tool install mailvigil` will be possible once the
 first version is on PyPI.
