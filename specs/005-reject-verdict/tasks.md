@@ -106,21 +106,25 @@ module (RNF-03).
 
 ## Stage 4 — The command (RF-06)
 
-- [ ] `tests/test_cli_verdict.py`, written first, through `main(argv)` and `capsys`, with synthetic
+- [x] `tests/test_cli_verdict.py`, written first, through `main(argv)` and `capsys`, with synthetic
   reports in `tmp_path`: a long, clean, busy set gives `READY`, code 0; a clean set that is short
   gives `TOO_EARLY`, code 3; a set with a recognized failure gives `NOT_READY`, code 4, and the
   output names the source. — RF-06, ADR-6
-- [ ] Same file, the shared refusals: a refused configuration, a conflicting `--domain`, no domain
+- [x] Same file, the shared refusals: a refused configuration, a conflicting `--domain`, no domain
   at all and no kept report each print the same line as `summary` on standard error, nothing on
   standard output, and code 1; no path is a usage error, code 2, before any file is read; the
   codes are not documented as stable. — RF-06
-- [ ] Same file and `tests/test_cli_summary.py`: `mailvigil summary` prints the same output and
+- [x] Same file and `tests/test_cli_summary.py`: `mailvigil summary` prints the same output and
   returns the same codes as before (the existing tests pass untouched); `--help` lists both
   commands; `--version` still works. — RF-06
-- [ ] `src/mailvigil/cli.py`: a parent parser with `paths`, `--config` and `--domain`, passed to both
+- [x] `src/mailvigil/cli.py`: a parent parser with `paths`, `--config` and `--domain`, passed to both
   subcommands; `_load(args)` extracted from `_run_summary`; `_run_verdict`; `EXIT_TOO_EARLY = 3` and
   `EXIT_NOT_READY = 4` with the comment that they are provisional until spec 006. — RF-06, ADR-6
-- [ ] Quality gate. — result recorded when run: ___
+- [x] Quality gate. — result recorded when run: all green on 2026-10-28; 13 new tests in
+  `tests/test_cli_verdict.py`, coverage 100% (Python 3.12). `tests/test_cli_summary.py` passes
+  untouched. A recognized failing source needs a passing `s1` signature with a failing DMARC
+  evaluation (a failing signature is `FAILING_SIGNATURE`, not recognized), so the test builder
+  signs correctly and fails SPF and the evaluation
 
 ## Stage 5 — Close the spec
 
