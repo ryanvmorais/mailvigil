@@ -1,5 +1,6 @@
 """
-Tests of the attachment reader (RF-01, RF-02, RF-10): ``read_xml`` and its size cap.
+Tests of the attachment reader (RF-01, RF-02, RF-10): ``read_xml`` and its size cap, and
+``read_xml_bytes``, the same reading over bytes already in memory (spec 007).
 
 Isolation: every attachment is built in memory by the ``conftest.py`` factories and written under
 ``tmp_path``; nothing touches the network, an environment variable or a path outside it. The
@@ -17,7 +18,7 @@ from pathlib import Path
 import pytest
 
 from mailvigil.reports.errors import Reason, ReportRefused
-from mailvigil.reports.reader import MAX_BYTES, _read_capped, read_xml
+from mailvigil.reports.reader import MAX_BYTES, Kind, _read_capped, read_xml, read_xml_bytes
 
 type _MakeZip = Callable[[Mapping[str, bytes]], bytes]
 type _MakeGzip = Callable[[bytes], bytes]
@@ -403,3 +404,121 @@ def test_refusal_detail_does_not_echo_the_content(tmp_path: Path, make_gzip: _Ma
         read_xml(_write(tmp_path, "r.gz", make_gzip(b"secret-token " * (MAX_BYTES // 10))))
 
     assert "secret-token" not in caught.value.detail
+
+
+# ---------------------------------------------------------------------------
+# Bytes in memory (RF-04 of spec 007)
+# ---------------------------------------------------------------------------
+
+
+def _stored(kind: Kind, content: bytes, make_gzip: _MakeGzip, make_zip: _MakeZip) -> bytes:
+    """
+    Wrap a document the way an attachment of that kind stores it.
+
+    Args:
+        kind (Kind): ``xml``, ``gz`` or ``zip``.
+        content (bytes): The document.
+        make_gzip (_MakeGzip): The ``conftest.py`` gzip factory.
+        make_zip (_MakeZip): The ``conftest.py`` zip factory.
+
+    Returns:
+        bytes: The attachment as it would arrive.
+    """
+    if kind == "gz":
+        return make_gzip(content)
+    if kind == "zip":
+        return make_zip({"report.xml": content})
+    return content
+
+
+@pytest.mark.parametrize("kind", ["xml", "gz", "zip"])
+def test_bytes_give_the_same_document_as_the_file(
+    tmp_path: Path, make_gzip: _MakeGzip, make_zip: _MakeZip, kind: Kind
+) -> None:
+    """A message attachment and a loose file of the same content read the same."""
+    data = _stored(kind, _XML, make_gzip, make_zip)
+
+    assert read_xml_bytes(data, kind) == _XML
+    assert read_xml_bytes(data, kind) == read_xml(_write(tmp_path, f"report.{kind}", data))
+
+
+@pytest.mark.parametrize("kind", ["xml", "gz", "zip"])
+def test_bytes_over_the_cap_are_refused_before_an_archive_is_opened(kind: Kind) -> None:
+    """The size of what arrived is checked first, as ``stat`` is for a file on disk."""
+    with pytest.raises(ReportRefused) as caught:
+        read_xml_bytes(b"\0" * (MAX_BYTES + 1), kind)
+
+    assert caught.value.reason is Reason.FILE_TOO_LARGE
+
+
+def test_a_gzip_bomb_in_memory_is_refused(make_gzip: _MakeGzip) -> None:
+    """A few KB that inflate past the cap are refused on the bytes produced."""
+    bomb = make_gzip(b"\0" * (MAX_BYTES + 1))
+    assert len(bomb) < MAX_BYTES // 100
+
+    with pytest.raises(ReportRefused) as caught:
+        read_xml_bytes(bomb, "gz")
+
+    assert caught.value.reason is Reason.DECOMPRESSED_TOO_LARGE
+
+
+def test_a_zip_bomb_in_memory_is_refused_whatever_its_header_declares(make_zip: _MakeZip) -> None:
+    """The cap rests on the bytes produced, so a header that lies cannot slip a bomb in."""
+    plain = make_zip({"bomb.xml": b"\0" * (MAX_BYTES + 1)})
+    lying = _patch_central_entry(plain, _SIZE_OFFSET, "<I", 10)
+
+    for archive in (plain, lying):
+        with pytest.raises(ReportRefused) as caught:
+            read_xml_bytes(archive, "zip")
+
+        assert caught.value.reason in {Reason.DECOMPRESSED_TOO_LARGE, Reason.NOT_AN_ARCHIVE}
+    with pytest.raises(ReportRefused) as exact:
+        read_xml_bytes(plain, "zip")
+    assert exact.value.reason is Reason.DECOMPRESSED_TOO_LARGE
+
+
+@pytest.mark.parametrize(
+    ("kind", "data"),
+    [
+        ("zip", b"this is not a zip"),
+        ("zip", b""),
+        ("gz", b"this is not gzip"),
+        ("gz", b"\x1f\x8b\x08\0garbage that is not a deflate stream"),
+    ],
+    ids=["zip-text", "zip-empty", "gzip-text", "gzip-bad-stream"],
+)
+def test_corrupt_archive_bytes_are_refused(kind: Kind, data: bytes) -> None:
+    """Bytes that are not the archive their kind claims are ``NOT_AN_ARCHIVE``."""
+    with pytest.raises(ReportRefused) as caught:
+        read_xml_bytes(data, kind)
+
+    assert caught.value.reason is Reason.NOT_AN_ARCHIVE
+
+
+def test_a_truncated_gzip_in_memory_is_refused(make_gzip: _MakeGzip) -> None:
+    """A gzip cut short ends before its trailer."""
+    with pytest.raises(ReportRefused) as caught:
+        read_xml_bytes(make_gzip(_XML * 100)[:-12], "gz")
+
+    assert caught.value.reason is Reason.NOT_AN_ARCHIVE
+
+
+def test_zip_bytes_without_or_with_several_xml_members_are_refused(make_zip: _MakeZip) -> None:
+    """The same two refusals a loose zip gets, with the same reasons."""
+    with pytest.raises(ReportRefused) as none:
+        read_xml_bytes(make_zip({"notes.txt": b"hello"}), "zip")
+    with pytest.raises(ReportRefused) as two:
+        read_xml_bytes(make_zip({"a.xml": _XML, "b.xml": _XML}), "zip")
+
+    assert none.value.reason is Reason.NO_XML_MEMBER
+    assert two.value.reason is Reason.MULTIPLE_XML_MEMBERS
+
+
+def test_reading_bytes_writes_nothing_to_disk(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, make_zip: _MakeZip
+) -> None:
+    """A member named ``../escape.xml`` is read in memory and never extracted (RNF-02)."""
+    monkeypatch.chdir(tmp_path)
+
+    assert read_xml_bytes(make_zip({"../escape.xml": _XML}), "zip") == _XML
+    assert list(tmp_path.rglob("*")) == []

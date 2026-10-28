@@ -111,6 +111,10 @@ _SUMMARY = SummaryMessages(
             Reason.NOT_A_REPORT: "not a DMARC report",
             Reason.UNSUPPORTED_VERSION: "unsupported report version",
             Reason.INVALID_FIELD: "invalid value in the report",
+            Reason.MESSAGE_TOO_LARGE: "message too large",
+            Reason.MESSAGE_TOO_COMPLEX: "message too complex",
+            Reason.NO_REPORT_ATTACHMENT: "no report attached",
+            Reason.MALFORMED_MESSAGE: "malformed message",
         }
     ),
     skipped_more="... and {n} more",

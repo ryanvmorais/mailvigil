@@ -35,8 +35,10 @@ out DMARC, and it runs entirely on your machine: your reports are never sent to 
 | Verdict | "Ready for `reject`?" with a declared criterion: 28 days covered, reports on 80% of the days, 1000 messages, no failure from a recognized sender, at most 0.5% of the messages failing from unrecognized sources | v0.1 | Built (`mailvigil verdict`) |
 | Output and language | `--json` and stable exit codes for scripts and CI; the text in English or Brazilian Portuguese (`--lang pt-BR`) | v0.1 | Built (`--json` and `--lang` on `summary` and `verdict`) |
 
-Out of scope for now: a web dashboard, Elasticsearch, fetching reports over IMAP and sending
-e-mail.
+Planned: reading `.eml` and `.mbox` files, a static HTML report and an opt-in `fetch` over IMAP (see
+[specs/](specs/README.md#roadmap)). Not planned, on purpose: indexing in Elasticsearch, a web
+dashboard served by the tool and sending e-mail, each with its reason in
+[Permanent non-goals](specs/README.md#permanent-non-goals).
 
 ## Configuration
 

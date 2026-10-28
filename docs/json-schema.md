@@ -135,7 +135,8 @@ One address whose messages failed. It is the same object in both documents.
 | Key | Type | Meaning |
 |---|---|---|
 | `name` | string | The file name, without its folder |
-| `reason` | string | Why it was refused, for example `malformed_xml` or `file_too_large` |
+| `part` | string or null | For a mail file (`.eml`, `.mbox`), the message and the attachment that were refused, such as `#3 report.zip` (the number counts the messages of a mailbox from 1); null for a loose file |
+| `reason` | string | Why it was refused, for example `malformed_xml`, `file_too_large` or `message_too_large` |
 
 ### `skipped_by_reason`
 
@@ -353,6 +354,7 @@ Both use invented data: `example.com`, a made-up service and the documentation a
   "skipped": [
     {
       "name": "broken.xml",
+      "part": null,
       "reason": "malformed_xml"
     }
   ],

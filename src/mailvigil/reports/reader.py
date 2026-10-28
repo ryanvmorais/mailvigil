@@ -1,5 +1,6 @@
 """
-Reading one attachment: from a ``.xml``, ``.gz`` or ``.zip`` file to the bytes of its XML.
+Reading one attachment: from a ``.xml``, ``.gz`` or ``.zip`` file, or from the same bytes taken
+out of a mail message, to the bytes of its XML.
 
 A report arrives from outside, so the file is hostile input: a few KB of zip or gzip can inflate to
 gigabytes. The one size defense on the decompressed side counts the bytes actually produced and
@@ -10,11 +11,12 @@ stops at ``MAX_BYTES``; it never consults a size an archive declares, because a 
 from __future__ import annotations
 
 import gzip
+import io
 import stat
 import zipfile
 import zlib
 from pathlib import Path
-from typing import Protocol
+from typing import BinaryIO, Literal, Protocol
 
 from mailvigil.reports.errors import Reason, ReportRefused
 
@@ -27,8 +29,12 @@ from mailvigil.reports.errors import Reason, ReportRefused
 # edit.
 MAX_BYTES = 5 * 1024 * 1024
 
-# The three forms a provider sends a report in; any other suffix is refused before the file opens.
-_SUFFIXES = (".xml", ".gz", ".zip")
+# Only the three forms a provider sends a report in, so a mail attachment of any other kind is
+# never opened as an archive.
+type Kind = Literal["xml", "gz", "zip"]
+
+# The suffix of each form; any other suffix is refused before the file opens.
+_KINDS: dict[str, Kind] = {".xml": "xml", ".gz": "gz", ".zip": "zip"}
 
 # What the standard library raises for an archive it cannot read. ``BadGzipFile`` is an ``OSError``,
 # so this tuple must be caught before ``OSError``. ``NotImplementedError`` is a compression method
@@ -91,12 +97,12 @@ def _read_capped(stream: _Readable) -> bytes:
     return b"".join(chunks)
 
 
-def _read_zip(path: Path) -> bytes:
+def _read_zip(source: Path | BinaryIO) -> bytes:
     """
     Read the one ``.xml`` member of a zip, in memory.
 
     Args:
-        path (Path): The zip file.
+        source (Path | BinaryIO): The zip file, or its bytes in a stream.
 
     Returns:
         bytes: The content of the member.
@@ -105,7 +111,7 @@ def _read_zip(path: Path) -> bytes:
         ReportRefused: ``NO_XML_MEMBER`` or ``MULTIPLE_XML_MEMBERS`` when the zip does not hold
             exactly one ``.xml`` file, and ``DECOMPRESSED_TOO_LARGE`` for a member over the cap.
     """
-    with zipfile.ZipFile(path) as archive:
+    with zipfile.ZipFile(source) as archive:
         members = [
             member
             for member in archive.infolist()
@@ -117,6 +123,60 @@ def _read_zip(path: Path) -> bytes:
             raise ReportRefused(Reason.MULTIPLE_XML_MEMBERS, f"the zip holds {len(members)} files")
         with archive.open(members[0]) as stream:
             return _read_capped(stream)
+
+
+def _read_kind(kind: Kind, source: Path | BinaryIO) -> bytes:
+    """
+    Read the XML out of an attachment of a known form, whether it is on disk or in memory.
+
+    Args:
+        kind (Kind): How the attachment is stored.
+        source (Path | BinaryIO): The file, or its bytes in a stream.
+
+    Returns:
+        bytes: The document, at most ``MAX_BYTES`` long.
+
+    Raises:
+        ReportRefused: ``NOT_AN_ARCHIVE`` for a corrupt or unsupported zip or gzip,
+            ``DECOMPRESSED_TOO_LARGE`` over the cap, and ``NO_XML_MEMBER`` or
+            ``MULTIPLE_XML_MEMBERS`` for a zip without exactly one ``.xml``.
+        OSError: When a file on disk cannot be read; the caller names the reason.
+    """
+    try:
+        if kind == "zip":
+            return _read_zip(source)
+        if kind == "gz":
+            with gzip.open(source, "rb") as gz_stream:
+                return _read_capped(gz_stream)
+        if isinstance(source, Path):
+            with source.open("rb") as stream:
+                return _read_capped(stream)
+        return _read_capped(source)
+    except _ARCHIVE_ERRORS as error:
+        raise ReportRefused(Reason.NOT_AN_ARCHIVE, type(error).__name__) from None
+
+
+def read_xml_bytes(data: bytes, kind: Kind) -> bytes:
+    """
+    Read the XML document of an attachment that is already in memory.
+
+    This is what a mail message gives: the same three forms as a file, with no file name to trust.
+    The same cap applies, to the size as it arrived and to the bytes actually produced.
+
+    Args:
+        data (bytes): The attachment as stored.
+        kind (Kind): How it is stored.
+
+    Returns:
+        bytes: The document, at most ``MAX_BYTES`` long.
+
+    Raises:
+        ReportRefused: ``FILE_TOO_LARGE`` when ``data`` is over the cap before anything is opened,
+            then the same refusals as ``read_xml`` for the content.
+    """
+    if len(data) > MAX_BYTES:
+        raise ReportRefused(Reason.FILE_TOO_LARGE, f"{len(data)} bytes")
+    return _read_kind(kind, io.BytesIO(data))
 
 
 def read_xml(path: Path) -> bytes:
@@ -138,7 +198,8 @@ def read_xml(path: Path) -> bytes:
             ``MULTIPLE_XML_MEMBERS`` for a zip without exactly one ``.xml``.
     """
     suffix = path.suffix.lower()
-    if suffix not in _SUFFIXES:
+    kind = _KINDS.get(suffix)
+    if kind is None:
         raise ReportRefused(Reason.UNSUPPORTED_EXTENSION, f"suffix {suffix or '(none)'}")
 
     try:
@@ -147,15 +208,6 @@ def read_xml(path: Path) -> bytes:
             raise ReportRefused(Reason.UNREADABLE, "not a regular file")
         if info.st_size > MAX_BYTES:
             raise ReportRefused(Reason.FILE_TOO_LARGE, f"{info.st_size} bytes on disk")
-
-        if suffix == ".zip":
-            return _read_zip(path)
-        if suffix == ".gz":
-            with gzip.open(path, "rb") as gz_stream:
-                return _read_capped(gz_stream)
-        with path.open("rb") as stream:
-            return _read_capped(stream)
-    except _ARCHIVE_ERRORS as error:
-        raise ReportRefused(Reason.NOT_AN_ARCHIVE, type(error).__name__) from None
+        return _read_kind(kind, path)
     except OSError as error:
         raise ReportRefused(Reason.UNREADABLE, type(error).__name__) from None

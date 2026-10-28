@@ -127,15 +127,16 @@ def _source(source: FailingSource) -> dict[str, object]:
 
 def _skipped(file: SkippedFile) -> dict[str, object]:
     """
-    Write one refused file: its name without the folder and the reason, never the English detail.
+    Write one refused file: its name without the folder, the part of a mail file and the reason,
+    never the English detail.
 
     Args:
         file (SkippedFile): The refused file.
 
     Returns:
-        dict[str, object]: ``name`` and ``reason``.
+        dict[str, object]: ``name``, ``part`` (``None`` for a loose file) and ``reason``.
     """
-    return {"name": file.path.name, "reason": file.reason.value}
+    return {"name": file.path.name, "part": file.part or None, "reason": file.reason.value}
 
 
 def _period(period: Period | None) -> dict[str, object] | None:

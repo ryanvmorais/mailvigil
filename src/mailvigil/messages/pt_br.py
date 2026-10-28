@@ -112,6 +112,10 @@ _SUMMARY = SummaryMessages(
             Reason.NOT_A_REPORT: "nao e um relatorio DMARC",
             Reason.UNSUPPORTED_VERSION: "versao de relatorio nao suportada",
             Reason.INVALID_FIELD: "valor invalido no relatorio",
+            Reason.MESSAGE_TOO_LARGE: "mensagem grande demais",
+            Reason.MESSAGE_TOO_COMPLEX: "mensagem complexa demais",
+            Reason.NO_REPORT_ATTACHMENT: "nenhum relatorio anexado",
+            Reason.MALFORMED_MESSAGE: "mensagem malformada",
         }
     ),
     skipped_more="... e mais {n}",

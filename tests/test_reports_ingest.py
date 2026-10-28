@@ -121,8 +121,15 @@ def test_a_good_report_is_returned_and_every_refusal_is_listed_with_its_reason(
     expected = {label: reason for label, (_, _, reason) in refused.items()}
     expected |= {"notes.txt": Reason.UNSUPPORTED_EXTENSION, "gone.zip": Reason.UNREADABLE}
     assert by_provider == expected
-    # Every way to be refused is exercised, so a new ``Reason`` has to come with a test.
-    assert set(by_provider.values()) == set(Reason)
+    # Every way to be refused is exercised, so a new ``Reason`` has to come with a test. The four
+    # about mail messages are exercised by the ingestion tests of spec 007, not by loose files.
+    message_reasons = {
+        Reason.MESSAGE_TOO_LARGE,
+        Reason.MESSAGE_TOO_COMPLEX,
+        Reason.NO_REPORT_ATTACHMENT,
+        Reason.MALFORMED_MESSAGE,
+    }
+    assert set(by_provider.values()) == set(Reason) - message_reasons
     assert (result.duplicates, result.other_domain) == (0, 0)
 
 

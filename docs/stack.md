@@ -338,7 +338,8 @@ hands anything back.
 - **click, typer, rich** — nice CLIs, but each is a dependency; `argparse` and a few ANSI codes do the job.
 - **defusedxml, lxml** — hardened or faster XML parsers; refusing `DOCTYPE`/`ENTITY` inside `expat` makes the standard parser safe enough for this input.
 - **gettext / Babel** — the CLI text exists in two languages (English and Portuguese), a small dictionary is simpler than a translation toolchain.
-- **Elasticsearch, Splunk, Kibana, a web dashboard** — that is parsedmarc's territory; MailVigil answers one question offline.
-- **IMAP fetching, sending e-mail** — out of scope: you point MailVigil at files you already have.
+- **Elasticsearch, Splunk, Kibana, a web dashboard served by the tool** — permanent non-goals: that is parsedmarc's territory, and a server breaks "offline, nothing to run" (reasons in `specs/README.md`). `--json` feeds them from outside.
+- **Sending e-mail** — a permanent non-goal: SMTP credentials and deliverability for no unmet need, since exit codes and `--json` compose with `cron`.
+- **IMAP fetching** — planned as an opt-in `fetch` command (spec 009, standard-library `imaplib`); `summary` and `verdict` stay offline and read files you already have.
 - **Docker / GHCR** — a pure-Python wheel installs with `pipx` or `uv tool`; an image adds a release surface for no gain.
 - **Pydantic** — would validate the report records, but it is a dependency and the shape is small enough to check by hand.
