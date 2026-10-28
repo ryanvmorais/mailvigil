@@ -143,10 +143,12 @@ records what the report said, not what it means.
    - `.zip`: `zipfile.ZipFile(path)`, members that are not directories and end in `.xml`
      (case-insensitive). Zero → `NO_XML_MEMBER`; more than one → `MULTIPLE_XML_MEMBERS`; one →
      `zip.open(member)`. Nothing is extracted; the name of the member is never used as a path.
-4. `_read_capped(stream)` does `stream.read(MAX_BYTES + 1)` and raises `DECOMPRESSED_TOO_LARGE` when
-   it gets more than `MAX_BYTES`. This is the only size defense on the decompressed side: it acts
-   on the bytes actually produced, so it holds for gzip (whose trailer size is only 32 bits and
-   untrusted) and for zip (whose header can lie), and at most `MAX_BYTES + 1` bytes are held.
+4. `_read_capped(stream)` reads until the end or until it holds `MAX_BYTES + 1` bytes (asking for
+   only what is still missing, and looping because a raw stream may return less than asked without
+   having ended) and raises `DECOMPRESSED_TOO_LARGE` when it got more than `MAX_BYTES`. This is the
+   only size defense on the decompressed side: it acts on the bytes actually produced, so it holds
+   for gzip (whose trailer size is only 32 bits and untrusted) and for zip (whose header can lie),
+   and at most `MAX_BYTES + 1` bytes are held.
 5. `zipfile.BadZipFile`, `gzip.BadGzipFile`, `zlib.error`, `EOFError`, `NotImplementedError`
    (unsupported compression) and `RuntimeError` (encrypted member) → `NOT_AN_ARCHIVE`. Any other
    `OSError` → `UNREADABLE`. `BadGzipFile` is an `OSError`, so it is caught first.
