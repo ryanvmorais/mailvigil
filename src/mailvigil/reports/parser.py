@@ -30,14 +30,11 @@ from mailvigil.reports.model import (
     SpfResult,
 )
 from mailvigil.reports.xmlsafe import parse_xml
-from mailvigil.text import clean_text
+from mailvigil.text import MAX_TEXT, clean_text
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-
-# The longest text a field may hold once cleaned (RF-05). One constant, so raising it is one edit.
-MAX_TEXT = 255
 
 # A whole number written with ASCII digits only. ``int`` alone also takes ``1_000``, ``-5``, ``+5``
 # and digits of other scripts, none of which a report has any reason to hold.
