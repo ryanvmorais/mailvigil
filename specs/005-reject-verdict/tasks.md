@@ -1,6 +1,6 @@
 ---
 feature: Reject verdict — "is this domain ready for p=reject?", with the criterion stated
-status: in progress
+status: done
 date: 2026-10-28
 related:
   - 005-reject-verdict/requirements.md
@@ -167,10 +167,16 @@ other stages; the rules, the thresholds and the exit codes do not change.
 
 ## Stage 6 — Close the spec
 
-- [ ] Validate the layout and the thresholds by hand on the maintainer's own reports (they never
+- [x] Validate the layout and the thresholds by hand on the maintainer's own reports (they never
   enter the repository). Record only what was learned and changed, in a sentence, without domains,
   addresses or counts that identify them. If a threshold is wrong, change the constant, its tests
-  and the requirements' Resolved decision, tests first. — Risk 1, RF-02
+  and the requirements' Resolved decision, tests first. — Risk 1, RF-02 — result recorded when run
+  (2026-10-28): the maintainer had no real report at hand, so this ran on 12 synthetic sets outside
+  the repository (deleted afterwards): clean, short, recognized and unrecognized failures, the 0.5%
+  edge, 28 days and 1000 messages on both sides, already at `p=reject`, `quarantine` with `pct` and
+  `sp`, IPv6, a 100-character service name, mixed `.xml`/`.gz`/`.zip`, and skipped, duplicate and
+  other-domain files. Answers, codes and the 80-column limit held and nothing needed a change. The
+  thresholds were **not** checked against real traffic: revisit them on the first real set
 - [x] Zero-dependency guard: `uv build`, then check the wheel metadata has no `Requires-Dist`, holds
   `verdict.py` and `render_verdict.py`, importable from the built wheel, and that
   `mailvigil verdict` runs from it on a synthetic report. — RNF-01
@@ -178,9 +184,9 @@ other stages; the rules, the thresholds and the exit codes do not change.
   example output and its status row, and keeps the exit codes as provisional; `CLAUDE.md`'s
   architecture block and status paragraph gain the two modules and the command; `docs/stack.md`
   gains `IntEnum`, integer comparison of thresholds and `argparse` parent parsers. — docs
-- [ ] Mark the three files `done` and move the roadmap row of `005` in `specs/README.md` to `done`.
+- [x] Mark the three files `done` and move the roadmap row of `005` in `specs/README.md` to `done`.
   — all
-- [ ] Quality gate and CI. — result recorded when run: local gate green on 2026-10-28 (658 tests,
+- [ ] Quality gate and CI. — result recorded when run: local gate green on 2026-10-28 (704 tests,
   coverage 100%, Python 3.12); the CI run URL goes here once the PR is open. The built wheel declares
   no `Requires-Dist`, holds both new modules, imports in a clean environment, and `mailvigil verdict`
   on 28 synthetic daily reports prints `READY` with code 0

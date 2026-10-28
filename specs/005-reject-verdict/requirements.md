@@ -1,6 +1,6 @@
 ---
 feature: Reject verdict — "is this domain ready for p=reject?", with the criterion stated
-status: approved
+status: done
 date: 2026-10-28
 related:
   - 003-config-and-senders/requirements.md
