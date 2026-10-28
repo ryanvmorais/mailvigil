@@ -139,15 +139,15 @@ command, then the close. The computation (`summary.py`) never imports `render` (
 
 ## Stage 5 — The command (RF-07, RF-08, RF-10, RNF-02, RNF-08)
 
-- [ ] `tests/test_cli_summary.py`, written first, through `main(argv)` and `capsys`, with reports
+- [x] `tests/test_cli_summary.py`, written first, through `main(argv)` and `capsys`, with reports
   written as synthetic files in `tmp_path` (the fixtures of `conftest.py`): a run with `--config`
   prints the summary, returns 0 and writes nothing to standard error; no path is a usage error
   with code 2 before any file is read; `--version` still prints the version; no command prints the
   help to standard error and returns 2. — RF-07, RF-10
-- [ ] `src/mailvigil/cli.py`: the `summary` subparser and the dispatch in `main`; update
+- [x] `src/mailvigil/cli.py`: the `summary` subparser and the dispatch in `main`; update
   `tests/test_smoke.py::test_no_arguments_exits_zero` to the new behavior, the one test that changes
   on purpose. — RF-07
-- [ ] Tests for the configuration and the domain, written first: `--config` loads the file, and an
+- [x] Tests for the configuration and the domain, written first: `--config` loads the file, and an
   explicit missing file is refused without trying `mailvigil.toml`; `mailvigil.toml` in the current
   folder (`monkeypatch.chdir`) is read and named in the header; a folder named `mailvigil.toml` is
   refused, not ignored; none gives `config  none` and an empty map; `--domain` alone works; the
@@ -155,18 +155,18 @@ command, then the close. The computation (`summary.py`) never imports `render` (
   `--domain` is refused with the loader's reason; neither source is refused with the hint to pass
   `--domain` or `--config`; a refused configuration names its path, cleaned. — RF-08, Resolved
   decisions 10 and 11
-- [ ] `cli.py`: `resolve_config` and the refusal lines. — RF-08, ADR-7
-- [ ] Tests for the exit codes, written first: a summary with failing traffic still returns 0; each
+- [x] `cli.py`: `resolve_config` and the refusal lines. — RF-08, ADR-7
+- [x] Tests for the exit codes, written first: a summary with failing traffic still returns 0; each
   refusal prints one line to standard error, nothing to standard output and returns 1, with no
   traceback; no kept report (nothing found, every file refused, all of another domain) prints the
   counts of what was skipped and filtered and returns 1; the command writes nothing under
   `tmp_path` besides the inputs. — RF-10, RNF-02
-- [ ] Tests for the encoding, written first: a service name with a character the stream cannot
+- [x] Tests for the encoding, written first: a service name with a character the stream cannot
   encode prints `?` and does not raise, on a stream built with `encoding="ascii"`; a stream with no
   `encoding` attribute falls back to UTF-8. — RNF-08, ADR-4
-- [ ] `cli.py`: `_write` and the exit-code mapping, and the wiring `ingest → summarize →
+- [x] `cli.py`: `_write` and the exit-code mapping, and the wiring `ingest → summarize →
   render_summary`. — RF-10, ADR-4
-- [ ] Quality gate. — result recorded when run
+- [x] Quality gate. — result recorded when run: all green on 2026-10-28; 505 passed (478 before, 27 new), coverage 100% (Python 3.12)
 
 ## Stage 6 — Close the spec
 
