@@ -11,13 +11,14 @@ which is already sanitized.
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from enum import StrEnum
 
 from mailvigil.config import Config
-from mailvigil.reports import IngestionResult, PolicyPublished, Reason, Record, SkippedFile
+from mailvigil.reports import IngestionResult, PolicyPublished, Reason, Record, Report, SkippedFile
 from mailvigil.senders import Outcome, identify_sender
 
 # ---------------------------------------------------------------------------
@@ -355,6 +356,94 @@ def _reason(results: Iterable[str]) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Period, policy and reporters (RF-03)
+# ---------------------------------------------------------------------------
+
+
+def _days_touched(report: Report) -> tuple[date, date]:
+    """
+    Find the first and the last UTC day a report touches (ADR-3).
+
+    Args:
+        report (Report): The report.
+
+    Returns:
+        tuple[date, date]: The day ``begin`` falls on and the day of ``end`` minus one microsecond.
+            The end of a period is exclusive, so a report from midnight to the next midnight touches
+            one day, as one ending at 23:59:59 does. A report of zero length counts for the day of
+            ``begin``.
+    """
+    first = report.begin.date()
+    if report.end <= report.begin:
+        return first, first
+    return first, (report.end - timedelta(microseconds=1)).date()
+
+
+def _period(reports: tuple[Report, ...]) -> Period | None:
+    """
+    Build the period the reports cover.
+
+    The days are counted from merged ``[first, last]`` intervals, never from a set of days: a report
+    may legitimately span centuries (RNF-09).
+
+    Args:
+        reports (tuple[Report, ...]): The reports kept.
+
+    Returns:
+        Period | None: The period, or ``None`` without reports.
+    """
+    if not reports:
+        return None
+    intervals = sorted(_days_touched(report) for report in reports)
+    first_day = intervals[0][0]
+    last_day = max(last for _first, last in intervals)
+
+    days_with_reports = 0
+    run_first, run_last = intervals[0]
+    for first, last in intervals[1:]:
+        if first > run_last:
+            days_with_reports += (run_last - run_first).days + 1
+            run_first, run_last = first, last
+        else:
+            run_last = max(run_last, last)
+    days_with_reports += (run_last - run_first).days + 1
+
+    return Period(
+        begin=min(report.begin for report in reports),
+        end=max(report.end for report in reports),
+        first_day=first_day,
+        last_day=last_day,
+        days_spanned=(last_day - first_day).days + 1,
+        days_with_reports=days_with_reports,
+    )
+
+
+def _policy(reports: tuple[Report, ...]) -> tuple[PolicyPublished | None, tuple[str, ...]]:
+    """
+    Pick the latest published policy and the other ``p`` values seen before it.
+
+    Args:
+        reports (tuple[Report, ...]): The reports kept.
+
+    Returns:
+        tuple[PolicyPublished | None, tuple[str, ...]]: The policy of the latest report (``None``
+            without reports) and the distinct ``p`` values of the others that differ from the latest
+            one, oldest first. The order does not depend on the order of the input.
+    """
+    if not reports:
+        return None, ()
+    ordered = sorted(
+        reports, key=lambda report: (report.end, report.begin, report.reporter, report.report_id)
+    )
+    latest = ordered[-1].policy
+    earlier: list[str] = []
+    for report in ordered[:-1]:
+        if report.policy.p != latest.p and report.policy.p not in earlier:
+            earlier.append(report.policy.p)
+    return latest, tuple(earlier)
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
@@ -456,11 +545,25 @@ def summarize(result: IngestionResult, config: Config) -> Summary:
         )
     )
 
+    policy, earlier_p = _policy(result.reports)
+    reasons = Counter(file.reason for file in result.skipped)
+
     return Summary(
         domain=config.domain,
         selectors_configured=len(config.senders),
+        reports=len(result.reports),
+        reporters=len({report.reporter for report in result.reports}),
+        period=_period(result.reports),
+        policy=policy,
+        earlier_p=earlier_p,
         totals=totals.freeze(),
         recognized_messages=recognized,
         senders=senders,
         failing=failing,
+        skipped=tuple(sorted(result.skipped, key=lambda file: str(file.path))),
+        skipped_by_reason=tuple(
+            sorted(reasons.items(), key=lambda item: (-item[1], item[0].value))
+        ),
+        duplicates=result.duplicates,
+        other_domain=result.other_domain,
     )

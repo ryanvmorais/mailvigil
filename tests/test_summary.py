@@ -12,8 +12,9 @@ from __future__ import annotations
 import dataclasses
 import itertools
 from dataclasses import FrozenInstanceError
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from enum import StrEnum
+from pathlib import Path
 from types import MappingProxyType
 
 import pytest
@@ -24,8 +25,10 @@ from mailvigil.reports import (
     IngestionResult,
     OverrideReason,
     PolicyPublished,
+    Reason,
     Record,
     Report,
+    SkippedFile,
     SpfResult,
 )
 from mailvigil.senders import Outcome
@@ -551,3 +554,287 @@ def test_many_records_from_few_sources_keep_only_the_sources() -> None:
     assert len(summary.senders) == 200
     assert len(summary.failing) == 200
     assert summary.totals.failing == 50_000
+
+
+# ---------------------------------------------------------------------------
+# Period (RF-03, ADR-3)
+# ---------------------------------------------------------------------------
+
+
+def at(day: int, hour: int = 0, minute: int = 0, second: int = 0) -> datetime:
+    """
+    Build a UTC moment in October 2026.
+
+    Args:
+        day (int): The day of the month.
+        hour (int, optional): The hour. Default: 0.
+        minute (int, optional): The minute. Default: 0.
+        second (int, optional): The second. Default: 0.
+
+    Returns:
+        datetime: The moment, timezone-aware.
+    """
+    return datetime(2026, 10, day, hour, minute, second, tzinfo=UTC)
+
+
+def dated(
+    begin: datetime,
+    end: datetime,
+    report_id: str = "1",
+    reporter: str = "reporter.example.net",
+    p: str = "none",
+) -> Report:
+    """
+    Build an empty report of ``example.com`` for a period.
+
+    Args:
+        begin (datetime): Start of the period.
+        end (datetime): End of the period.
+        report_id (str, optional): The id the reporter gave it. Default: ``1``.
+        reporter (str, optional): The reporting organization. Default: ``reporter.example.net``.
+        p (str, optional): The published policy. Default: ``none``.
+
+    Returns:
+        Report: The report.
+    """
+    return Report(
+        reporter=reporter,
+        report_id=report_id,
+        begin=begin,
+        end=end,
+        policy=PolicyPublished(domain="example.com", p=p),
+        records=(),
+        source_file=f"report-{report_id}.xml",
+    )
+
+
+def summary_of_reports(*reports: Report) -> Summary:
+    """
+    Summarize these reports.
+
+    Args:
+        *reports (Report): The reports kept.
+
+    Returns:
+        Summary: The summary.
+    """
+    return summarize(IngestionResult(reports=reports), config())
+
+
+def test_the_period_runs_from_the_earliest_begin_to_the_latest_end() -> None:
+    """Whatever the order of the reports."""
+    summary = summary_of_reports(
+        dated(at(5), at(5, 23, 59, 59), "2"), dated(at(1), at(1, 23, 59, 59), "1")
+    )
+
+    period = summary.period
+    assert period is not None
+    assert (period.begin, period.end) == (at(1), at(5, 23, 59, 59))
+    assert (period.first_day, period.last_day) == (date(2026, 10, 1), date(2026, 10, 5))
+    assert (period.days_spanned, period.days_with_reports) == (5, 2)
+
+
+@pytest.mark.parametrize("end", [at(2), at(1, 23, 59, 59)], ids=["next midnight", "23:59:59"])
+def test_a_report_of_one_day_touches_one_day_however_the_reporter_ends_it(end: datetime) -> None:
+    """The end is exclusive, so midnight to midnight is one day, not two (ADR-3)."""
+    period = summary_of_reports(dated(at(1), end)).period
+
+    assert period is not None
+    assert (period.days_spanned, period.days_with_reports) == (1, 1)
+    assert period.last_day == date(2026, 10, 1)
+
+
+def test_a_report_that_crosses_midnight_touches_two_days() -> None:
+    """Each day a report touches counts."""
+    period = summary_of_reports(dated(at(1, 12), at(2, 12))).period
+
+    assert period is not None
+    assert (period.days_spanned, period.days_with_reports) == (2, 2)
+
+
+def test_a_gap_day_lowers_the_days_with_reports() -> None:
+    """The verdict needs to know that a day is missing."""
+    period = summary_of_reports(
+        dated(at(1), at(2), "1"), dated(at(3), at(4), "2"), dated(at(5), at(6), "3")
+    ).period
+
+    assert period is not None
+    assert (period.days_spanned, period.days_with_reports) == (5, 3)
+
+
+def test_overlapping_reports_do_not_count_a_day_twice() -> None:
+    """Two reporters covering the same days are still those days."""
+    period = summary_of_reports(
+        dated(at(1), at(4), "1"), dated(at(2), at(3), "2"), dated(at(3), at(5), "3")
+    ).period
+
+    assert period is not None
+    assert (period.days_spanned, period.days_with_reports) == (4, 4)
+
+
+def test_the_last_day_is_the_last_one_touched_not_the_day_of_a_midnight_end() -> None:
+    """The latest ``end`` is a midnight; the day it names is not part of the period."""
+    period = summary_of_reports(dated(at(1), at(2), "1"), dated(at(2), at(4), "2")).period
+
+    assert period is not None
+    assert period.end == at(4)
+    assert period.last_day == date(2026, 10, 3)
+
+
+def test_a_zero_length_period_counts_the_day_of_begin() -> None:
+    """A choice, not a measurement (ADR-3)."""
+    period = summary_of_reports(dated(at(7, 8), at(7, 8))).period
+
+    assert period is not None
+    assert (period.first_day, period.last_day) == (date(2026, 10, 7), date(2026, 10, 7))
+    assert (period.days_spanned, period.days_with_reports) == (1, 1)
+
+
+def test_a_period_of_five_hundred_years_is_summarized_at_once() -> None:
+    """No structure grows with the length of a period (RNF-09)."""
+    begin = at(1)
+    end = begin.replace(year=2526)
+
+    period = summary_of_reports(dated(begin, end, "1"), dated(at(1), at(2), "2")).period
+
+    assert period is not None
+    assert period.days_spanned == (end - begin).days
+    assert period.days_with_reports == period.days_spanned
+
+
+# ---------------------------------------------------------------------------
+# Policy, reports and reporters (RF-03)
+# ---------------------------------------------------------------------------
+
+
+def test_one_policy_gives_all_its_fields() -> None:
+    """The policy of the only report is the policy, with ``sp``, ``np`` and ``pct``."""
+    published = PolicyPublished(
+        domain="example.com", p="quarantine", sp="reject", np="reject", pct=50
+    )
+    only = dataclasses.replace(dated(at(1), at(2)), policy=published)
+
+    summary = summary_of_reports(only)
+
+    assert summary.policy == published
+    assert summary.earlier_p == ()
+
+
+def test_a_changed_policy_lists_the_earlier_values_oldest_first_without_repeats() -> None:
+    """The latest report wins; the others that differ are the history."""
+    reports = (
+        dated(at(1), at(2), "1", p="none"),
+        dated(at(2), at(3), "2", p="quarantine"),
+        dated(at(3), at(4), "3", p="none"),
+        dated(at(4), at(5), "4", p="reject"),
+        dated(at(5), at(6), "5", p="reject"),
+    )
+
+    for order in itertools.permutations(reports):
+        summary = summary_of_reports(*order)
+        assert summary.policy is not None
+        assert summary.policy.p == "reject"
+        assert summary.earlier_p == ("none", "quarantine")
+
+
+def test_a_policy_that_never_changed_has_no_earlier_values() -> None:
+    """Two reports with the same ``p`` are not a change."""
+    summary = summary_of_reports(dated(at(1), at(2), "1"), dated(at(2), at(3), "2"))
+
+    assert summary.earlier_p == ()
+
+
+def test_the_reports_and_reporters_are_counted() -> None:
+    """Two reporters, one of them twice, are two; an absent reporter (``?``) is one."""
+    summary = summary_of_reports(
+        dated(at(1), at(2), "1", reporter="a.example.net"),
+        dated(at(2), at(3), "2", reporter="a.example.net"),
+        dated(at(3), at(4), "3", reporter="b.example.net"),
+        dated(at(4), at(5), "4", reporter="?"),
+        dated(at(5), at(6), "5", reporter="?"),
+    )
+
+    assert (summary.reports, summary.reporters) == (5, 3)
+
+
+def test_the_selectors_configured_are_counted() -> None:
+    """The header says how many selectors the map holds."""
+    summary = summarize(IngestionResult(), config({"a": "A", "b": "B", "c": "C"}))
+
+    assert summary.selectors_configured == 3
+
+
+def test_no_reports_gives_zero_totals_and_no_period_or_policy() -> None:
+    """Whether that is an error is the command's decision (RF-10)."""
+    summary = summarize(IngestionResult(), config())
+
+    assert (summary.reports, summary.reporters) == (0, 0)
+    assert (summary.period, summary.policy, summary.earlier_p) == (None, None, ())
+    assert summary.totals == Counts()
+    assert (summary.senders, summary.failing) == ((), ())
+
+
+# ---------------------------------------------------------------------------
+# What was left out (RF-05)
+# ---------------------------------------------------------------------------
+
+
+def skipped(name: str, reason: Reason = Reason.NOT_A_REPORT) -> SkippedFile:
+    """
+    Build a refused file.
+
+    Args:
+        name (str): The file name.
+        reason (Reason, optional): Why it was refused. Default: ``NOT_A_REPORT``.
+
+    Returns:
+        SkippedFile: The refusal.
+    """
+    return SkippedFile(Path(name), reason, "")
+
+
+def test_duplicates_and_other_domains_are_copied_also_at_zero() -> None:
+    """A line saying nothing was left out is information."""
+    empty = summarize(IngestionResult(), config())
+    assert (empty.duplicates, empty.other_domain) == (0, 0)
+
+    summary = summarize(IngestionResult(duplicates=3, other_domain=2), config())
+
+    assert (summary.duplicates, summary.other_domain) == (3, 2)
+
+
+def test_skipped_files_are_ordered_by_path_whatever_the_input_order() -> None:
+    """Discovery order must not reach the output (RNF-05)."""
+    files = (skipped("b.xml"), skipped("a.xml"), skipped("c.xml"))
+
+    for order in itertools.permutations(files):
+        summary = summarize(IngestionResult(skipped=order), config())
+        assert [str(file.path) for file in summary.skipped] == ["a.xml", "b.xml", "c.xml"]
+
+
+def test_skipped_files_are_counted_per_reason_most_frequent_first() -> None:
+    """Ties are broken by the reason's value."""
+    summary = summarize(
+        IngestionResult(
+            skipped=(
+                skipped("1.xml", Reason.UNREADABLE),
+                skipped("2.xml", Reason.NOT_A_REPORT),
+                skipped("3.xml", Reason.MALFORMED_XML),
+                skipped("4.xml", Reason.NOT_A_REPORT),
+                skipped("5.xml", Reason.MALFORMED_XML),
+                skipped("6.xml", Reason.NOT_A_REPORT),
+            )
+        ),
+        config(),
+    )
+
+    assert summary.skipped_by_reason == (
+        (Reason.NOT_A_REPORT, 3),
+        (Reason.MALFORMED_XML, 2),
+        (Reason.UNREADABLE, 1),
+    )
+
+
+def test_nothing_skipped_has_no_reasons() -> None:
+    """An empty tuple, not a missing field."""
+    assert summarize(IngestionResult(), config()).skipped_by_reason == ()
