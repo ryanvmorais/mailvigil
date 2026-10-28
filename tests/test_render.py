@@ -18,8 +18,8 @@ import pytest
 
 from mailvigil.render import (
     _REASON_PHRASES,
-    _fit,
     _label,
+    fit,
     format_share,
     no_reports_message,
     render_summary,
@@ -213,23 +213,23 @@ def test_a_share_does_not_depend_on_a_float() -> None:
 
 
 def test_fit_leaves_a_short_text_alone() -> None:
-    assert _fit("Example Mailer", 20) == "Example Mailer"
-    assert _fit("abcde", 5) == "abcde"
+    assert fit("Example Mailer", 20) == "Example Mailer"
+    assert fit("abcde", 5) == "abcde"
 
 
 def test_fit_cuts_to_the_width_with_dots() -> None:
-    assert _fit("a" * 20, 10) == "aaaaaaa..."
+    assert fit("a" * 20, 10) == "aaaaaaa..."
 
 
 @pytest.mark.parametrize(("width", "expected"), [(3, "..."), (2, ".."), (0, "")])
 def test_fit_into_a_tiny_width_never_exceeds_it(width: int, expected: str) -> None:
-    assert _fit("abcdef", width) == expected
+    assert fit("abcdef", width) == expected
 
 
 def test_fit_removes_escape_sequences_line_breaks_and_overrides_before_cutting() -> None:
-    assert _fit(f"a\x1b[31mb\nc{_RLO}d", 80) == "a[31mb cd"
+    assert fit(f"a\x1b[31mb\nc{_RLO}d", 80) == "a[31mb cd"
     # The dropped characters do not take room from the visible ones.
-    assert _fit(f"ab\x1b\x1b\x1b{_RLO}{_RLO}cd", 4) == "abcd"
+    assert fit(f"ab\x1b\x1b\x1b{_RLO}{_RLO}cd", 4) == "abcd"
 
 
 def test_every_reason_has_a_phrase_that_is_not_the_bare_key() -> None:
