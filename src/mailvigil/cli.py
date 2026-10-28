@@ -2,10 +2,12 @@
 Command-line entry point of MailVigil.
 
 The ``summary`` command wires three calls: ``ingest`` reads the reports, ``summarize`` adds them up
-and ``render_summary`` writes the text. The ``verdict`` command shares everything up to the
-``Summary`` and then calls ``judge`` and ``render_verdict``. This module counts nothing, judges
-nothing and lays nothing out; it decides where the domain and the configuration come from (RF-08)
-and turns every refusal, and every answer, into an exit code (RF-10, spec 005 RF-06).
+and ``render_summary`` writes the text, or ``summary_document`` and ``dumps`` write the JSON with
+``--json``. The ``verdict`` command shares everything up to the ``Summary`` and then calls ``judge``
+and ``render_verdict`` (or ``verdict_document``). This module counts nothing, judges nothing and
+lays nothing out; it decides where the domain and the configuration come from (RF-08) and turns
+every refusal, and every answer, into an exit code. The exit codes are a contract (spec 006 RF-04):
+the code is decided before the format, so ``--json`` cannot change it.
 """
 
 from __future__ import annotations
@@ -20,6 +22,7 @@ from typing import TextIO
 from mailvigil import __version__
 from mailvigil.config import Config, ConfigError, check_domain, load_config
 from mailvigil.render import no_reports_message, render_summary
+from mailvigil.render_json import dumps, summary_document, verdict_document
 from mailvigil.render_verdict import render_verdict
 from mailvigil.reports import IngestionResult, ingest
 from mailvigil.summary import summarize
@@ -29,12 +32,14 @@ from mailvigil.verdict import Answer, judge
 # The file read from the current folder when --config is not given (Resolved decision 10).
 DEFAULT_CONFIG = Path("mailvigil.toml")
 
-# Exit codes, provisional until spec 006 (RF-10): 0 is "an answer was printed", not "healthy".
+# Exit codes, the contract of spec 006 (RF-04): 0 is "an answer was printed", not "healthy".
+# This is the one table; the README lists the same five and a test compares the two. Changing a
+# value is a breaking change.
 EXIT_OK = 0
 EXIT_REFUSED = 1
 EXIT_USAGE = 2
-# Only ``verdict`` returns these two: a script must tell "wait" from "no" without parsing text.
-# Provisional until spec 006, like the others (spec 005 ADR-6).
+# Only ``verdict`` returns these two: a script must tell "wait" from "no" without parsing text
+# (spec 005 ADR-6).
 EXIT_TOO_EARLY = 3
 EXIT_NOT_READY = 4
 
@@ -202,6 +207,11 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="DOMAIN",
         help="the domain the reports are about (required when there is no configuration file)",
     )
+    shared.add_argument(
+        "--json",
+        action="store_true",
+        help="print one JSON document instead of the text (see docs/json-schema.md)",
+    )
 
     commands = parser.add_subparsers(dest="command", metavar="COMMAND")
     commands.add_parser(
@@ -226,7 +236,8 @@ def _load(args: argparse.Namespace) -> tuple[Config, str | None, IngestionResult
     Resolve the configuration and read the reports, the part both commands share.
 
     Args:
-        args (argparse.Namespace): The parsed arguments: ``paths``, ``config`` and ``domain``.
+        args (argparse.Namespace): The parsed arguments: ``paths``, ``config``, ``domain`` and
+            ``json``.
 
     Returns:
         tuple[Config, str | None, IngestionResult] | None: The configuration, the path of the file
@@ -251,7 +262,8 @@ def _run_summary(args: argparse.Namespace) -> int:
     Run the ``summary`` command: resolve, ingest, summarize, print.
 
     Args:
-        args (argparse.Namespace): The parsed arguments: ``paths``, ``config`` and ``domain``.
+        args (argparse.Namespace): The parsed arguments: ``paths``, ``config``, ``domain`` and
+            ``json``.
 
     Returns:
         int: ``EXIT_OK`` when the summary was printed, ``EXIT_REFUSED`` when it could not be made.
@@ -261,7 +273,11 @@ def _run_summary(args: argparse.Namespace) -> int:
         return EXIT_REFUSED
     config, source, result = loaded
 
-    _write(sys.stdout, render_summary(summarize(result, config), source))
+    summary = summarize(result, config)
+    if args.json:
+        _write(sys.stdout, dumps(summary_document(summary, source)))
+    else:
+        _write(sys.stdout, render_summary(summary, source))
     return EXIT_OK
 
 
@@ -270,7 +286,8 @@ def _run_verdict(args: argparse.Namespace) -> int:
     Run the ``verdict`` command: resolve, ingest, summarize, judge, print.
 
     Args:
-        args (argparse.Namespace): The parsed arguments: ``paths``, ``config`` and ``domain``.
+        args (argparse.Namespace): The parsed arguments: ``paths``, ``config``, ``domain`` and
+            ``json``.
 
     Returns:
         int: ``EXIT_OK`` for ready, ``EXIT_TOO_EARLY`` for too early, ``EXIT_NOT_READY`` for not
@@ -282,7 +299,10 @@ def _run_verdict(args: argparse.Namespace) -> int:
     config, _source, result = loaded
 
     verdict = judge(summarize(result, config))
-    _write(sys.stdout, render_verdict(verdict))
+    if args.json:
+        _write(sys.stdout, dumps(verdict_document(verdict)))
+    else:
+        _write(sys.stdout, render_verdict(verdict))
     return _VERDICT_EXIT[verdict.answer]
 
 
