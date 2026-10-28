@@ -326,7 +326,7 @@ hands anything back.
 | `re` | the name pattern of an attachment (`provider!domain!begin!end…`), compiled with `re.ASCII` |
 | `datetime` | the period of the summary: each report is a range of days with an exclusive end (one ending at midnight does not touch the next day), and overlapping ranges are merged so a day is counted once (ADR-3 of spec 004) |
 | `collections.Counter` | counts the skipped files per reason for the "left out" section |
-| integer arithmetic | `format_share` rounds a percentage to one decimal with `//`, never a float, and prints `<0.1%` so a small failing share is not rounded to zero (ADR-5 of spec 004) |
+| integer arithmetic | `format_share` rounds a percentage to one decimal with `//`, never a float, and prints `<0.1%` so a small failing share is not rounded to zero (ADR-5 of spec 004). `share_tenths` is the integer under it: the verdict asks it whether a failed rule rounds to its own limit and then prints `>0.5%` (or `<80%`) instead of a number that reads as a pass beside `FAIL` (ADR-8 of spec 005) |
 | `NO_COLOR` | convention for turning terminal colors off, honored by the output (**planned**) |
 
 ---

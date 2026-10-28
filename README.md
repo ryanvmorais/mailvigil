@@ -176,6 +176,9 @@ senders that were quiet in this period, are not covered.
 failing yet: wait for more reports. `NOT READY` means a source fails (rules 4 and 5), and the
 command names it.
 
+When files were refused, duplicated or from another domain, the verdict adds one line saying so;
+`mailvigil summary` shows why. They never change the answer.
+
 Exit codes: `summary` returns 0 when it printed the summary. `verdict` returns 0 for ready, 3 for
 too early and 4 for not ready; 1 means the reports or the configuration were refused and 2 is a
 usage error. They are provisional: they become a stable contract with the output spec, at the
