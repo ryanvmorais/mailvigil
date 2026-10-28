@@ -21,7 +21,7 @@ import pytest
 
 from mailvigil.cli import _config_line
 from mailvigil.config import ConfigError, ConfigReason
-from mailvigil.messages import ENGLISH, Messages, Plural, language_by_code
+from mailvigil.messages import ENGLISH, PORTUGUESE, Messages, Plural, language_by_code
 from mailvigil.reports import Reason
 from mailvigil.senders import Outcome
 from mailvigil.verdict import Answer, NoteKind, RuleId
@@ -98,6 +98,23 @@ def _used(template: str) -> frozenset[str]:
     return frozenset(name for _, name, _, _ in Formatter().parse(template) if name is not None)
 
 
+# The two languages every shape test runs over (RF-06: both have the same shape).
+_BOTH = pytest.mark.parametrize("messages", [ENGLISH, PORTUGUESE], ids=["en", "pt-BR"])
+
+# What is the same word in both languages, by declaration path (``area.field[MEMBER]`` for a mapping
+# entry; ``.one`` or ``.many`` for the form of a ``Plural`` that happens to be written alike). Each
+# is a name, a code or a layout template that carries no word of its own; everything else must be
+# translated, so an English sentence left in the Portuguese catalog fails the test.
+_SAME_IN_BOTH: frozenset[str] = frozenset(
+    {
+        "summary.key_config",
+        "summary.col_ok",
+        "summary.col_total",
+        "summary.source_detail",
+        "verdict.other_tail",
+    }
+)
+
 # ---------------------------------------------------------------------------
 # Shape
 # ---------------------------------------------------------------------------
@@ -107,20 +124,29 @@ def test_english_is_a_messages_value() -> None:
     assert isinstance(ENGLISH, Messages)
 
 
-def test_no_template_is_empty() -> None:
-    templates = list(_walk(ENGLISH))
+def test_portuguese_is_a_messages_value() -> None:
+    assert isinstance(PORTUGUESE, Messages)
+
+
+@_BOTH
+def test_no_template_is_empty(messages: Messages) -> None:
+    templates = list(_walk(messages))
     assert templates
     for path, template, _is_plural in templates:
         assert template.strip(), path
 
 
-def test_every_template_is_ascii() -> None:
-    for path, template, _is_plural in _walk(ENGLISH):
+@_BOTH
+def test_every_template_is_ascii(messages: Messages) -> None:
+    for path, template, _is_plural in _walk(messages):
         assert template.isascii(), path
 
 
-def test_every_template_uses_exactly_the_placeholders_its_field_declares() -> None:
-    for path, template, is_plural in _walk(ENGLISH):
+@_BOTH
+def test_every_template_uses_exactly_the_placeholders_its_field_declares(
+    messages: Messages,
+) -> None:
+    for path, template, is_plural in _walk(messages):
         declared = _PLACEHOLDERS.get(path, _PLACEHOLDERS.get(path.split("[")[0], frozenset()))
         used = _used(template)
         if is_plural:
@@ -128,19 +154,53 @@ def test_every_template_uses_exactly_the_placeholders_its_field_declares() -> No
         assert used == declared, path
 
 
-def test_every_declared_placeholder_belongs_to_a_field_that_exists() -> None:
-    paths = {path for path, _template, _is_plural in _walk(ENGLISH)}
+def test_portuguese_has_the_same_templates_as_english_and_no_other() -> None:
+    english = [(path, is_plural) for path, _template, is_plural in _walk(ENGLISH)]
+    portuguese = [(path, is_plural) for path, _template, is_plural in _walk(PORTUGUESE)]
+    assert portuguese == english
+
+
+def test_no_portuguese_template_is_its_english_twin_except_the_listed_ones() -> None:
+    english = {(path, i): t for i, (path, t, _p) in enumerate(_walk(ENGLISH))}
+    portuguese = {(path, i): t for i, (path, t, _p) in enumerate(_walk(PORTUGUESE))}
+    alike = {path for (path, i), text in portuguese.items() if english[(path, i)] == text}
+    assert alike <= _SAME_IN_BOTH, sorted(alike - _SAME_IN_BOTH)
+    # An exception that is no longer needed is a stale line of this test, not a harmless one.
+    assert alike >= _SAME_IN_BOTH, sorted(_SAME_IN_BOTH - alike)
+
+
+def test_the_portuguese_catalog_says_neither_safe_nor_attack() -> None:
+    """The verdict reads reports, it does not certify a domain (spec 006 Resolved decision 4)."""
+    for path, template, _is_plural in _walk(PORTUGUESE):
+        text = template.lower()
+        assert "seguro" not in text, path
+        assert "ataque" not in text, path
+
+
+@_BOTH
+def test_a_hanging_indent_label_is_one_word_with_its_colon(messages: Messages) -> None:
+    """The wrapped sentences indent by the label's width, so a label cannot hold a line break."""
+    for label in (messages.verdict.why_label, messages.verdict.next_label):
+        assert label.endswith(":")
+        assert "\n" not in label
+
+
+@_BOTH
+def test_every_declared_placeholder_belongs_to_a_field_that_exists(messages: Messages) -> None:
+    paths = {path for path, _template, _is_plural in _walk(messages)}
     bases = {path.split("[")[0] for path in paths}
     for declared in _PLACEHOLDERS:
         assert declared in paths or declared in bases, declared
 
 
-def test_every_template_formats_with_its_placeholders() -> None:
-    for path, template, _is_plural in _walk(ENGLISH):
+@_BOTH
+def test_every_template_formats_with_its_placeholders(messages: Messages) -> None:
+    for path, template, _is_plural in _walk(messages):
         values = dict.fromkeys(_used(template), "x")
         assert template.format(**values), path
 
 
+@_BOTH
 @pytest.mark.parametrize(
     ("get", "enum", "left_out"),
     [
@@ -154,16 +214,35 @@ def test_every_template_formats_with_its_placeholders() -> None:
     ],
 )
 def test_every_enum_keyed_mapping_covers_its_enum(
-    get: Callable[[Messages], Mapping[Enum, str]], enum: type[Enum], left_out: set[Enum]
+    messages: Messages,
+    get: Callable[[Messages], Mapping[Enum, str]],
+    enum: type[Enum],
+    left_out: set[Enum],
 ) -> None:
-    mapping = get(ENGLISH)
+    mapping = get(messages)
     assert set(mapping) == set(enum) - left_out
     for text in mapping.values():
         assert text
 
 
-def test_the_reasons_that_keep_their_detail_are_configuration_reasons() -> None:
-    assert ENGLISH.refusals.config_detail <= set(ConfigReason)
+@_BOTH
+def test_the_reasons_that_keep_their_detail_are_configuration_reasons(messages: Messages) -> None:
+    assert messages.refusals.config_detail <= set(ConfigReason)
+
+
+def test_portuguese_keeps_the_detail_of_the_two_reasons_a_reader_cannot_act_without() -> None:
+    """The parser's own message and the suggested key; the rest is said by the phrase (ADR-5)."""
+    assert PORTUGUESE.refusals.config_detail == {
+        ConfigReason.MALFORMED_TOML,
+        ConfigReason.UNKNOWN_KEY,
+    }
+
+
+def test_every_portuguese_configuration_phrase_differs_from_its_reason_word() -> None:
+    """The phrase is for a person, the reason word is for a log."""
+    for reason, phrase in PORTUGUESE.refusals.config_reasons.items():
+        assert phrase != reason.value
+        assert "_" not in phrase
 
 
 def test_importing_the_catalog_does_not_import_a_renderer() -> None:
@@ -204,7 +283,12 @@ def test_english_is_found_in_any_case(code: str) -> None:
     assert language_by_code(code) is ENGLISH
 
 
-@pytest.mark.parametrize("code", ["fr", "", "english", "en-US"])
+@pytest.mark.parametrize("code", ["pt-BR", "pt-br", "PT-BR", "Pt-Br"])
+def test_portuguese_is_found_in_any_case(code: str) -> None:
+    assert language_by_code(code) is PORTUGUESE
+
+
+@pytest.mark.parametrize("code", ["fr", "", "english", "en-US", "pt", "pt_BR", "portuguese"])
 def test_any_other_code_is_refused(code: str) -> None:
     with pytest.raises(ValueError, match="unknown language"):
         language_by_code(code)
@@ -237,3 +321,25 @@ def test_a_language_can_drop_the_detail_of_a_reason() -> None:
     dropped = ConfigError(ConfigReason.NOT_UTF8, "", "the file is not valid UTF-8")
     assert _config_line(kept, quiet) == str(kept)
     assert _config_line(dropped, quiet) == "not_utf8"
+
+
+@pytest.mark.parametrize("reason", list(ConfigReason))
+def test_the_portuguese_line_is_the_phrase_then_the_key(reason: ConfigReason) -> None:
+    error = ConfigError(reason, "senders")
+    assert (
+        _config_line(error, PORTUGUESE) == f"{PORTUGUESE.refusals.config_reasons[reason]} [senders]"
+    )
+
+
+@pytest.mark.parametrize("reason", list(ConfigReason))
+def test_the_portuguese_line_keeps_the_detail_only_where_the_language_says(
+    reason: ConfigReason,
+) -> None:
+    error = ConfigError(reason, "k", "an English detail")
+    line = _config_line(error, PORTUGUESE)
+    assert ("an English detail" in line) is (reason in PORTUGUESE.refusals.config_detail)
+
+
+def test_the_portuguese_line_without_a_key_is_the_bare_phrase() -> None:
+    error = ConfigError(ConfigReason.MISSING_DOMAIN)
+    assert _config_line(error, PORTUGUESE) == PORTUGUESE.refusals.config_reasons[error.reason]
