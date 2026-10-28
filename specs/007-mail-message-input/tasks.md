@@ -1,6 +1,6 @@
 ---
 feature: Mail message input — read report attachments straight from `.eml` and `.mbox` files
-status: in progress
+status: done
 date: 2026-10-28
 related:
   - 007-mail-message-input/requirements.md
@@ -147,18 +147,31 @@ fails, the code is wrong.
 
 ## Stage 4 — Close (RF-01 to RF-09, all RNF)
 
-- [ ] Validate end to end with synthetic data built by a throwaway script outside the repository
+- [x] Validate end to end with synthetic data built by a throwaway script outside the repository
   (in the scratchpad): an `.eml` per provider shape (zip, gz, xml, an attachment with no name), a
   mailbox of 200 messages of which 5 are reports, a mailbox with one 20 MiB message, one with no
   separators; run `mailvigil summary` and `mailvigil verdict` over them in both languages and with
   `--json`. Record what was seen, including the time and the peak memory of the large cases.
   — RF-02, RF-05
-- [ ] Docs: `README.md` (the input row names `.eml` and `.mbox`; the "Planned" sentence drops the
+  **Seen (2026-10-28, Windows, Python 3.14, synthetic data, `main(argv)` in one process):** the four
+  provider shapes (zip, gz, xml, an attachment with no name) gave 4 reports and 160 messages, all
+  recognized. A mailbox of 200 messages with 5 reports gave 5 reports in 0.09 s. A mailbox with two
+  good reports around one 20 MiB message (28 MB as base64) kept both and skipped the big one as
+  `inbox.mbox #2: message too large`: 0.19 s, and 8.6 MiB peak under `tracemalloc` (0.86 s with the
+  tracing on). A 20 MiB mailbox with no separator at all was one refused message, `#1`: 0.33 s,
+  8.9 MiB peak. An explicit `.eml` with no attachment was `no report attached`; the same text in
+  Portuguese, in `--lang pt-BR`, and `skipped[].part` in `--json`, were as designed. Verdict exits
+  were 3 on too-small windows, as for loose files.
+- [x] Docs: `README.md` (the input row names `.eml` and `.mbox`; the "Planned" sentence drops the
   first item), `CLAUDE.md` (the architecture tree gets `mail.py` and the new tests),
   `docs/stack.md` (`email`, `email.policy`, the message factory seam, `io.BytesIO`, `bytearray`),
   `specs/README.md` (the roadmap row to `done`), this file and the other two (`status: done`).
   Run `/atualizar-docs`. — RF-08, RNF-01
-- [ ] Quality gate of the spec, the whole sequence on the final branch: `uv run ruff check .` →
+- [x] Quality gate of the spec, the whole sequence on the final branch: `uv run ruff check .` →
   `uv run black --check .` → `uv run mypy` → `uv run pytest --cov`, and `uv lock --check`; confirm
   `dependencies = []` and that the CI `package` job would still pass (`uv build`, then no
   `Requires-Dist` in the wheel). Record the result here. — RNF-01
+  **Result (2026-10-28):** `ruff` clean, `black` unchanged, `mypy` strict clean on 23 source files,
+  `pytest --cov` 1,188 tests passed with coverage 100% (1,668 statements, 380 branches),
+  `uv lock --check` passes, `dependencies = []`, and the wheel built by `uv build` has no
+  `Requires-Dist`.

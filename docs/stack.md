@@ -8,15 +8,19 @@ live in the `### ADR-N` blocks of `specs/*/design.md`. This page is the map: the
 project and the reasoning behind each piece. Entries marked **(planned)** are decided but not
 built yet. The project is pre-0.1: the report-ingestion layer (`mailvigil.reports`), the
 configuration loader, the sender identification, the summary, the verdict and their texts are built
-and tested, and `mailvigil summary` and `mailvigil verdict` run them end to end, in English or
-Portuguese (`--lang`), as text or as one JSON document (`--json`), with exit codes that are a public
+and tested (it reads `.eml` and `.mbox` too, spec 007), and `mailvigil summary` and `mailvigil
+verdict` run them end to end, in English or Portuguese (`--lang`), as text or as one JSON document (`--json`), with exit codes that are a public
 contract (spec 006).
 
 The project is one small program with no runtime dependency:
 
 ```text
-report files (.zip, .gz, .xml)
-        │  zipfile / gzip   (size cap against zip bombs)
+report files (.zip, .gz, .xml)        mail files (.eml, .mbox)
+        │                                   │  email   (bounded: size, lines, parts, depth)
+        │                                   ▼
+        │                          report attachments (bytes in memory)
+        ▼                                   ▼
+   zipfile / gzip   (size cap against zip bombs)
         ▼
    XML bytes ──► xml.parsers.expat (refuses DOCTYPE/ENTITY) ──► ElementTree tree
         │
@@ -118,6 +122,30 @@ errors.
 
 **Docs:** [zipfile](https://docs.python.org/3/library/zipfile.html),
 [gzip](https://docs.python.org/3/library/gzip.html)
+
+### `email` and `email.policy`
+
+Reads the mail messages of an `.eml` file or of each message in an `.mbox`, and hands back the
+attachments that look like a report as plain bytes. `mailvigil/reports/mail.py` feeds a
+`BytesFeedParser` 64 KiB at a time and walks the parts with its own stack, so it never enters a
+message attached to a message and never recurses.
+
+**Why this:** the `email` package is in the standard library and parses what real mail clients
+write (RFC 2047 and RFC 2231 file names, base64, quoted-printable). A message is a container the
+sender controls, so the work is in the bounds: the parser splits every line into an object, and on
+a large message of empty parts it spends hundreds of MiB before a check *after* parsing could run.
+The module checks the size and the number of lines first, then counts parts as the parser creates
+them, through a message factory that raises past the limit
+(`policy.default.clone(message_factory=…)` is the seam; ADR-1 and ADR-2 of spec 007). A report that
+is not an attachment, or a message too big, costs one skipped entry and never the run.
+
+**Learn:** `BytesFeedParser` (`feed`, `close`), `email.policy.default` and `clone()`, `EmailMessage.get_filename()` and `get_payload(decode=True)`, how a `multipart/*` tree is shaped and why walking
+it with a stack is safer than recursion, why a body can be larger than its own size on disk
+(base64 adds a third).
+
+**Docs:** [email](https://docs.python.org/3/library/email.html),
+[email.policy](https://docs.python.org/3/library/email.policy.html),
+[email.parser](https://docs.python.org/3/library/email.parser.html)
 
 ### `xml.parsers.expat` and `xml.etree.ElementTree`
 
@@ -322,6 +350,7 @@ hands anything back.
 | `dataclasses`, `enum.StrEnum` | the immutable report model (`frozen=True, slots=True`), the refusal reasons and the verdict's answers, which are plain strings a later spec can translate |
 | `enum.IntEnum` | `RuleId`, the number of each verdict rule (1 to 5): it sorts and prints as the number the table shows |
 | integer thresholds | the verdict compares whole numbers only: rule 5 is `MAX_UNRECOGNIZED_PER_MILLE = 5` (0.5%), per mille so no float decides a verdict (ADR-4 of spec 005) |
+| `io.BytesIO`, `bytearray` | an attachment taken out of a message is opened as `BytesIO` by the same zip and gzip code that opens a file; an mbox message is gathered in a `bytearray` that stops growing past the cap, so a mailbox with no separator never fills memory (ADR-3 and ADR-6 of spec 007) |
 | `os.path.realpath` | tells that one file given twice, or once directly and once through its folder, is the same file, so it is read once |
 | `difflib` | `get_close_matches` suggests the right key for a typo in the configuration (`domian` → `domain`) |
 | `types.MappingProxyType` | the selector map of a `Config` is a read-only view, so a frozen dataclass does not hide a mutable dict (ADR-5 of spec 003) |

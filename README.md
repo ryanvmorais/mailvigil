@@ -28,14 +28,14 @@ out DMARC, and it runs entirely on your machine: your reports are never sent to 
 
 | Area | What | Version | Status |
 |---|---|---|---|
-| Input | Read a folder or files (`.zip`, `.gz`, `.xml`), filter by domain | v0.1 | Built (`mailvigil summary`) |
+| Input | Read a folder or files (`.zip`, `.gz`, `.xml`, and mail messages: `.eml`, `.mbox`), filter by domain | v0.1 | Built (`mailvigil summary`) |
 | Hostile input | Cap decompressed size (zip bombs) and refuse XML with `DOCTYPE` or `ENTITY` (entity expansion) | v0.1 | Built (`mailvigil summary`) |
 | Configuration | A TOML file with your domain and a map from DKIM selector to service name; a signature only counts under your own domain | v0.1 | Built (`mailvigil summary`) |
 | Summary | Per sender and per situation (ok, fragile, failing), failures highlighted | v0.1 | Built (`mailvigil summary`) |
 | Verdict | "Ready for `reject`?" with a declared criterion: 28 days covered, reports on 80% of the days, 1000 messages, no failure from a recognized sender, at most 0.5% of the messages failing from unrecognized sources | v0.1 | Built (`mailvigil verdict`) |
 | Output and language | `--json` and stable exit codes for scripts and CI; the text in English or Brazilian Portuguese (`--lang pt-BR`) | v0.1 | Built (`--json` and `--lang` on `summary` and `verdict`) |
 
-Planned: reading `.eml` and `.mbox` files, a static HTML report and an opt-in `fetch` over IMAP (see
+Planned: a static HTML report and an opt-in `fetch` over IMAP (see
 [specs/](specs/README.md#roadmap)). Not planned, on purpose: indexing in Elasticsearch, a web
 dashboard served by the tool and sending e-mail, each with its reason in
 [Permanent non-goals](specs/README.md#permanent-non-goals).
@@ -110,8 +110,9 @@ uv run mailvigil verdict --config mailvigil.toml reports/ --lang pt-BR
 
 The commands print their text and nothing else; they only read your files and touch no network.
 A folder is searched, one level deep, only for the names providers use for their attachments
-(`provider!domain!begin!end.zip`, also `.gz` and `.xml`). A file named on the command line is read
-whatever its name. The output looks like this (invented data):
+(`provider!domain!begin!end.zip`, also `.gz` and `.xml`) and for `.eml` and `.mbox` files, whose
+report attachments are taken out of the messages in memory. A file named on the command line is
+read whatever its name. The output looks like this (invented data):
 
 ```text
 MailVigil summary for example.com
