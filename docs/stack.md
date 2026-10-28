@@ -8,8 +8,9 @@ live in the `### ADR-N` blocks of `specs/*/design.md`. This page is the map: the
 project and the reasoning behind each piece. Entries marked **(planned)** are decided but not
 built yet. The project is pre-0.1: the report-ingestion layer (`mailvigil.reports`), the
 configuration loader, the sender identification, the summary, the verdict and their texts are built
-and tested, and `mailvigil summary` and `mailvigil verdict` run them end to end; `--json` and the
-stable exit codes are not built (the verdict's codes are provisional).
+and tested, and `mailvigil summary` and `mailvigil verdict` run them end to end, in English or
+Portuguese (`--lang`), as text or as one JSON document (`--json`), with exit codes that are a public
+contract (spec 006).
 
 The project is one small program with no runtime dependency:
 
@@ -29,11 +30,8 @@ report files (.zip, .gz, .xml)
  summary per sender and per situation ──► 80-column terminal text   ◄── built
         │
         ▼
- verdict (five rules) ──► 80-column terminal text + exit code 0, 3 or 4   ◄── built
- ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
-        │
-        ▼
- --json and the stable exit codes (spec 006)   ◄── planned
+ verdict (five rules) ──► 80-column text (--lang en|pt-BR) or JSON (--json)
+                         + exit code 0, 3 or 4                          ◄── built
 ```
 
 ---
@@ -180,7 +178,9 @@ quoted), and validating the shape of the loaded dict before using it.
 ### `argparse`
 
 The command line: `--version`, the `summary` and `verdict` subcommands, which share `PATH...`,
-`--config` and `--domain`, and later `--json`.
+`--config`, `--domain`, `--json` and `--lang`. `--lang` is parsed by a `type=` function that returns
+the language's message catalog, so a code that does not exist is argparse's own usage error (exit
+`2`) and the command never sees a string.
 
 **Why this:** against click, typer and rich, argparse needs nothing installed. The CLI is small
 enough that its verbosity does not hurt, and terminal colors are a few ANSI codes that honor
@@ -190,7 +190,7 @@ enough that its verbosity does not hurt, and terminal colors are a few ANSI code
 paths"), `add_subparsers(dest="command")` for a command with its own flags, a parent parser
 (`add_help=False`, passed as `parents=[shared]`) for the arguments two commands have in common, and
 `parse_args(argv)` with an explicit `argv` (what makes the CLI testable) returning an exit code from
-`main(argv) -> int`.
+`main(argv) -> int`, and `type=` (a function that converts, and validates, an option's text).
 
 **Docs:** [argparse](https://docs.python.org/3/library/argparse.html)
 
@@ -316,6 +316,8 @@ hands anything back.
 |---|---|
 | `twine` (via `uvx`) | `twine check --strict` in CI: the README renders on PyPI |
 | `coverage` | the engine under pytest-cov; settings in `[tool.coverage.*]` |
+| `json` | `render_json.py` turns the frozen summary and verdict into a `dict` and `json.dumps` writes it with `ensure_ascii=True` (so no console encoding can corrupt it) and `allow_nan=False`. The key order is the order the dict is built in, and it is part of the contract documented in `docs/json-schema.md` (spec 006) |
+| message catalog | `messages/` holds every sentence as frozen dataclasses, one `Messages` per language (`ENGLISH`, `PORTUGUESE`); the renderers take it as a last parameter and read every sentence from it. `Plural` stores the whole phrase for 1 and for any other count, so Portuguese agreement needs no rule. Tests check that both languages have the same fields and placeholders (ADR-3 and ADR-4 of spec 006) |
 | `unicodedata` | drops control, format and line-separator characters from every text of a report, by Unicode category (ADR-6 of spec 002) |
 | `dataclasses`, `enum.StrEnum` | the immutable report model (`frozen=True, slots=True`), the refusal reasons and the verdict's answers, which are plain strings a later spec can translate |
 | `enum.IntEnum` | `RuleId`, the number of each verdict rule (1 to 5): it sorts and prints as the number the table shows |

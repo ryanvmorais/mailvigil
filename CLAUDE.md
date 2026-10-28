@@ -9,8 +9,8 @@ MailVigil is an open-source command-line tool that reads DMARC aggregate reports
 it is safe to move the policy to `p=reject`. Python `>=3.12`, standard library only (zero runtime
 dependencies), offline. It is pre-0.1: the CLI answers `mailvigil --version`, `mailvigil summary`
 and `mailvigil verdict` (report ingestion, configuration, sender identification, the summary, the
-verdict on `p=reject` and their texts are built and wired); `--json` and the stable exit codes are
-not built yet (the verdict's codes 3 and 4 are provisional until spec 006). Everything
+verdict on `p=reject` and their texts are built and wired); `--json`, `--lang en|pt-BR` and the stable
+exit codes (a public contract, `docs/json-schema.md`) are built (spec 006 is done). Everything
 is specified in [specs/](specs/) first. The repository has been public since
 2026-10-27 (the maintainer made it public, not Claude); nothing is announced or published to PyPI
 until the first version is ready.
@@ -28,6 +28,8 @@ uv sync
 uv run mailvigil --version
 uv run mailvigil summary --domain example.com path/to/reports   # or --config FILE
 uv run mailvigil verdict --domain example.com path/to/reports   # exit 0 ready, 3 too early, 4 not ready
+uv run mailvigil verdict --config FILE path/to/reports --json   # one JSON document, same exit code
+uv run mailvigil summary --config FILE path/to/reports --lang pt-BR   # the text in Portuguese
 
 # Run the tests (one file, then one test)
 uv run pytest
@@ -62,8 +64,9 @@ src/mailvigil/
   __init__.py        # __version__ read from package metadata
   cli.py             # argparse entry point (`mailvigil = mailvigil.cli:main`): `--version`, `summary`
                      # (resolve_config, ingest → summarize → render, exit 0/1/2) and `verdict` (same
-                     # load, then judge → render_verdict; exit 0 ready, 3 too early, 4 not ready,
-                     # provisional until spec 006); a parent parser shares paths/--config/--domain
+                     # load, then judge → render_verdict; exit 0 ready, 3 too early, 4 not ready);
+                     # the exit code is decided before the format; a parent parser shares
+                     # paths/--config/--domain/--json/--lang (`--lang` is parsed to a Messages)
   py.typed           # marks the package as typed (PEP 561)
   reports/           # report ingestion (spec 002); public API re-exported by __init__.py
     errors.py        #   Reason (StrEnum) and ReportRefused: every refusal is typed
@@ -79,20 +82,30 @@ src/mailvigil/
   senders.py         # identify_sender(record, config) → Identification; a selector counts only under the domain
   summary.py         # summarize(result, config) → frozen Summary: rows per sender, failing sources, period,
                      # policy, what was left out (spec 004); never imports render
-  render.py          # render_summary(summary, config_source) → 80-column ASCII text; no_reports_message;
-                     # also the public helpers fit, address, format_share, share_tenths
+  render.py          # render_summary(summary, config_source, messages) → 80-column ASCII text;
+                     # no_reports_message; also the public helpers fit, address, format_share,
+                     # share_tenths
   verdict.py         # judge(summary) → frozen Verdict: Answer (READY/TOO_EARLY/NOT_READY), five Rules
                      # with the four threshold constants, Notes, LeftOut (what the summary did not
                      # count; it never changes the answer); integer arithmetic; never imports a
                      # text module (spec 005)
-  render_verdict.py  # render_verdict(verdict) → 80-column ASCII text: reason, rules table, notes,
-                     # what was left out, next step
+  render_verdict.py  # render_verdict(verdict, messages) → 80-column ASCII text: reason, rules table,
+                     # notes, what was left out, next step
+  render_json.py     # summary_document / verdict_document → dict, dumps → ASCII JSON, no language
+                     # (spec 006); the schema is public contract, see docs/json-schema.md
+  messages/          # every sentence of the tool, one Messages per language (spec 006): model.py
+                     # (Plural and the frozen dataclasses), en.py (ENGLISH), pt_br.py (PORTUGUESE,
+                     # ASCII only); language_by_code; imports no renderer
 tests/               # pytest, one test file per module (test_reports_*.py, test_text.py, test_config.py,
                      # test_senders.py, test_summary.py, test_render.py, test_verdict.py,
-                     # test_render_verdict.py, test_cli_summary.py, test_cli_verdict.py); fixtures
-                     # are synthetic, built in conftest.py or tmp_path
+                     # test_render_verdict.py, test_render_json.py, test_render_pt.py,
+                     # test_messages.py, test_json_schema_doc.py, test_cli_summary.py,
+                     # test_cli_verdict.py, test_cli_json.py, test_cli_lang.py,
+                     # test_cli_exit_codes.py); fixtures are synthetic, built in conftest.py,
+                     # cli_helpers.py, schema_examples.py or tmp_path
 specs/               # spec-driven development: requirements → design → tasks per feature
 docs/stack.md        # each technology of the stack, why it was chosen, what to study first
+docs/json-schema.md  # every field of the two --json documents and the compatibility promise
 .githooks/           # versioned pre-commit hook (core.hooksPath)
 .claude/             # Claude Code hooks: format on edit, validate at turn end, guard uv.lock
 .github/             # CI, CodeQL, dependency review, weekly pip-audit, Dependabot, issue/PR templates
@@ -119,8 +132,8 @@ uv.lock              # never edit by hand (generated; a hook blocks it)
 ## Conventions
 
 - **Language:** code, commits, branches, docstrings and docs in English (open source; rule from
-  `/idioma`). User-facing CLI text: English and Portuguese (locale or `--lang`), decided in the
-  specs.
+  `/idioma`). User-facing CLI text: English (default) and Brazilian Portuguese, chosen only by
+  `--lang` (no locale detection), ASCII in both, decided in the specs.
 - **File style:** follow `/estilo-arquivos` for each file type (docstrings with `Args:` /
   `Returns:`, full annotations, `# why` comments); do not copy its rules here.
 - **Python floor:** 3.12, tested in CI together with the newest stable release. Ruff and black
