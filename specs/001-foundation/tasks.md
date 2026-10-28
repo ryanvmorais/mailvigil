@@ -56,9 +56,11 @@ changes code unless a job fails.
   (pip-audit)` all run and pass. Done on PR #3 (rerun, run 40602354923): the four passed, so the
   pinned SHAs and the 3.15 leg work on GitHub. The Stage 1 pull request still has to be opened.
   — RF-03, RF-04, RF-05, RF-06, RNF-02
-- [ ] Prove the `package` guard bites: on a throwaway branch add a runtime dependency to
+- [x] Prove the `package` guard bites: on a throwaway branch add a runtime dependency to
   `[project].dependencies`, confirm the job fails with "MailVigil must stay dependency-free", then
-  delete the branch (no PR merged). — RF-05, RNF-01
+  delete the branch (no PR merged). Done on 2026-10-27: run 40606976731 on a throwaway branch
+  with `packaging>=24` failed only `Package`, with that message; the branch was deleted.
+  — RF-05, RNF-01
 - [x] Trigger `Weekly pip-audit` with `workflow_dispatch` and confirm it passes. Done on
   2026-10-27: run 40602805245 passed in 15 s. — RF-06, ADR-4
 - [ ] Confirm Dependabot is active (Insights → Dependency graph → Dependabot, or its first Sunday
