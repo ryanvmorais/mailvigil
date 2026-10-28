@@ -1,6 +1,6 @@
 ---
 feature: Summary — per sender and per situation, failures highlighted, and the first command
-status: in progress
+status: done
 date: 2026-10-27
 related:
   - 004-summary/requirements.md
@@ -170,20 +170,51 @@ command, then the close. The computation (`summary.py`) never imports `render` (
 
 ## Stage 6 — Close the spec
 
-- [ ] Hostile-input audit (RF-11): list the cases of the requirement and point each to its test;
-  add whichever is missing. — RF-11
-- [ ] Validate the layout by hand: run `mailvigil summary` against the maintainer's own reports
+- [x] Hostile-input audit (RF-11): list the cases of the requirement and point each to its test;
+  add whichever is missing. — RF-11. Result on 2026-10-28, all 14 cases already had a test, none
+  added: zero messages (`test_a_record_with_no_messages_adds_nothing_and_makes_no_row`); empty and
+  upper-case result (`test_a_record_is_ok_fragile_or_failing`, `test_pass_ignores_case_and_surrounding_spaces`);
+  one IP under two kinds (`test_one_address_under_two_outcomes_is_two_rows_without_a_service`); two
+  selectors of one service (`test_two_selectors_of_one_service_share_a_row`); more rows than the
+  limit with a failing one among the small (`test_every_known_row_is_shown_and_twelve_other_rows_print_ten_and_a_remainder`);
+  share under 0.1% (`test_a_tiny_failing_share_is_not_rounded_to_zero`); policy changed
+  (`test_a_changed_policy_lists_the_earlier_values_oldest_first_without_repeats`); other order
+  (`test_the_same_reports_in_any_order_give_an_equal_summary`); crosses midnight
+  (`test_a_report_that_crosses_midnight_touches_two_days`); absurdly long period
+  (`test_a_period_of_five_hundred_years_is_summarized_at_once`); name wider than its column
+  (`test_a_known_row_name_wider_than_the_column_is_cut`) and one the stream cannot encode
+  (`test_a_name_the_stream_cannot_encode_prints_a_question_mark`); conflicting domain
+  (`test_a_different_domain_in_the_flag_is_refused_naming_both`); missing `--config`
+  (`test_explicit_missing_config_is_refused_without_trying_the_default`); no reports kept
+  (`test_every_file_refused_prints_the_skipped_counts`, `test_all_reports_of_another_domain_print_the_filtered_count`);
+  escape sequence in a skipped name (`test_a_skipped_file_name_with_an_escape_sequence_is_shown_cleaned`)
+- [x] Validate the layout by hand: run `mailvigil summary` against the maintainer's own reports
   (outside the repository, never committed or pasted into a spec, issue or PR) and record only
   whether the output reads well and what was changed in `render.py` as a result. — Risk 1 of the
-  design
-- [ ] Zero-dependency guard: `uv build`, then check the wheel metadata has no `Requires-Dist` and
+  design. Done on 2026-10-28 with invented reports instead (the maintainer had lost the real ones):
+  nine files outside the repository, with two reporters per format, a policy change, a gap day, a
+  duplicate, a report of another domain, a malformed file, an unsafe one and 14 small sources.
+  Three things read badly and were changed, tests first: (1) the label column was capped at 30, so
+  `198.51.100.99 (failing signature)` lost its address; the cap is now 35, the longest IPv4 address
+  with the longest kind; (2) every unrecognized failing source opened with the same line,
+  `! unrecognized`, before the address; it now opens with the address and the second line starts at
+  the messages (foreign domain and failing signature keep their kind line); (3) a folder holding
+  files that do not follow the provider naming got "No .xml, .gz or .zip file was found", which
+  was untrue; the message now says that a folder is searched only for `provider!domain!begin!end.zip`
+  names and that a file named directly is read whatever its name. The requirements example and
+  ADR-6 follow. Everything else read well
+- [x] Zero-dependency guard: `uv build`, then check the wheel metadata has no `Requires-Dist` and
   holds `summary.py` and `render.py`, importable from the built wheel, and that
-  `uv run mailvigil summary` runs from it. — RNF-01
-- [ ] Run `/atualizar-docs`: the README gains the `mailvigil summary` quick start with an invented
+  `uv run mailvigil summary` runs from it. — RNF-01. Result on 2026-10-28: the wheel has no
+  `Requires-Dist`, holds both modules, and `mailvigil summary` ran from it in an isolated
+  environment (`uv run --isolated --no-project --with <wheel>`) on a synthetic report, exit 0
+- [x] Run `/atualizar-docs` (done on 2026-10-28; the README also gained the folder naming rule): the README gains the `mailvigil summary` quick start with an invented
   example output, its "Summary" row, and keeps the exit codes as "not defined yet"; `CLAUDE.md`'s
   architecture block and status paragraph gain the two modules and the command; `docs/stack.md`
   gains the subcommands of `argparse`, `datetime` and interval merging, and integer rounding. —
   docs
-- [ ] Mark the three files `done` and move the roadmap row of `004` in `specs/README.md` to `done`.
+- [x] Mark the three files `done` and move the roadmap row of `004` in `specs/README.md` to `done`.
   — all
-- [ ] Quality gate and CI. — result recorded when run
+- [x] Quality gate and CI. — result recorded when run: local gate all green on 2026-10-28; 507
+  passed (505 before, 2 new), coverage 100% (Python 3.12), `uv lock --check` ok; the CI runs on
+  the pull request
