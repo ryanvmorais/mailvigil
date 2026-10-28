@@ -2,9 +2,10 @@
 Command-line entry point of MailVigil.
 
 The ``summary`` command wires three calls: ``ingest`` reads the reports, ``summarize`` adds them up
-and ``render_summary`` writes the text. This module counts nothing and lays nothing out; it decides
-where the domain and the configuration come from (RF-08) and turns every refusal into one line on
-standard error and an exit code (RF-10).
+and ``render_summary`` writes the text. The ``verdict`` command shares everything up to the
+``Summary`` and then calls ``judge`` and ``render_verdict``. This module counts nothing, judges
+nothing and lays nothing out; it decides where the domain and the configuration come from (RF-08)
+and turns every refusal, and every answer, into an exit code (RF-10, spec 005 RF-06).
 """
 
 from __future__ import annotations
@@ -19,9 +20,11 @@ from typing import TextIO
 from mailvigil import __version__
 from mailvigil.config import Config, ConfigError, check_domain, load_config
 from mailvigil.render import no_reports_message, render_summary
-from mailvigil.reports import ingest
+from mailvigil.render_verdict import render_verdict
+from mailvigil.reports import IngestionResult, ingest
 from mailvigil.summary import summarize
 from mailvigil.text import clean_text
+from mailvigil.verdict import Answer, judge
 
 # The file read from the current folder when --config is not given (Resolved decision 10).
 DEFAULT_CONFIG = Path("mailvigil.toml")
@@ -30,6 +33,17 @@ DEFAULT_CONFIG = Path("mailvigil.toml")
 EXIT_OK = 0
 EXIT_REFUSED = 1
 EXIT_USAGE = 2
+# Only ``verdict`` returns these two: a script must tell "wait" from "no" without parsing text.
+# Provisional until spec 006, like the others (spec 005 ADR-6).
+EXIT_TOO_EARLY = 3
+EXIT_NOT_READY = 4
+
+# The one place an answer becomes an exit code (spec 005 ADR-6).
+_VERDICT_EXIT = {
+    Answer.READY: EXIT_OK,
+    Answer.TOO_EARLY: EXIT_TOO_EARLY,
+    Answer.NOT_READY: EXIT_NOT_READY,
+}
 
 # Longest path or domain echoed in a refusal line; it comes from the command line, not a report.
 _MAX_ECHO = 200
@@ -159,39 +173,77 @@ def build_parser() -> argparse.ArgumentParser:
     Build the argument parser of the ``mailvigil`` command.
 
     The subcommand is optional at the parser level, so that ``main`` decides what a missing one
-    means.
+    means. ``summary`` and ``verdict`` take the same three arguments, defined once in a parent
+    parser.
 
     Returns:
-        argparse.ArgumentParser: The parser, with ``--version`` and the ``summary`` subcommand.
+        argparse.ArgumentParser: The parser, with ``--version`` and the ``summary`` and ``verdict``
+            subcommands.
     """
     parser = argparse.ArgumentParser(
         prog="mailvigil",
         description="Reads DMARC aggregate reports and says if it is safe to move to p=reject.",
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
-    commands = parser.add_subparsers(dest="command", metavar="COMMAND")
 
-    summary = commands.add_parser(
-        "summary",
-        help="say who sends mail as the domain, from DMARC aggregate reports",
-        description="Sum up DMARC aggregate reports per sender and per situation.",
-    )
-    summary.add_argument(
+    shared = argparse.ArgumentParser(add_help=False)
+    shared.add_argument(
         "paths", nargs="+", type=Path, metavar="PATH", help="report files or folders of reports"
     )
-    summary.add_argument(
+    shared.add_argument(
         "--config",
         type=Path,
         metavar="FILE",
         help="TOML file with the domain and the selector map "
         f"(default: {DEFAULT_CONFIG} in the current folder, if there is one)",
     )
-    summary.add_argument(
+    shared.add_argument(
         "--domain",
         metavar="DOMAIN",
         help="the domain the reports are about (required when there is no configuration file)",
     )
+
+    commands = parser.add_subparsers(dest="command", metavar="COMMAND")
+    commands.add_parser(
+        "summary",
+        parents=[shared],
+        help="say who sends mail as the domain, from DMARC aggregate reports",
+        description="Sum up DMARC aggregate reports per sender and per situation.",
+    )
+    commands.add_parser(
+        "verdict",
+        parents=[shared],
+        help="say if the domain is ready for p=reject, and why",
+        description="Say if the domain is ready for p=reject, from DMARC aggregate reports. "
+        f"The exit code is {EXIT_OK} for ready, {EXIT_TOO_EARLY} for too early and "
+        f"{EXIT_NOT_READY} for not ready.",
+    )
     return parser
+
+
+def _load(args: argparse.Namespace) -> tuple[Config, str | None, IngestionResult] | None:
+    """
+    Resolve the configuration and read the reports, the part both commands share.
+
+    Args:
+        args (argparse.Namespace): The parsed arguments: ``paths``, ``config`` and ``domain``.
+
+    Returns:
+        tuple[Config, str | None, IngestionResult] | None: The configuration, the path of the file
+            used as it should be shown and what was read; ``None`` when the run was refused, after
+            the one line on standard error.
+    """
+    try:
+        config, source = resolve_config(args.config, args.domain)
+    except _Refusal as refusal:
+        _write(sys.stderr, f"mailvigil: {refusal.message}")
+        return None
+
+    result = ingest(args.paths, config.domain)
+    if not result.reports:
+        _write(sys.stderr, no_reports_message(result, config.domain))
+        return None
+    return config, source, result
 
 
 def _run_summary(args: argparse.Namespace) -> int:
@@ -204,19 +256,34 @@ def _run_summary(args: argparse.Namespace) -> int:
     Returns:
         int: ``EXIT_OK`` when the summary was printed, ``EXIT_REFUSED`` when it could not be made.
     """
-    try:
-        config, source = resolve_config(args.config, args.domain)
-    except _Refusal as refusal:
-        _write(sys.stderr, f"mailvigil: {refusal.message}")
+    loaded = _load(args)
+    if loaded is None:
         return EXIT_REFUSED
-
-    result = ingest(args.paths, config.domain)
-    if not result.reports:
-        _write(sys.stderr, no_reports_message(result, config.domain))
-        return EXIT_REFUSED
+    config, source, result = loaded
 
     _write(sys.stdout, render_summary(summarize(result, config), source))
     return EXIT_OK
+
+
+def _run_verdict(args: argparse.Namespace) -> int:
+    """
+    Run the ``verdict`` command: resolve, ingest, summarize, judge, print.
+
+    Args:
+        args (argparse.Namespace): The parsed arguments: ``paths``, ``config`` and ``domain``.
+
+    Returns:
+        int: ``EXIT_OK`` for ready, ``EXIT_TOO_EARLY`` for too early, ``EXIT_NOT_READY`` for not
+            ready and ``EXIT_REFUSED`` when no verdict could be made.
+    """
+    loaded = _load(args)
+    if loaded is None:
+        return EXIT_REFUSED
+    config, _source, result = loaded
+
+    verdict = judge(summarize(result, config))
+    _write(sys.stdout, render_verdict(verdict))
+    return _VERDICT_EXIT[verdict.answer]
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -235,5 +302,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "summary":
         return _run_summary(args)
+    if args.command == "verdict":
+        return _run_verdict(args)
     parser.print_help(sys.stderr)
     return EXIT_USAGE
