@@ -1,6 +1,6 @@
 ---
 feature: Output and exit codes — `--json`, the stable exit-code contract and the Portuguese text
-status: in progress
+status: done
 date: 2026-10-28
 related:
   - 006-output-and-exit-codes/requirements.md
@@ -151,16 +151,24 @@ Behavior-neutral: the output is byte-equal to today's. No Portuguese is written 
 
 ## Stage 4 — Validation and close (RF-07, RNF-06)
 
-- [ ] Run both commands in both formats and both languages on invented report sets of the four
+- [x] Run both commands in both formats and both languages on invented report sets of the four
   kinds the 005 close used (a clean long set, a short set, a recognized failure, many unrecognized
   failures) and read the output: the Portuguese reads naturally, nothing overflows, the JSON is
   readable with `python -m json.tool`, the codes are the ones in the table. Record what was found
   and fix it in this stage. Real reports are never used or committed. — RF-06, RNF-06
-- [ ] Run `/atualizar-docs`: `README.md` (flags, the Portuguese quick start with an invented
+  Done (2026-10-28), on four invented sets outside the repository (deleted afterwards): a clean
+  35-day set, a 5-day set, a recognized sender failing alignment (rule 4) and 13 unrecognized
+  failing sources (rule 5, beyond the text limit of 10). Both commands, both languages and both
+  formats: codes `0`, `3`, `4`, `4` as expected and the same with and without `--json` or
+  `--lang`; every JSON parsed with `json.tool`; the longest line was 80 columns and all text was
+  ASCII; the Portuguese read naturally. Nothing needed a change. Two things seen and left alone,
+  both outside this spec: the decimal point stays a point in Portuguese (localized numbers are a
+  non-goal) and the list of sources in the verdict does not align its columns (as in 005).
+- [x] Run `/atualizar-docs`: `README.md` (flags, the Portuguese quick start with an invented
   example, the roadmap and status rows, "provisional" gone), `CLAUDE.md` (architecture block gains
   `render_json.py` and `messages/`; the language line is rewritten for `--lang`; the status
   paragraph loses "`--json` and the stable exit codes are not built yet"), `docs/stack.md` (the
   `json` module and the catalog pattern); then `/fechar-sessao`. — Resolved decision 2
-- [ ] Mark the three files `done` and move the roadmap row of `006` in `specs/README.md` to `done`,
+- [x] Mark the three files `done` and move the roadmap row of `006` in `specs/README.md` to `done`,
   with the note that "Exit codes and `--json` are public contract" now applies.
-- [ ] Quality gate. — result recorded when run: ___
+- [x] Quality gate. — ruff, black and mypy clean; `pytest --cov` 1074 passed, 100% coverage (2026-10-28); only docs and spec files changed in this stage.

@@ -60,7 +60,7 @@ merged or split, when its spec is opened.
 | [`003-config-and-senders`](003-config-and-senders/) | TOML config with the domain and the DKIM selector → service name map, and sender identification | `v0.1` | **done** |
 | [`004-summary`](004-summary/) | per-sender and per-situation summary (ok, fragile, failing), failures highlighted, and the first command (`mailvigil summary`) | `v0.1` | **done** |
 | [`005-reject-verdict`](005-reject-verdict/) | "ready for `reject`?" with a declared criterion (minimum window, minimum volume, no legitimate failures); the thresholds are decided there | `v0.1` | **done** |
-| [`006-output-and-exit-codes`](006-output-and-exit-codes/) | `--json`, stable exit codes, English and Portuguese text (locale or `--lang`) | `v0.1` | **in progress** |
+| [`006-output-and-exit-codes`](006-output-and-exit-codes/) | `--json`, stable exit codes, English and Portuguese text (`--lang`) | `v0.1` | **done** |
 
 Out of scope for now: a web dashboard, Elasticsearch, fetching reports over IMAP and sending
 e-mail.

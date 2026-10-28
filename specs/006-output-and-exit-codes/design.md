@@ -1,6 +1,6 @@
 ---
 feature: Output and exit codes — `--json`, the stable exit-code contract and the Portuguese text
-status: in progress
+status: done
 date: 2026-10-28
 related:
   - 006-output-and-exit-codes/requirements.md

@@ -33,7 +33,7 @@ out DMARC, and it runs entirely on your machine: your reports are never sent to 
 | Configuration | A TOML file with your domain and a map from DKIM selector to service name; a signature only counts under your own domain | v0.1 | Built (`mailvigil summary`) |
 | Summary | Per sender and per situation (ok, fragile, failing), failures highlighted | v0.1 | Built (`mailvigil summary`) |
 | Verdict | "Ready for `reject`?" with a declared criterion: 28 days covered, reports on 80% of the days, 1000 messages, no failure from a recognized sender, at most 0.5% of the messages failing from unrecognized sources | v0.1 | Built (`mailvigil verdict`) |
-| Output | `--json` and stable exit codes for scripts and CI | v0.1 | Built (`--json` on `summary` and `verdict`) |
+| Output and language | `--json` and stable exit codes for scripts and CI; the text in English or Brazilian Portuguese (`--lang pt-BR`) | v0.1 | Built (`--json` and `--lang` on `summary` and `verdict`) |
 
 Out of scope for now: a web dashboard, Elasticsearch, fetching reports over IMAP and sending
 e-mail.
@@ -101,6 +101,9 @@ uv run mailvigil verdict --config mailvigil.toml reports/
 
 # The same answers as one JSON document, for a script or a CI job
 uv run mailvigil verdict --config mailvigil.toml reports/ --json
+
+# The text in Brazilian Portuguese (English is the default)
+uv run mailvigil verdict --config mailvigil.toml reports/ --lang pt-BR
 ```
 
 The commands print their text and nothing else; they only read your files and touch no network.
@@ -148,6 +151,9 @@ Left out of these numbers
 A `!` marks a sender with failing messages. Files that were refused, duplicates and reports of
 another domain are counted at the bottom, so a number never silently drops out.
 
+Installing with `pipx install mailvigil` or `uv tool install mailvigil` will be possible once the
+first version is on PyPI.
+
 ### The verdict
 
 `mailvigil verdict` answers one of three things, each with the rule that decided it. This is a
@@ -175,7 +181,7 @@ This reads only the reports you gave it: mail that no receiver reports on, and
 senders that were quiet in this period, are not covered.
 ```
 
-`READY` means every rule passes. `TOO_EARLY` means the data rules (1 to 3) fail and nothing is
+`READY` means every rule passes. `TOO EARLY` means the data rules (1 to 3) fail and nothing is
 failing yet: wait for more reports. `NOT READY` means a source fails (rules 4 and 5), and the
 command names it.
 
@@ -220,8 +226,37 @@ no `sp`) is `null`. A refused run prints no document: the one line goes to stand
 without `--json`, and the exit code is `1`. `docs/json-schema.md` lists every field and the
 compatibility promise.
 
-Installing with `pipx install mailvigil` or `uv tool install mailvigil` will be possible once the
-first version is on PyPI.
+### Language
+
+The text of both commands and the one-line refusals are in English by default. `--lang pt-BR`
+(`pt-br` works too) prints them in Brazilian Portuguese; `--lang en` is the default spelled out, and
+any other code is a usage error (exit `2`). The Portuguese is plain ASCII (`nao`, not `não`), so no
+console encoding can break the layout. The same invented `NOT READY` as above:
+
+```text
+Veredito do MailVigil para example.com: NAO PRONTO para p=reject
+
+Motivo: as falhas de origens nao reconhecidas sao 0.8% das mensagens (56 de
+        7056); o limite e 0.5%.
+  203.0.113.5  nao reconhecido: 56 mensagens com falha
+
+Regras
+  regra                       medido           necessario  resultado
+  1  periodo coberto          29 dias          >= 28       passa
+  2  dias com relatorio       29 de 29 (100%)  >= 80%      passa
+  3  mensagens vistas         7056             >= 1000     passa
+  4  falhas reconhecidas      0                <= 0        passa
+  5  falhas nao reconhecidas  56 (0.8%)        <= 0.5%     FALHA
+
+Proximo: olhe as origens acima e acrescente os seletores das que forem suas a
+         [senders] na configuracao.
+
+Isto le apenas os relatorios que voce deu: email que nenhum receptor reporta, e
+remetentes que ficaram quietos neste periodo, nao sao cobertos.
+```
+
+Numbers keep the decimal point in both languages, `--json` has no language (its identifiers do not
+change), `--help` stays in English, and neither the language nor `--json` changes an exit code.
 
 ## Development
 
