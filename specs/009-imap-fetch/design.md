@@ -196,7 +196,8 @@ saves is always one `007` would accept.
 5. For each remaining UID, in order: past `deadline` → everything not yet tried joins `left`; stop.
    `data = mailbox.message(uid, MAX_MESSAGE_BYTES)`; `None` → `skipped`; `len(data) >
    MAX_MESSAGE_BYTES` → `too_large`; else `store.save`. A `write_failed` ends the run: it raises
-   `FetchRefused` carrying the outcome so far.
+   `FetchRefused` carrying the outcome so far; any refusal raised after the search (sizes,
+   message) carries it too, with the messages not tried counted in `left`.
 6. Return the `FetchOutcome`. The caller closes the mailbox in a `finally`.
 
 The function takes `clock` and `deadline` as arguments and never reads the time itself, so a test

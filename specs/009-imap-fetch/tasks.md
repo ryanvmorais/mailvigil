@@ -71,10 +71,10 @@ signature changed (the parent parser split); if any other one fails, the code is
 
 ## Stage 3 — The loop against a fake (RF-04, RF-05, RF-07, RF-08, RNF-03, RNF-04, ADR-1, ADR-8)
 
-- [ ] `tests/fetch_helpers.py`: `FakeMailbox` (the five methods of the protocol, scripted: UIDs,
+- [x] `tests/fetch_helpers.py`: `FakeMailbox` (the five methods of the protocol, scripted: UIDs,
   sizes, bodies, a validity number, hooks to raise or to return `None`, a record of every call and
   of `close`) and `build_message(...)` (a small synthetic `.eml`). — RNF-06
-- [ ] `tests/test_fetch_run.py`, written first: the counts add up
+- [x] `tests/test_fetch_run.py`, written first: the counts add up
   (`matched == saved + already + too_large + skipped + left`) in every scenario below; messages
   are requested newest first; `--limit` counts new messages only and puts the rest in `left`; a
   rerun against the same store saves nothing and every file is byte-identical; a changed validity
@@ -83,12 +83,13 @@ signature changed (the parent parser split); if any other one fails, the code is
   `MAX_MESSAGE_BYTES + 1` bytes is `too_large` and is not saved; a UID with no size, a body of
   `None` and the tokens dropped by the search are `skipped`; a clock past the deadline moves every
   message not yet tried to `left` and stops; a `write_failed` raises `FetchRefused` carrying the
-  outcome so far; `message` is asked for exactly the cap; `close` is called on success and on every
-  refusal; the module reads no time, environment or `sys.argv`. — RF-04, RF-05, RF-07, RF-08, RNF-03,
-  RNF-04, ADR-8
-- [ ] `src/mailvigil/fetch/run.py`: `fetch_reports(mailbox, folder, since, store, limit, clock,
+  outcome so far; `message` is asked for exactly the cap; the loop does not close the mailbox (the
+  command that opened it does, and stage 5 tests that on every path); the module reads no
+  time, environment or `sys.argv`. — RF-04, RF-05, RF-07, RF-08, RNF-03, RNF-04, ADR-8
+- [x] `src/mailvigil/fetch/run.py`: `fetch_reports(mailbox, folder, since, store, limit, clock,
   deadline)` as in the design. — RF-04, RF-05, RF-07, RF-08, ADR-8
-- [ ] Quality gate of the stage: the same four commands. **Result:** _pending_.
+- [x] Quality gate of the stage: the same four commands. **Result:** ruff, black and mypy clean;
+  2413 tests passed, coverage 100%.
 
 ## Stage 4 — The adapter to `imaplib` (RF-01 to RF-05, RF-10, RNF-01, RNF-02, ADR-2 to ADR-5)
 
@@ -142,7 +143,8 @@ signature changed (the parent parser split); if any other one fails, the code is
   `--to`; the prompt through a patched `getpass.getpass` when stdin is a terminal; a password file
   with and without a trailing newline, an empty one, a missing one, a longer-than-4-KiB first line;
   on POSIX a file readable by group or others adds a warning and still works; `--lang pt-BR` is
-  ASCII; a canary password absent from standard output and error in every case above. — RF-02,
+  ASCII; the mailbox is closed on success and on every
+  refusal; a canary password absent from standard output and error in every case above. — RF-02,
   RF-08
 - [ ] `tests/test_cli.py` (the existing file) first: `summary --help` and `verdict --help` are
   byte-identical to the ones before the parent parser split (compare with a recorded text), and
