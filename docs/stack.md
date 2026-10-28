@@ -6,7 +6,9 @@ and the handful of concepts worth learning first if it is new to you.
 This is not exhaustive: the full version graph is pinned in `uv.lock`, and per-feature decisions
 live in the `### ADR-N` blocks of `specs/*/design.md`. This page is the map: the *shape* of the
 project and the reasoning behind each piece. Entries marked **(planned)** are decided but not
-built yet; the project is pre-0.1 and only the skeleton exists.
+built yet. The project is pre-0.1: the report-ingestion layer (`mailvigil.reports`) is built and
+tested, but the configuration, summary, verdict and output are not, and the CLI does not call the
+ingestion layer yet.
 
 The project is one small program with no runtime dependency:
 
@@ -14,10 +16,12 @@ The project is one small program with no runtime dependency:
 report files (.zip, .gz, .xml)
         │  zipfile / gzip   (size cap against zip bombs)
         ▼
-   XML bytes ──► refuse DOCTYPE/ENTITY ──► xml.etree.ElementTree
+   XML bytes ──► xml.parsers.expat (refuses DOCTYPE/ENTITY) ──► ElementTree tree
         │
         ▼
- records per source IP and DKIM selector ◄── mailvigil.toml (tomllib)
+ Report and Record objects (ipaddress, sanitized text)   ◄── built
+ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
+ grouped by sender ◄── mailvigil.toml (tomllib)           ◄── planned
         │
         ▼
  summary + verdict ──► terminal text, or --json, plus an exit code
@@ -38,8 +42,8 @@ reads a few small XML files. The standard library already has everything the job
 XML, TOML, argument parsing), which is what makes "zero dependencies" possible.
 
 **Learn:** type hints (`X | None`, `list[str]`, `Sequence[str]`), `pathlib.Path`, generators for
-reading many files without loading all of them, `typing.NamedTuple` or dataclasses for the report
-records.
+reading many files without loading all of them, and frozen dataclasses with `slots=True` (what the
+report records are) next to `enum.StrEnum` (what the refusal reasons are).
 
 **Docs:** [docs.python.org/3.12](https://docs.python.org/3.12/)
 
@@ -90,34 +94,62 @@ environments with a required reviewer.
 
 ### `zipfile` and `gzip`
 
-Open the `.zip` and `.gz` files the providers send. Each member is read with a hard cap on the
-decompressed size (5 MiB), so a small archive that expands into gigabytes (a zip bomb) is
-refused instead of exhausting memory.
+Open the `.zip` and `.gz` files the providers send. The one XML member is read with a hard cap on
+the decompressed size (5 MiB), so a small archive that expands into gigabytes (a zip bomb) is
+refused instead of exhausting memory. Nothing is extracted to disk, and a member's name is never
+used as a path.
 
 **Why this:** against a third-party archive library, these two are in the standard library and
-already stream; the risk is in *how much* you read, which is our code either way.
+already stream; the risk is in *how much* you read, which is our code either way. The cap counts
+the bytes actually produced and ignores the size an archive declares, because a header can lie
+(ADR-2 of spec 002).
 
-**Learn:** `ZipFile.infolist()` and `ZipInfo.file_size` (declared size, which can lie),
-`ZipFile.open()` plus a bounded `read(limit + 1)`, `gzip.open()`.
+**Learn:** `ZipFile.infolist()` to find the members (and why `ZipInfo.file_size` is not trusted),
+`ZipFile.open()` as a stream, reading it in a loop up to `MAX_BYTES + 1` (a raw stream may return
+fewer bytes than asked without having ended), `gzip.open()` and the `BadZipFile` / `BadGzipFile`
+errors.
 
 **Docs:** [zipfile](https://docs.python.org/3/library/zipfile.html),
 [gzip](https://docs.python.org/3/library/gzip.html)
 
-### `xml.etree.ElementTree` **(planned)**
+### `xml.parsers.expat` and `xml.etree.ElementTree`
 
-Parses the DMARC aggregate report (RUA) XML into a tree we walk to get each record: source IP,
-count, SPF and DKIM results, alignment and DKIM selector. Before parsing, any file that contains
-`DOCTYPE` or `ENTITY` is refused.
+`expat` is the XML parser underneath the standard library; `mailvigil/reports/xmlsafe.py` drives it
+directly, with handlers that raise as soon as the document declares a `DOCTYPE` or an `ENTITY`.
+A `TreeBuilder` from `ElementTree` assembles the tree that `parser.py` walks to get each record:
+source IP, count, SPF and DKIM results, alignment and DKIM selector. That module is the only place
+that creates an XML parser.
 
 **Why this:** against `lxml` (a C dependency) and `defusedxml` (a dependency just for this), the
-standard parser is enough once the dangerous constructs are refused up front. A legitimate DMARC
-report has neither, so refusing them costs nothing.
+standard parser is enough once the dangerous constructs are refused. Hooking `expat` instead of
+searching the bytes for `<!DOCTYPE` matters: expat decodes the document first, so the check sees
+what the parser sees, in UTF-8 or UTF-16. The byte search missed a UTF-16 document in testing
+(ADR-1 of spec 002). A legitimate DMARC report has neither construct, so refusing them costs
+nothing.
 
-**Learn:** `ET.fromstring`, `find` / `findall` / `findtext` with paths, why entity expansion
-("billion laughs") is an attack, and why refusing the construct is safer than limiting it.
+**Learn:** `expat.ParserCreate`, the `StartDoctypeDeclHandler` and `EntityDeclHandler` hooks,
+`TreeBuilder` (`start`, `end`, `data`, `close`), `find` / `findall` / `findtext` on the result, why
+entity expansion ("billion laughs") is an attack, and why refusing the construct is safer than
+limiting it.
 
-**Docs:** [xml.etree.ElementTree](https://docs.python.org/3/library/xml.etree.elementtree.html),
+**Docs:** [xml.parsers.expat](https://docs.python.org/3/library/pyexpat.html),
+[xml.etree.ElementTree](https://docs.python.org/3/library/xml.etree.elementtree.html),
 [XML security notes](https://docs.python.org/3/library/xml.html#xml-vulnerabilities)
+
+### `ipaddress`
+
+Turns the `source_ip` text of each record into a canonical address, so `2001:DB8::1` and
+`2001:db8:0::1` are the same sender. Text that is not an address is kept, sanitized, instead of
+failing the whole report.
+
+**Why this:** the alternative is comparing strings, which treats one IPv6 address written two ways
+as two senders and would split a sender's volume in the summary. The module is in the standard
+library and handles IPv4 and IPv6.
+
+**Learn:** `ip_address()` and its `ValueError`, `str()` of the result as the canonical form,
+`is_private` and the other classification properties (useful later, in the summary).
+
+**Docs:** [ipaddress](https://docs.python.org/3/library/ipaddress.html)
 
 ### `tomllib` **(planned)**
 
@@ -213,8 +245,14 @@ wheel must declare no runtime dependency, it must install and run in a clean env
 `security` job (`pip-audit`). Actions are pinned by commit SHA with the version in a comment, on a
 fixed `ubuntu-26.04` runner.
 
-**Why this:** it is where the repository lives. The private repository on the Free plan has 2,000
-minutes a month and a US$ 0 budget, so CI runs on pull requests and by hand only.
+Two more workflows cover the supply chain: CodeQL (code scanning, run as a workflow rather than the
+default setup) and dependency review on pull requests.
+
+**Why this:** it is where the repository lives. The repository is public, so Actions minutes are
+free and the CI runs on pull requests, on pushes to `main` and by hand. A `proteger-main` ruleset
+requires a pull request, a linear history and the quality and package checks to pass; `pip-audit`,
+CodeQL and dependency review are deliberately not required, so a new CVE cannot block the PR that
+fixes it.
 
 **Learn:** `on:` triggers, `permissions: contents: read`, `concurrency`, a matrix, and why a SHA
 cannot be moved after publication but a tag can.
@@ -242,9 +280,9 @@ A versioned pre-commit hook (`.githooks/pre-commit`) runs the whole gate, and fo
 hooks in `.claude/` format on edit, validate at the end of a turn, block edits to `uv.lock` and
 warn about a missing environment.
 
-**Why this:** the private repository has no branch protection on the Free plan, so the local hook
-is the real gate. The editor-side hooks make the agent fix lint and type errors before it hands
-anything back.
+**Why this:** the local hook fails a bad commit before it leaves the machine, so the CI is a second
+check and not the first. The editor-side hooks make the agent fix lint and type errors before it
+hands anything back.
 
 **Learn:** `git config core.hooksPath`, and the hook events (`PreToolUse`, `PostToolUse`, `Stop`,
 `SessionStart`) and the exit code `2` that blocks.
@@ -260,6 +298,10 @@ anything back.
 |---|---|
 | `twine` (via `uvx`) | `twine check --strict` in CI: the README renders on PyPI |
 | `coverage` | the engine under pytest-cov; settings in `[tool.coverage.*]` |
+| `unicodedata` | drops control, format and line-separator characters from every text of a report, by Unicode category (ADR-6 of spec 002) |
+| `dataclasses`, `enum.StrEnum` | the immutable report model (`frozen=True, slots=True`) and the refusal reasons, which are plain strings a later spec can translate |
+| `os.path.realpath` | tells that one file given twice, or once directly and once through its folder, is the same file, so it is read once |
+| `re` | the name pattern of an attachment (`provider!domain!begin!end…`), compiled with `re.ASCII` |
 | `NO_COLOR` | convention for turning terminal colors off, honored by the output (**planned**) |
 
 ---
@@ -267,7 +309,7 @@ anything back.
 ## What is deliberately not in the stack
 
 - **click, typer, rich** — nice CLIs, but each is a dependency; `argparse` and a few ANSI codes do the job.
-- **defusedxml, lxml** — hardened or faster XML parsers; refusing `DOCTYPE`/`ENTITY` up front makes the standard parser safe enough for this input.
+- **defusedxml, lxml** — hardened or faster XML parsers; refusing `DOCTYPE`/`ENTITY` inside `expat` makes the standard parser safe enough for this input.
 - **gettext / Babel** — the CLI text exists in two languages (English and Portuguese), a small dictionary is simpler than a translation toolchain.
 - **Elasticsearch, Splunk, Kibana, a web dashboard** — that is parsedmarc's territory; MailVigil answers one question offline.
 - **IMAP fetching, sending e-mail** — out of scope: you point MailVigil at files you already have.
