@@ -109,27 +109,42 @@ public entry point.
 
 ## Stage 5 — Discovery and ingestion (RF-06 to RF-09)
 
-- [ ] `tests/test_reports_discovery.py`, written first: a file is kept whatever its name; a folder
+- [x] `tests/test_reports_discovery.py`, written first: a file is kept whatever its name; a folder
   keeps only names matching the attachment pattern, including `report (1).zip` style names;
   subfolders ignored silently; the same file given twice, and once directly and once through its
   folder, is read once; names differing only in case sort the same on every platform; a missing
-  path is `UNREADABLE` and the other paths are still discovered. — RF-06, RNF-05
-- [ ] `src/mailvigil/reports/discovery.py`: `discover` as in the design (sort by name string,
-  `os.path.realpath` dedupe). — RF-06
-- [ ] `tests/test_reports_ingest.py`, written first: one good report plus one of each refusal in a
+  path is `UNREADABLE` and the other paths are still discovered. The `(1)` case is an attachment
+  name with the suffix, `…!1!2 (1).zip`; a bare `report (1).zip` has no provider, domain or period,
+  so the pattern leaves it out, and a test says so. Names that differ only in case cannot coexist
+  on Windows, so the order test uses names that differ in the letter. A folder that cannot be
+  listed is covered with `Path.iterdir` replaced for that folder. — RF-06, RNF-05
+- [x] `src/mailvigil/reports/discovery.py`: `discover` as in the design (sort by name string,
+  `os.path.realpath` dedupe). The pattern is compiled with `re.ASCII`, so `\d` stays `0-9`.
+  — RF-06
+- [x] `tests/test_reports_ingest.py`, written first: one good report plus one of each refusal in a
   folder (good one returned, each bad one in `skipped` with the right `Reason`); domain filter exact
   and case-insensitive, trailing dot in the argument, a subdomain counted as `other_domain`, empty
   `domain` raises `ValueError`; zero reports for the domain still returns the `other_domain` count;
   same reporter and id twice counts one duplicate and does not sum records; same id from two
   reporters kept; an other-domain report never counts as a duplicate; an empty folder gives an
   empty result; ingesting twice gives equal results; nothing is written under `tmp_path` besides
-  the inputs. — RF-07, RF-08, RF-09, RF-10, RNF-02, RNF-05
-- [ ] `src/mailvigil/reports/ingest.py`: `ingest` as in the design. — RF-07, RF-08, RF-09
-- [ ] `src/mailvigil/reports/__init__.py`: re-export the public API of the design's Interfaces
-  table and nothing else; a test imports each name from `mailvigil.reports`. — RF-09
-- [ ] Zero-dependency guard: `uv build`, then check the wheel metadata has no `Requires-Dist`, as
-  the CI `package` job does. — RNF-01
-- [ ] Quality gate. — result recorded when run: ___
+  the inputs. The refusal table covers all twelve `Reason` members and asserts `set(Reason)`, so a
+  new reason needs a new case; two of them, `UNSUPPORTED_EXTENSION` and a missing file, come from
+  paths given directly, since a folder never yields them.
+  — RF-07, RF-08, RF-09, RF-10, RNF-02, RNF-05
+- [x] `src/mailvigil/reports/ingest.py`: `ingest` as in the design. Files `discover` could not look
+  at come first in `skipped`, then the ones the reader or parser refused, each group in discovery
+  order. — RF-07, RF-08, RF-09
+- [x] `src/mailvigil/reports/__init__.py`: re-export the public API of the design's Interfaces
+  table and nothing else; a test imports each name from `mailvigil.reports`. The table plus the
+  model types and `Reason`; the test pins `__all__`. — RF-09
+- [x] Zero-dependency guard: `uv build`, then check the wheel metadata has no `Requires-Dist`, as
+  the CI `package` job does. Result: no `Requires-Dist`; the wheel holds the eight `reports`
+  modules and `mailvigil.reports` imports from it. — RNF-01
+- [x] Quality gate. — result recorded when run: all green on 2026-10-27; 178 passed, coverage 100%
+  (Python 3.12). Mutation checks, each caught by a test: sorting by `Path`, no `realpath` dedupe,
+  no name filter, a case-sensitive domain, a kept trailing dot, deduping by id alone, and the
+  duplicate rule running before the domain filter.
 
 ## Stage 6 — Close the spec
 
