@@ -1,6 +1,6 @@
 ---
 feature: Summary — per sender and per situation, failures highlighted, and the first command
-status: in progress
+status: done
 date: 2026-10-27
 related:
   - 004-summary/requirements.md
@@ -355,7 +355,7 @@ the text identical across platforms and Python versions (RNF-05, RNF-06).
 ### ADR-6 — A fixed 80-column layout, with widths taken from the data
 
 **Decision.** Lines are built by padding to computed widths, ASCII only, with the label column
-between 10 and 30 characters and the number columns as wide as their longest value; anything wider
+between 10 and 35 characters (the longest IPv4 address with the longest kind) and the number columns as wide as their longest value; anything wider
 is cut by `_fit`.
 **Alternatives.** A constant width per column; reading the terminal size; wrapping.
 **Why.** A constant width breaks the first time a count has a digit more than the header. The

@@ -7,10 +7,10 @@ This file guides Claude Code (claude.ai/code) when working in this repository.
 MailVigil is an open-source command-line tool that reads DMARC aggregate reports (RUA, usually
 `.zip`, `.gz` or `.xml`) and says, in plain language, who is sending mail as a domain and whether
 it is safe to move the policy to `p=reject`. Python `>=3.12`, standard library only (zero runtime
-dependencies), offline. It is pre-0.1: the CLI only answers `mailvigil --version`, and the report
-ingestion layer (`mailvigil.reports`), the configuration loader (`mailvigil.config`) and the sender
-identification (`mailvigil.senders`) are built and tested but not wired to the CLI yet; everything
-else is specified in [specs/](specs/) first. The repository has been public since
+dependencies), offline. It is pre-0.1: the CLI answers `mailvigil --version` and `mailvigil summary`
+(report ingestion, configuration, sender identification, the summary and its text are built and
+wired); the verdict on `p=reject`, `--json` and the stable exit codes are not built yet. Everything
+is specified in [specs/](specs/) first. The repository has been public since
 2026-10-27 (the maintainer made it public, not Claude); nothing is announced or published to PyPI
 until the first version is ready.
 
@@ -25,6 +25,7 @@ uv sync
 
 # Run the CLI from the source tree
 uv run mailvigil --version
+uv run mailvigil summary --domain example.com path/to/reports   # or --config FILE
 
 # Run the tests (one file, then one test)
 uv run pytest
@@ -57,7 +58,8 @@ local one (`mailvigil.local.toml` is ignored).
 ```text
 src/mailvigil/
   __init__.py        # __version__ read from package metadata
-  cli.py             # argparse entry point (`mailvigil = mailvigil.cli:main`)
+  cli.py             # argparse entry point (`mailvigil = mailvigil.cli:main`): `--version` and the
+                     # `summary` command (resolve_config, ingest → summarize → render, exit 0/1/2)
   py.typed           # marks the package as typed (PEP 561)
   reports/           # report ingestion (spec 002); public API re-exported by __init__.py
     errors.py        #   Reason (StrEnum) and ReportRefused: every refusal is typed
@@ -68,10 +70,15 @@ src/mailvigil/
     discovery.py     #   paths (files and folders) to an ordered, deduplicated list of files
     ingest.py        #   ingest(paths, domain): the entry point; refusals go to `skipped`
   text.py            # text and domain rules shared by reports and config (clean_text, normalize_domain…)
-  config.py          # load_config(path) → frozen Config (domain + selector map); ConfigError is typed (spec 003)
+  config.py          # load_config(path) → frozen Config (domain + selector map); check_domain is shared with
+                     # the CLI's --domain; ConfigError is typed (spec 003)
   senders.py         # identify_sender(record, config) → Identification; a selector counts only under the domain
+  summary.py         # summarize(result, config) → frozen Summary: rows per sender, failing sources, period,
+                     # policy, what was left out (spec 004); never imports render
+  render.py          # render_summary(summary, config_source) → 80-column ASCII text; no_reports_message
 tests/               # pytest, one test file per module (test_reports_*.py, test_text.py, test_config.py,
-                     # test_senders.py); fixtures are synthetic, built in conftest.py or tmp_path
+                     # test_senders.py, test_summary.py, test_render.py, test_cli_summary.py); fixtures
+                     # are synthetic, built in conftest.py or tmp_path
 specs/               # spec-driven development: requirements → design → tasks per feature
 docs/stack.md        # each technology of the stack, why it was chosen, what to study first
 .githooks/           # versioned pre-commit hook (core.hooksPath)

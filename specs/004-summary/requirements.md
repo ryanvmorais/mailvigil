@@ -1,6 +1,6 @@
 ---
 feature: Summary — per sender and per situation, failures highlighted, and the first command
-status: in progress
+status: done
 date: 2026-10-27
 related:
   - 001-foundation/requirements.md
@@ -118,8 +118,8 @@ Senders
   Unrecognized sources that fail
   ! unrecognized, foreign domain (selector newsletter)
       203.0.113.50  25 messages  dkim: unaligned, spf: none
-  ! unrecognized
-      198.51.100.77  3 messages  dkim: fail, spf: fail; forwarded
+  ! 198.51.100.77
+      3 messages  dkim: fail, spf: fail; forwarded
 
 Left out of these numbers
   skipped files  2 (1 too large, 1 not a report)

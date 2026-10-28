@@ -7,8 +7,9 @@ This is not exhaustive: the full version graph is pinned in `uv.lock`, and per-f
 live in the `### ADR-N` blocks of `specs/*/design.md`. This page is the map: the *shape* of the
 project and the reasoning behind each piece. Entries marked **(planned)** are decided but not
 built yet. The project is pre-0.1: the report-ingestion layer (`mailvigil.reports`), the
-configuration loader and the sender identification are built and tested, but the summary, verdict
-and output are not, and the CLI does not call any of these layers yet.
+configuration loader, the sender identification, the summary and its text are built and tested, and
+`mailvigil summary` runs them end to end; the verdict, `--json` and the stable exit codes are not
+built.
 
 The project is one small program with no runtime dependency:
 
@@ -23,10 +24,13 @@ report files (.zip, .gz, .xml)
         │
         ▼
  sender named from the DKIM selector ◄── a TOML file (tomllib)   ◄── built
+        │
+        ▼
+ summary per sender and per situation ──► 80-column terminal text   ◄── built
  ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
         │
         ▼
- summary + verdict ──► terminal text, or --json, plus an exit code
+ verdict ──► terminal text, or --json, plus a stable exit code
 ```
 
 ---
@@ -172,14 +176,16 @@ quoted), and validating the shape of the loaded dict before using it.
 
 ### `argparse`
 
-The command line: flags, `--version`, and later the subcommands and `--json`.
+The command line: `--version`, the `summary` subcommand with its `PATH...`, `--config` and
+`--domain`, and later `--json`.
 
 **Why this:** against click, typer and rich, argparse needs nothing installed. The CLI is small
 enough that its verbosity does not hurt, and terminal colors are a few ANSI codes that honor
 `NO_COLOR` (**planned**).
 
-**Learn:** `ArgumentParser`, `add_argument(action="version")`, `parse_args(argv)` with an explicit
-`argv` (what makes the CLI testable), and exit codes from `main() -> int`.
+**Learn:** `ArgumentParser`, `add_argument(action="version")`, `add_subparsers(dest="command")` for
+a command with its own flags, `nargs="+"` for "one or more paths", `parse_args(argv)` with an
+explicit `argv` (what makes the CLI testable), and exit codes from `main(argv) -> int`.
 
 **Docs:** [argparse](https://docs.python.org/3/library/argparse.html)
 
@@ -311,6 +317,9 @@ hands anything back.
 | `difflib` | `get_close_matches` suggests the right key for a typo in the configuration (`domian` → `domain`) |
 | `types.MappingProxyType` | the selector map of a `Config` is a read-only view, so a frozen dataclass does not hide a mutable dict (ADR-5 of spec 003) |
 | `re` | the name pattern of an attachment (`provider!domain!begin!end…`), compiled with `re.ASCII` |
+| `datetime` | the period of the summary: each report is a range of days with an exclusive end (one ending at midnight does not touch the next day), and overlapping ranges are merged so a day is counted once (ADR-3 of spec 004) |
+| `collections.Counter` | counts the skipped files per reason for the "left out" section |
+| integer arithmetic | `format_share` rounds a percentage to one decimal with `//`, never a float, and prints `<0.1%` so a small failing share is not rounded to zero (ADR-5 of spec 004) |
 | `NO_COLOR` | convention for turning terminal colors off, honored by the output (**planned**) |
 
 ---

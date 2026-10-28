@@ -21,16 +21,17 @@ It is built for site owners, developers, agencies and infrastructure freelancers
 out DMARC, and it runs entirely on your machine: your reports are never sent to anyone.
 
 > **Status:** under development (pre-0.1). Nothing is released yet and the interface will change
-> until the first version is out. The table below is the plan, not what works today.
+> until the first version is out. Rows marked "Built" work today through `mailvigil summary`; the
+> rest of the table is the plan.
 
 ## What it will do
 
 | Area | What | Version | Status |
 |---|---|---|---|
-| Input | Read a folder or files (`.zip`, `.gz`, `.xml`), filter by domain | v0.1 | Library built, not wired to the CLI yet |
-| Hostile input | Cap decompressed size (zip bombs) and refuse XML with `DOCTYPE` or `ENTITY` (entity expansion) | v0.1 | Library built, not wired to the CLI yet |
-| Configuration | A TOML file with your domain and a map from DKIM selector to service name; a signature only counts under your own domain | v0.1 | Library built, not wired to the CLI yet |
-| Summary | Per sender and per situation (ok, fragile, failing), failures highlighted | v0.1 | Planned |
+| Input | Read a folder or files (`.zip`, `.gz`, `.xml`), filter by domain | v0.1 | Built (`mailvigil summary`) |
+| Hostile input | Cap decompressed size (zip bombs) and refuse XML with `DOCTYPE` or `ENTITY` (entity expansion) | v0.1 | Built (`mailvigil summary`) |
+| Configuration | A TOML file with your domain and a map from DKIM selector to service name; a signature only counts under your own domain | v0.1 | Built (`mailvigil summary`) |
+| Summary | Per sender and per situation (ok, fragile, failing), failures highlighted | v0.1 | Built (`mailvigil summary`) |
 | Verdict | "Ready for `reject`?" with a declared criterion (minimum window, minimum volume, no legitimate failures) | v0.1 | Planned |
 | Output | `--json` and stable exit codes for scripts and CI | v0.1 | Planned |
 
@@ -62,7 +63,8 @@ mailbox = "Example Mail (staff mailboxes)"
 - **The file is strict.** An unknown key (`domian`), a duplicate selector or a control character in
   a name is an error with a reason, never a silent guess, because a typo would change the answer.
 
-The loader exists in the library (`mailvigil.config`), but no command reads the file yet.
+`mailvigil summary --config FILE` reads it. Without `--config` the command reads `mailvigil.toml`
+in the current folder, if there is one; with neither a file nor `--domain` it asks for one.
 
 ## MailVigil vs. other tools
 
@@ -86,9 +88,59 @@ git clone https://github.com/ryanvmorais/mailvigil.git
 cd mailvigil
 uv sync
 
-# Check that the command runs (the only command that exists so far)
+# Check that the command runs
 uv run mailvigil --version
+
+# Sum up a folder of reports (or name the files); mailvigil.toml is read if it is here
+uv run mailvigil summary reports/
+uv run mailvigil summary --config mailvigil.toml reports/
+uv run mailvigil summary --domain example.com report.xml.gz
 ```
+
+The command prints the summary and nothing else; it only reads your files and touches no network.
+A folder is searched, one level deep, only for the names providers use for their attachments
+(`provider!domain!begin!end.zip`, also `.gz` and `.xml`). A file named on the command line is read
+whatever its name. The output looks like this (invented data):
+
+```text
+MailVigil summary for example.com
+  config    mailvigil.toml (3 selectors)
+  period    2026-10-20 to 2026-10-20 (1 of 1 day has a report)
+  reports   1 from 1 reporter
+  policy    p=none, sp=none, pct=100
+  messages  7335 (7250 from recognized senders, 98.8%)
+
+Situations
+  ok       6300  85.9%
+  fragile   975  13.3%
+  failing    60   0.8%
+
+Senders
+  sender                               ok  fragile  failing  total
+  Example Mailer (newsletters)       6300        0        0   6300
+  Example Mail (staff mailboxes)        0      950        0    950
+! 203.0.113.5 (unrecognized)            0        0       40     40
+  198.51.100.99 (failing signature)     0       25        0     25
+! 203.0.113.9 (unrecognized)            0        0       12     12
+! 2001:db8::7 (unrecognized)            0        0        8      8
+
+! FAILING: 60 messages in 3 sources
+  Unrecognized sources that fail
+  ! 203.0.113.5
+      40 messages  dkim: fail, spf: fail
+  ! 203.0.113.9
+      12 messages  dkim: none, spf: fail
+  ! 2001:db8::7
+      8 messages  dkim: none, spf: none
+
+Left out of these numbers
+  skipped files  0
+  duplicates     0
+  other domains  0
+```
+
+A `!` marks a sender with failing messages. Files that were refused, duplicates and reports of
+another domain are counted at the bottom, so a number never silently drops out.
 
 Exit codes: not defined yet. They arrive with the output spec and become a stable contract at the
 first release.
