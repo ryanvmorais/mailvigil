@@ -1,6 +1,6 @@
 ---
 feature: Report ingestion — read DMARC aggregate reports safely into a typed record model
-status: approved
+status: done
 date: 2026-10-27
 related:
   - 002-report-ingestion/requirements.md
@@ -392,7 +392,8 @@ that message possible. (RF-01, RF-06, RF-07)
 2. **Real providers deviate from the RFC.** Mitigation: every optional element has a default and
    unknown elements are ignored; only `count`, the period and `pct` are strict. Before the first
    release the maintainer runs the layer over the real reports of his domain locally and reports
-   refusals as `skipped` reasons, without committing or pasting the reports.
+   refusals as `skipped` reasons, without committing or pasting the reports. *Run on 2026-10-27:
+   the maintainer reported no refusal that looked legitimate; the counts were not shared.*
 3. **5 MiB may be too small for a very busy domain.** The source script never hit it. A refusal is
    visible as `DECOMPRESSED_TOO_LARGE`, and `MAX_BYTES` is one constant; raising it is a decision
    for a spec, not a silent edit.
