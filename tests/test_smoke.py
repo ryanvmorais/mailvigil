@@ -30,9 +30,13 @@ def test_version_flag_prints_version_and_exits_zero(capsys: pytest.CaptureFixtur
     assert capsys.readouterr().out.strip() == f"mailvigil {__version__}"
 
 
-def test_no_arguments_exits_zero() -> None:
-    """Without arguments the skeleton command does nothing and succeeds."""
-    assert main([]) == 0
+def test_no_arguments_prints_the_help_and_exits_two(capsys: pytest.CaptureFixture[str]) -> None:
+    """Without a command the help goes to stderr and the code is the usage one (RF-07)."""
+    assert main([]) == 2
+
+    captured = capsys.readouterr()
+    assert "usage: mailvigil" in captured.err
+    assert captured.out == ""
 
 
 def test_unknown_flag_exits_two(capsys: pytest.CaptureFixture[str]) -> None:
