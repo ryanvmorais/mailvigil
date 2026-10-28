@@ -7,9 +7,10 @@ This file guides Claude Code (claude.ai/code) when working in this repository.
 MailVigil is an open-source command-line tool that reads DMARC aggregate reports (RUA, usually
 `.zip`, `.gz` or `.xml`) and says, in plain language, who is sending mail as a domain and whether
 it is safe to move the policy to `p=reject`. Python `>=3.12`, standard library only (zero runtime
-dependencies), offline. It is pre-0.1: the CLI answers `mailvigil --version` and `mailvigil summary`
-(report ingestion, configuration, sender identification, the summary and its text are built and
-wired); the verdict on `p=reject`, `--json` and the stable exit codes are not built yet. Everything
+dependencies), offline. It is pre-0.1: the CLI answers `mailvigil --version`, `mailvigil summary`
+and `mailvigil verdict` (report ingestion, configuration, sender identification, the summary, the
+verdict on `p=reject` and their texts are built and wired); `--json` and the stable exit codes are
+not built yet (the verdict's codes 3 and 4 are provisional until spec 006). Everything
 is specified in [specs/](specs/) first. The repository has been public since
 2026-10-27 (the maintainer made it public, not Claude); nothing is announced or published to PyPI
 until the first version is ready.
@@ -26,6 +27,7 @@ uv sync
 # Run the CLI from the source tree
 uv run mailvigil --version
 uv run mailvigil summary --domain example.com path/to/reports   # or --config FILE
+uv run mailvigil verdict --domain example.com path/to/reports   # exit 0 ready, 3 too early, 4 not ready
 
 # Run the tests (one file, then one test)
 uv run pytest
@@ -58,8 +60,10 @@ local one (`mailvigil.local.toml` is ignored).
 ```text
 src/mailvigil/
   __init__.py        # __version__ read from package metadata
-  cli.py             # argparse entry point (`mailvigil = mailvigil.cli:main`): `--version` and the
-                     # `summary` command (resolve_config, ingest → summarize → render, exit 0/1/2)
+  cli.py             # argparse entry point (`mailvigil = mailvigil.cli:main`): `--version`, `summary`
+                     # (resolve_config, ingest → summarize → render, exit 0/1/2) and `verdict` (same
+                     # load, then judge → render_verdict; exit 0 ready, 3 too early, 4 not ready,
+                     # provisional until spec 006); a parent parser shares paths/--config/--domain
   py.typed           # marks the package as typed (PEP 561)
   reports/           # report ingestion (spec 002); public API re-exported by __init__.py
     errors.py        #   Reason (StrEnum) and ReportRefused: every refusal is typed
@@ -75,9 +79,15 @@ src/mailvigil/
   senders.py         # identify_sender(record, config) → Identification; a selector counts only under the domain
   summary.py         # summarize(result, config) → frozen Summary: rows per sender, failing sources, period,
                      # policy, what was left out (spec 004); never imports render
-  render.py          # render_summary(summary, config_source) → 80-column ASCII text; no_reports_message
+  render.py          # render_summary(summary, config_source) → 80-column ASCII text; no_reports_message;
+                     # also the public helpers fit, address, count_noun, format_share
+  verdict.py         # judge(summary) → frozen Verdict: Answer (READY/TOO_EARLY/NOT_READY), five Rules
+                     # with the four threshold constants, Notes; integer arithmetic; never imports a
+                     # text module (spec 005)
+  render_verdict.py  # render_verdict(verdict) → 80-column ASCII text: reason, rules table, notes, next step
 tests/               # pytest, one test file per module (test_reports_*.py, test_text.py, test_config.py,
-                     # test_senders.py, test_summary.py, test_render.py, test_cli_summary.py); fixtures
+                     # test_senders.py, test_summary.py, test_render.py, test_verdict.py,
+                     # test_render_verdict.py, test_cli_summary.py, test_cli_verdict.py); fixtures
                      # are synthetic, built in conftest.py or tmp_path
 specs/               # spec-driven development: requirements → design → tasks per feature
 docs/stack.md        # each technology of the stack, why it was chosen, what to study first

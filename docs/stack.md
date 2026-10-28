@@ -7,9 +7,9 @@ This is not exhaustive: the full version graph is pinned in `uv.lock`, and per-f
 live in the `### ADR-N` blocks of `specs/*/design.md`. This page is the map: the *shape* of the
 project and the reasoning behind each piece. Entries marked **(planned)** are decided but not
 built yet. The project is pre-0.1: the report-ingestion layer (`mailvigil.reports`), the
-configuration loader, the sender identification, the summary and its text are built and tested, and
-`mailvigil summary` runs them end to end; the verdict, `--json` and the stable exit codes are not
-built.
+configuration loader, the sender identification, the summary, the verdict and their texts are built
+and tested, and `mailvigil summary` and `mailvigil verdict` run them end to end; `--json` and the
+stable exit codes are not built (the verdict's codes are provisional).
 
 The project is one small program with no runtime dependency:
 
@@ -27,10 +27,13 @@ report files (.zip, .gz, .xml)
         │
         ▼
  summary per sender and per situation ──► 80-column terminal text   ◄── built
+        │
+        ▼
+ verdict (five rules) ──► 80-column terminal text + exit code 0, 3 or 4   ◄── built
  ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
         │
         ▼
- verdict ──► terminal text, or --json, plus a stable exit code
+ --json and the stable exit codes (spec 006)   ◄── planned
 ```
 
 ---
@@ -176,16 +179,18 @@ quoted), and validating the shape of the loaded dict before using it.
 
 ### `argparse`
 
-The command line: `--version`, the `summary` subcommand with its `PATH...`, `--config` and
-`--domain`, and later `--json`.
+The command line: `--version`, the `summary` and `verdict` subcommands, which share `PATH...`,
+`--config` and `--domain`, and later `--json`.
 
 **Why this:** against click, typer and rich, argparse needs nothing installed. The CLI is small
 enough that its verbosity does not hurt, and terminal colors are a few ANSI codes that honor
 `NO_COLOR` (**planned**).
 
-**Learn:** `ArgumentParser`, `add_argument(action="version")`, `add_subparsers(dest="command")` for
-a command with its own flags, `nargs="+"` for "one or more paths", `parse_args(argv)` with an
-explicit `argv` (what makes the CLI testable), and exit codes from `main(argv) -> int`.
+**Learn:** `ArgumentParser` with `add_argument` (`action="version"`, `nargs="+"` for "one or more
+paths"), `add_subparsers(dest="command")` for a command with its own flags, a parent parser
+(`add_help=False`, passed as `parents=[shared]`) for the arguments two commands have in common, and
+`parse_args(argv)` with an explicit `argv` (what makes the CLI testable) returning an exit code from
+`main(argv) -> int`.
 
 **Docs:** [argparse](https://docs.python.org/3/library/argparse.html)
 
@@ -312,7 +317,9 @@ hands anything back.
 | `twine` (via `uvx`) | `twine check --strict` in CI: the README renders on PyPI |
 | `coverage` | the engine under pytest-cov; settings in `[tool.coverage.*]` |
 | `unicodedata` | drops control, format and line-separator characters from every text of a report, by Unicode category (ADR-6 of spec 002) |
-| `dataclasses`, `enum.StrEnum` | the immutable report model (`frozen=True, slots=True`) and the refusal reasons, which are plain strings a later spec can translate |
+| `dataclasses`, `enum.StrEnum` | the immutable report model (`frozen=True, slots=True`), the refusal reasons and the verdict's answers, which are plain strings a later spec can translate |
+| `enum.IntEnum` | `RuleId`, the number of each verdict rule (1 to 5): it sorts and prints as the number the table shows |
+| integer thresholds | the verdict compares whole numbers only: rule 5 is `MAX_UNRECOGNIZED_PER_MILLE = 5` (0.5%), per mille so no float decides a verdict (ADR-4 of spec 005) |
 | `os.path.realpath` | tells that one file given twice, or once directly and once through its folder, is the same file, so it is read once |
 | `difflib` | `get_close_matches` suggests the right key for a typo in the configuration (`domian` → `domain`) |
 | `types.MappingProxyType` | the selector map of a `Config` is a read-only view, so a frozen dataclass does not hide a mutable dict (ADR-5 of spec 003) |
