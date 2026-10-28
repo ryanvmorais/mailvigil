@@ -328,3 +328,78 @@ def test_the_verdict_help_shows_the_three_shared_arguments(
     assert "PATH" in out
     assert "--config" in out
     assert "--domain" in out
+
+
+# ---------------------------------------------------------------------------
+# What was left out (RF-09, ADR-9)
+# ---------------------------------------------------------------------------
+
+
+def test_files_left_out_are_counted_in_one_line_and_change_nothing_else(
+    tmp_path: Path,
+    make_report_xml: _ReportXml,
+    make_record_xml: _RecordXml,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A malformed file, a duplicate and a report of another domain give one line, same answer."""
+    folder = write_window(tmp_path / "reports", make_report_xml, make_record_xml, days=_LONG)
+    config = write_config(tmp_path / "config.toml")
+    first = sorted(folder.iterdir())[0]
+    malformed = tmp_path / "broken.xml"
+    malformed.write_bytes(b"not a report")
+    duplicate = tmp_path / "copy.xml"
+    duplicate.write_bytes(first.read_bytes())
+    elsewhere = tmp_path / "elsewhere.xml"
+    elsewhere.write_bytes(make_report_xml(domain="example.org", report_id="other"))
+
+    clean_code = main(["verdict", str(folder), "--config", str(config)])
+    clean = capsys.readouterr().out
+    code = main(
+        [
+            "verdict",
+            str(folder),
+            *map(str, (malformed, duplicate, elsewhere)),
+            "--config",
+            str(config),
+        ]
+    )
+    out = capsys.readouterr().out
+
+    assert code == clean_code == 0
+    assert "Left out" not in clean
+    assert (
+        " ".join(out.split()).count(
+            "Left out of this verdict: 1 file skipped, 1 duplicate, 1 report of another domain. "
+            "mailvigil summary shows why."
+        )
+        == 1
+    )
+    assert out.replace(_left_out_paragraph(out), "") == clean
+    assert "broken.xml" not in out
+
+
+def _left_out_paragraph(text: str) -> str:
+    """Return the left-out paragraph of an output, with the blank line that precedes it."""
+    paragraphs = text.split("\n\n")
+    kept = [p for p in paragraphs if p.startswith("Left out")]
+    return "\n\n" + kept[0] if kept else ""
+
+
+def test_a_skipped_file_alone_does_not_change_ready_or_the_code(
+    tmp_path: Path,
+    make_report_xml: _ReportXml,
+    make_record_xml: _RecordXml,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A refused file is not a failing message: the answer is READY and the code is 0."""
+    folder = write_window(tmp_path / "reports", make_report_xml, make_record_xml, days=_LONG)
+    config = write_config(tmp_path / "config.toml")
+    malformed = tmp_path / "broken.xml"
+    malformed.write_bytes(b"not a report")
+
+    code = main(["verdict", str(folder), str(malformed), "--config", str(config)])
+
+    out = capsys.readouterr().out
+    assert code == 0
+    assert out.startswith("MailVigil verdict for example.com: READY")
+    assert "1 file skipped." in " ".join(out.split())

@@ -72,6 +72,26 @@ _REASON_PHRASES = {
 # ---------------------------------------------------------------------------
 
 
+def share_tenths(part: int, whole: int) -> int:
+    """
+    Write a share as tenths of a percent, in integers, rounding half up (ADR-8 of spec 005).
+
+    This is the number under ``format_share``, public so a caller can ask whether a share rounds
+    to a limit without reading it back from the text.
+
+    Args:
+        part (int): The messages in the share.
+        whole (int): All the messages.
+
+    Returns:
+        int: ``0`` for no part (or no whole); otherwise ``1000 * part / whole`` rounded half up, so
+            ``1000`` for the whole and ``5`` for 0.5%.
+    """
+    if part <= 0 or whole <= 0:
+        return 0
+    return (2000 * part + whole) // (2 * whole)
+
+
 def format_share(part: int, whole: int) -> str:
     """
     Write a share as a percentage that never rounds a small number away (ADR-5).
@@ -93,7 +113,7 @@ def format_share(part: int, whole: int) -> str:
         return "0%"
     if part >= whole:
         return "100%"
-    tenths = (2000 * part + whole) // (2 * whole)
+    tenths = share_tenths(part, whole)
     if tenths == 0:
         return "<0.1%"
     tenths = min(tenths, 999)

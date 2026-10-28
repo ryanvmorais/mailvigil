@@ -16,12 +16,20 @@ import sys
 from dataclasses import FrozenInstanceError
 from datetime import UTC, date, datetime, timedelta
 from itertools import permutations
+from pathlib import Path
 from types import MappingProxyType
 
 import pytest
 
 from mailvigil.config import Config
-from mailvigil.reports import IngestionResult, PolicyPublished, Record, Report
+from mailvigil.reports import (
+    IngestionResult,
+    PolicyPublished,
+    Reason,
+    Record,
+    Report,
+    SkippedFile,
+)
 from mailvigil.senders import Outcome
 from mailvigil.summary import Counts, FailingSource, Period, Summary, summarize
 from mailvigil.verdict import (
@@ -30,6 +38,7 @@ from mailvigil.verdict import (
     MIN_DAYS_SPANNED,
     MIN_MESSAGES,
     Answer,
+    LeftOut,
     Note,
     NoteKind,
     Rule,
@@ -64,6 +73,9 @@ def make_summary(
     sp: str = "",
     np: str = "",
     earlier_p: tuple[str, ...] = (),
+    skipped: int = 0,
+    duplicates: int = 0,
+    other_domain: int = 0,
 ) -> Summary:
     """
     Build a ``Summary`` of ``example.com`` whose figures agree with each other.
@@ -85,10 +97,20 @@ def make_summary(
         sp (str, optional): The latest published ``sp``. Default: empty.
         np (str, optional): The latest published ``np``. Default: empty.
         earlier_p (tuple[str, ...], optional): The other ``p`` values seen. Default: none.
+        skipped (int, optional): Files refused. Default: 0.
+        duplicates (int, optional): Reports dropped as already seen. Default: 0.
+        other_domain (int, optional): Reports of another domain. Default: 0.
 
     Returns:
         Summary: The summary.
     """
+    left_out = {
+        "skipped": tuple(
+            SkippedFile(Path(f"bad{n}.xml"), Reason.MALFORMED_XML, "") for n in range(skipped)
+        ),
+        "duplicates": duplicates,
+        "other_domain": other_domain,
+    }
     if sources is None:
         built: list[FailingSource] = []
         if recognized_failing:
@@ -100,7 +122,7 @@ def make_summary(
         sources = tuple(built)
     failing = sum(source.messages for source in sources)
     if days == 0:
-        return Summary(domain="example.com")
+        return Summary(domain="example.com", **left_out)
     begin = datetime.combine(_FIRST_DAY, datetime.min.time(), tzinfo=UTC)
     last_day = _FIRST_DAY + timedelta(days=days - 1)
     period = Period(
@@ -120,6 +142,7 @@ def make_summary(
         earlier_p=earlier_p,
         totals=Counts(ok=ok, dkim_only=dkim_only, spf_only=spf_only, failing=failing),
         failing=sources,
+        **left_out,
     )
 
 
@@ -629,3 +652,71 @@ def test_the_verdict_module_imports_no_text_module() -> None:
     )
     result = subprocess.run([sys.executable, "-c", code], capture_output=True, check=False)
     assert result.returncode == 0, result.stderr.decode()
+
+
+# ---------------------------------------------------------------------------
+# What was left out (RF-09, ADR-9)
+# ---------------------------------------------------------------------------
+
+
+def test_nothing_left_out_gives_an_empty_left_out() -> None:
+    """A verdict built from a clean summary counts nothing as left out."""
+    assert judge(make_summary()).left_out == LeftOut(0, 0, 0)
+
+
+def test_the_three_counts_are_copied_from_the_summary() -> None:
+    """Skipped files, duplicates and reports of another domain keep their own figure."""
+    verdict = judge(make_summary(skipped=2, duplicates=3, other_domain=4))
+    assert verdict.left_out == LeftOut(skipped=2, duplicates=3, other_domain=4)
+
+
+def test_a_summary_without_reports_still_carries_what_was_left_out() -> None:
+    """The refused files matter most when nothing else was kept."""
+    verdict = judge(make_summary(days=0, skipped=1, duplicates=1, other_domain=1))
+    assert verdict.left_out == LeftOut(1, 1, 1)
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {},
+        {"days": 10},
+        {"recognized_failing": 3},
+        {"unrecognized_failing": 500},
+        {"days": 0},
+    ],
+)
+def test_what_was_left_out_changes_neither_the_answer_nor_the_rules(
+    kwargs: dict[str, int],
+) -> None:
+    """A refused file is not a failing message: the rules and the answer ignore it."""
+    plain = judge(make_summary(**kwargs))
+    left = judge(make_summary(**kwargs, skipped=5, duplicates=2, other_domain=1))
+    assert dataclasses.replace(left, left_out=LeftOut()) == plain
+
+
+def test_a_ready_verdict_stays_ready_with_skipped_files() -> None:
+    """The line is a prompt to look, not a block (ADR-9)."""
+    verdict = judge(make_summary(skipped=3))
+    assert verdict.answer is Answer.READY
+    assert verdict.deciding is None
+
+
+def test_left_out_is_frozen_and_a_hand_built_verdict_need_not_pass_one() -> None:
+    """``LeftOut`` cannot be assigned to, and ``Verdict.left_out`` has a default of nothing."""
+    left_out = LeftOut(1, 2, 3)
+    with pytest.raises(FrozenInstanceError):
+        left_out.skipped = 9  # type: ignore[misc]
+    assert LeftOut() == LeftOut(0, 0, 0)
+    verdict = judge(make_summary())
+    hand_built = Verdict(
+        domain=verdict.domain,
+        answer=verdict.answer,
+        enforcing=verdict.enforcing,
+        rules=verdict.rules,
+        deciding=verdict.deciding,
+        recognized_failing=verdict.recognized_failing,
+        unrecognized_failing=verdict.unrecognized_failing,
+        notes=verdict.notes,
+    )
+    assert hand_built.left_out == LeftOut()

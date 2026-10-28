@@ -16,7 +16,7 @@ from __future__ import annotations
 import textwrap
 from collections.abc import Callable, Sequence
 
-from mailvigil.render import address, count_noun, fit, format_share
+from mailvigil.render import address, count_noun, fit, format_share, share_tenths
 from mailvigil.senders import Outcome
 from mailvigil.summary import FailingSource
 from mailvigil.verdict import Answer, Note, NoteKind, Rule, RuleId, RuleKind, Verdict
@@ -113,6 +113,31 @@ def _per_mille(tenths: int) -> str:
         str: For example ``0.5%`` for 5.
     """
     return f"{tenths // 10}.{tenths % 10}%"
+
+
+def _share(rule: Rule) -> str:
+    """
+    Write the share of a rule so that it never reads as a pass beside a failure (RF-08, ADR-8).
+
+    A share is printed to one decimal, so a rule that fails by a hair rounds to its own limit and
+    would read ``0.5%`` beside ``<= 0.5%`` and ``FAIL``. The choice is taken from ``Rule.passed``
+    and ``share_tenths``, both integers, not from the text.
+
+    Args:
+        rule (Rule): Rule 2 or rule 5, the two that carry a share.
+
+    Returns:
+        str: The share as ``format_share`` writes it; or, for a failed rule whose share rounds to
+            its limit, the limit with ``<`` (an "at least" rule) or ``>`` (an "at most" rule).
+    """
+    if not rule.passed:
+        if rule.id is RuleId.COVERAGE:
+            limit, text = rule.needed * 10, f"{rule.needed}%"
+        else:
+            limit, text = rule.needed, _per_mille(rule.needed)
+        if share_tenths(rule.measured, rule.whole) == limit:
+            return f"{'<' if rule.at_least else '>'}{text}"
+    return format_share(rule.measured, rule.whole)
 
 
 def _rule(verdict: Verdict, rule_id: RuleId) -> Rule:
@@ -299,7 +324,7 @@ def _why(verdict: Verdict) -> list[str]:
     rule = _rule(verdict, RuleId.UNRECOGNIZED_FAILURES)
     sentence = (
         "Why: failures from unrecognized sources are "
-        f"{format_share(rule.measured, rule.whole)} of the messages ({rule.measured} of "
+        f"{_share(rule)} of the messages ({rule.measured} of "
         f"{rule.whole}); the limit is {_per_mille(rule.needed)}."
     )
     lines = _wrap(sentence, rest=" " * 5)
@@ -317,7 +342,7 @@ def _measured(rule: Rule) -> str:
     Returns:
         str: For example ``28 days``, ``27 of 28 (96.4%)`` or ``12 (0.1%)``.
     """
-    share = format_share(rule.measured, rule.whole)
+    share = _share(rule)
     if rule.id is RuleId.PERIOD:
         return count_noun(rule.measured, "day")
     if rule.id is RuleId.COVERAGE:
@@ -494,6 +519,35 @@ def _next_step(verdict: Verdict) -> list[str]:
     return _wrap(text, rest=" " * 6)
 
 
+def _left_out(verdict: Verdict) -> list[str]:
+    """
+    Say what the summary did not count, in one sentence, only when something was left out (RF-09).
+
+    The sentence gives counts and no file name: the names and the reasons are in ``summary``.
+
+    Args:
+        verdict (Verdict): The verdict.
+
+    Returns:
+        list[str]: The wrapped sentence; nothing when every count is zero.
+    """
+    left = verdict.left_out
+    parts = [
+        count_noun(left.skipped, "file") + " skipped" if left.skipped else "",
+        count_noun(left.duplicates, "duplicate") if left.duplicates else "",
+        (
+            count_noun(left.other_domain, "report of another domain", "reports of other domains")
+            if left.other_domain
+            else ""
+        ),
+    ]
+    shown = [part for part in parts if part]
+    if not shown:
+        return []
+    text = f"Left out of this verdict: {', '.join(shown)}. mailvigil summary shows why."
+    return _wrap(text, rest=" " * 4)
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
@@ -508,8 +562,8 @@ def render_verdict(verdict: Verdict) -> str:
 
     Returns:
         str: The title, the reason, the rules table, the notes (when present), the next step (unless
-            ready) and the closing sentence, separated by one blank line, without a trailing
-            newline.
+            ready), what was left out (when anything was) and the closing sentence, separated by
+            one blank line, without a trailing newline.
     """
     sections = [
         _title(verdict),
@@ -517,6 +571,7 @@ def render_verdict(verdict: Verdict) -> str:
         _table(verdict),
         _notes(verdict),
         _next_step(verdict),
+        _left_out(verdict),
         _wrap(_CAVEAT),
     ]
     return "\n\n".join("\n".join(lines) for lines in sections if lines)

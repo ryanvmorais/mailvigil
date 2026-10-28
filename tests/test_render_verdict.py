@@ -29,8 +29,10 @@ from mailvigil.verdict import (
     MIN_DAYS_SPANNED,
     MIN_MESSAGES,
     Answer,
+    LeftOut,
     Note,
     NoteKind,
+    RuleId,
     Verdict,
     judge,
 )
@@ -734,3 +736,172 @@ def test_changing_a_constant_changes_the_column_and_the_explanation(
     verdict = make_verdict(**kwargs)
     assert needed in [row[3] for row in table(verdict)[1:]]
     assert sentence in flat(render_verdict(verdict))
+
+
+# ---------------------------------------------------------------------------
+# A share never reads against its result (RF-08, ADR-8)
+# ---------------------------------------------------------------------------
+
+
+def _measured_cell(verdict: Verdict, row: int) -> str:
+    """Return the "measured" cell of a rule (1 to 5) of the rendered table."""
+    return table(verdict)[row][2]
+
+
+@pytest.mark.parametrize("failing", [151, 160])
+def test_a_failed_share_that_rounds_to_the_limit_is_printed_beyond_it(failing: int) -> None:
+    """151 and 160 of 30000 both round to 0.5%, the limit, and both fail: neither may read 0.5%."""
+    verdict = make_verdict(ok=30000 - failing, sources=(other(failing),))
+    text = flat(render_verdict(verdict))
+
+    assert _measured_cell(verdict, 5).startswith(f"{failing} (>0.5%)")
+    assert f">0.5% of the messages ({failing} of 30000); the limit is 0.5%" in text
+    assert "FAIL" in table(verdict)[5]
+    assert "(0.5%)" not in text
+
+
+def test_a_share_exactly_at_the_limit_still_prints_as_the_limit() -> None:
+    """150 of 30000 is 0.5% and passes: the text is what it was before."""
+    verdict = make_verdict(ok=29850, sources=(other(150),))
+    assert _measured_cell(verdict, 5) == "150 (0.5%)"
+    assert table(verdict)[5][-1] == "pass"
+
+
+def test_a_failed_share_that_rounds_above_the_limit_prints_as_before() -> None:
+    """170 of 30000 rounds to 0.6%: that already reads as over 0.5%."""
+    verdict = make_verdict(ok=29830, sources=(other(170),))
+    assert _measured_cell(verdict, 5) == "170 (0.6%)"
+    assert "0.6% of the messages (170 of 30000)" in flat(render_verdict(verdict))
+
+
+def test_the_coverage_rule_prints_less_than_the_limit_when_it_fails_at_80_percent() -> None:
+    """2399 of 3000 days is 79.97%: it fails, and 80.0% beside ``>= 80%`` would read as a pass."""
+    verdict = make_verdict(days=3000, with_reports=2399)
+    assert _measured_cell(verdict, 2) == "2399 of 3000 (<80%)"
+    assert table(verdict)[2][-1] == "fail (too early)"
+
+
+def test_the_coverage_rule_at_exactly_the_limit_prints_the_rounded_share() -> None:
+    """2400 of 3000 days is 80% and passes."""
+    verdict = make_verdict(days=3000, with_reports=2400)
+    assert _measured_cell(verdict, 2) == "2400 of 3000 (80.0%)"
+
+
+def test_a_coverage_failure_clearly_under_the_limit_prints_as_before() -> None:
+    """20 of 28 days is 71.4%."""
+    verdict = make_verdict(days=28, with_reports=20)
+    assert _measured_cell(verdict, 2) == "20 of 28 (71.4%)"
+
+
+def test_the_beyond_the_limit_form_follows_the_rule_not_the_text() -> None:
+    """A hand-built rule that passed prints the rounded share even when it equals the limit."""
+    verdict = make_verdict(ok=29849, sources=(other(151),))
+    rules = tuple(
+        dataclasses.replace(r, passed=True) if r.id is RuleId.UNRECOGNIZED_FAILURES else r
+        for r in verdict.rules
+    )
+    forged = dataclasses.replace(verdict, rules=rules)
+    assert _measured_cell(forged, 5) == "151 (0.5%)"
+
+
+# ---------------------------------------------------------------------------
+# The verdict says what was left out (RF-09, ADR-9)
+# ---------------------------------------------------------------------------
+
+
+def _with_left_out(left_out: LeftOut, **kwargs: Any) -> Verdict:
+    """Judge a verdict and attach the figures of what was left out."""
+    return dataclasses.replace(make_verdict(**kwargs), left_out=left_out)
+
+
+def _left_out_text(verdict: Verdict) -> str:
+    """Return the left-out sentence of the rendered text, or an empty string."""
+    paragraphs = render_verdict(verdict).split("\n\n")
+    found = [flat(p) for p in paragraphs if p.startswith("Left out")]
+    return found[0] if found else ""
+
+
+def test_nothing_left_out_prints_no_line_and_no_section() -> None:
+    """The text is exactly what it was before RF-09."""
+    verdict = make_verdict()
+    assert "Left out" not in render_verdict(verdict)
+    assert render_verdict(dataclasses.replace(verdict, left_out=LeftOut())) == render_verdict(
+        verdict
+    )
+
+
+@pytest.mark.parametrize(
+    ("left_out", "expected"),
+    [
+        (
+            LeftOut(skipped=1),
+            "Left out of this verdict: 1 file skipped. mailvigil summary shows why.",
+        ),
+        (
+            LeftOut(skipped=2),
+            "Left out of this verdict: 2 files skipped. mailvigil summary shows why.",
+        ),
+        (
+            LeftOut(duplicates=1),
+            "Left out of this verdict: 1 duplicate. mailvigil summary shows why.",
+        ),
+        (
+            LeftOut(other_domain=1),
+            "Left out of this verdict: 1 report of another domain. mailvigil summary shows why.",
+        ),
+        (
+            LeftOut(other_domain=3),
+            "Left out of this verdict: 3 reports of other domains. mailvigil summary shows why.",
+        ),
+        (
+            LeftOut(skipped=2, duplicates=1, other_domain=3),
+            "Left out of this verdict: 2 files skipped, 1 duplicate, 3 reports of other domains. "
+            "mailvigil summary shows why.",
+        ),
+    ],
+)
+def test_the_left_out_sentence_names_only_the_parts_above_zero(
+    left_out: LeftOut, expected: str
+) -> None:
+    """Each part has its own singular and plural, and a part at zero is left out of the line."""
+    assert _left_out_text(_with_left_out(left_out)) == expected
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {},
+        {"days": 10},
+        {"sources": (known(3),)},
+        {"sources": (other(500),)},
+        {"days": 0},
+    ],
+)
+def test_the_line_sits_between_the_next_step_and_the_caveat_for_every_answer(
+    kwargs: dict[str, Any],
+) -> None:
+    """READY, TOO EARLY and NOT READY all show it, always just before the closing sentence."""
+    verdict = _with_left_out(LeftOut(skipped=1), **kwargs)
+    paragraphs = render_verdict(verdict).split("\n\n")
+
+    assert flat(paragraphs[-1]) == _CAVEAT
+    assert paragraphs[-2].startswith("Left out of this verdict")
+    if verdict.deciding is not None:
+        assert paragraphs[-3].startswith("Next:")
+
+
+def test_the_line_never_names_a_file() -> None:
+    """File names stay in ``summary``, where the reasons are."""
+    text = render_verdict(_with_left_out(LeftOut(skipped=4, duplicates=2, other_domain=1)))
+    assert ".xml" not in text
+    assert ".zip" not in text
+    assert ".gz" not in text
+
+
+def test_the_line_fits_80_columns_with_huge_counts() -> None:
+    """Counts of ``10**12`` wrap instead of overflowing the screen."""
+    huge = 10**12
+    verdict = _with_left_out(LeftOut(skipped=huge, duplicates=huge, other_domain=huge))
+    assert all(len(line) <= 80 for line in lines_of(verdict))
+    assert all(ord(ch) < 128 for ch in render_verdict(verdict))
+    assert str(huge) in _left_out_text(verdict)
