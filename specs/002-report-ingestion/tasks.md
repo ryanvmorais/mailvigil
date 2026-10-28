@@ -61,20 +61,26 @@ public entry point.
 
 ## Stage 3 — Reading one attachment (RF-01, RF-02)
 
-- [ ] `tests/test_reports_reader.py`, written first: round trip for `.xml`, `.gz` and `.zip`;
+- [x] `tests/test_reports_reader.py`, written first: round trip for `.xml`, `.gz` and `.zip`;
   upper-case suffix; unknown suffix (`UNSUPPORTED_EXTENSION`, without opening the file); missing
   file (`UNREADABLE`); a directory passed as a file (`UNREADABLE`); zip with no XML member
   (`NO_XML_MEMBER`) and with two (`MULTIPLE_XML_MEMBERS`); corrupt zip and corrupt gzip
-  (`NOT_AN_ARCHIVE`). — RF-01
-- [ ] Size tests, same file: `MAX_BYTES + 1` zeros as `.xml`, as a `.gz` and as a `.zip` member (each
+  (`NOT_AN_ARCHIVE`). — RF-01 (also covered: truncated gzip, an encrypted member and an
+  unsupported compression method, both made by patching the central directory)
+- [x] Size tests, same file: `MAX_BYTES + 1` zeros as `.xml`, as a `.gz` and as a `.zip` member (each
   compresses to a few KB; `DECOMPRESSED_TOO_LARGE`); a file over the cap on disk (`FILE_TOO_LARGE`);
   a zip whose header declares a size smaller than the data (`NOT_AN_ARCHIVE`); `_read_capped`
   called directly on a stream larger than the cap, proving the cap does not consult any header;
-  exactly `MAX_BYTES` accepted; a small report unaffected. — RF-02, RF-10, ADR-2
-- [ ] `src/mailvigil/reports/reader.py`: `MAX_BYTES`, `_read_capped`, `read_xml` as in the design
+  exactly `MAX_BYTES` accepted; a small report unaffected. — RF-02, RF-10, ADR-2 (a plain `.xml`
+  over the cap is `FILE_TOO_LARGE`, caught by `stat` before it is opened, so only the `.gz` and the
+  `.zip` reach `DECOMPRESSED_TOO_LARGE`; the cap is also proved on an endless stream, which
+  `_read_capped` must stop reading at `MAX_BYTES + 1`)
+- [x] `src/mailvigil/reports/reader.py`: `MAX_BYTES`, `_read_capped`, `read_xml` as in the design
   (suffix → `stat` → open → capped read → error mapping). Never extract, never use a member name
-  as a path. — RF-01, RF-02, RNF-02
-- [ ] Quality gate. — result recorded when run: ___
+  as a path. — RF-01, RF-02, RNF-02 (`_read_capped` loops over short reads instead of making one
+  `read`, so a raw stream cannot hand back a truncated document as a whole one; design updated)
+- [x] Quality gate. — result recorded when run: all green on 2026-10-27; 75 passed, coverage 100%
+  (Python 3.12). Mutation check: with the cap check disabled, six reader tests fail.
 
 ## Stage 4 — Parsing a report (RF-04, RF-05)
 
