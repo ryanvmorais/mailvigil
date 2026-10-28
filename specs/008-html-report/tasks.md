@@ -210,10 +210,11 @@ maintainer, not decided here.
   rows of the numbers table inside the open `details`, which it cannot judge because the scroll box
   clips them (the colours are the pairs the palette test measures). Single-word last lines on a few
   paragraphs at 390 px are cosmetic and left.
-- [ ] Look at the print preview by eye (the print block of the stylesheet is tested, not seen). — RF-07
-  **Left open for the maintainer:** Chrome prints the `not ready` page to a 2-page A4 PDF, but this
-  machine cannot render a PDF to an image (no poppler), so the layout was not seen. Open
-  `report.html` and press Ctrl+P.
+- [x] Look at the print preview by eye (the print block of the stylesheet is tested, not seen). — RF-07
+  **Result:** Chrome printed the `not ready` page to a 2-page A4 PDF and poppler (`pdftoppm`, 70 dpi)
+  rendered it to images: the stylesheet's print rules hold, the light palette is used, and no card
+  is cut between the two pages (the page break falls between the stacked bar and the timeline).
+  The page tint prints behind the cards (Chrome's `--print-to-pdf` keeps backgrounds); not changed.
 
 - [x] Quality gate of the stage (same four commands). **Result:** ruff, black, mypy strict clean;
   2231 tests pass, coverage 100%. Decisions the stage took: `answer_phrase` and `left_out_parts`
@@ -245,8 +246,12 @@ maintainer, not decided here.
   (`htmlkit.py`, `html_style.py`, `html_charts.py`, `render_html.py`, `DayCounts`), the commands and
   the one-line warning that markup is built in `htmlkit.py` only; `specs/README.md`: the roadmap
   row to `done`. `docs/json-schema.md` is checked and unchanged. — RF-08
-  **Result:** done, except the image of the page: it is the maintainer's call (it would be built
-  from synthetic data), so the README describes the page in words only for now.
+  **Result:** done. The README image is `docs/images/dmarc-reject-verdict-html-report.png`, a
+  1280 px capture (cropped after the timeline) of a page built from invented reports: three
+  senders, two unrecognized sources, two days with no report; the file name carries the search
+  terms (subject, technology, context) and the README gives it a descriptive `alt`. The link is
+  absolute (`raw.githubusercontent.com`, `main`) so it also renders on PyPI; it resolves once this
+  branch is merged.
 - [x] `status:` of the three files of the spec to `done`, and the maintainer's memory of the
   project updated (the 008 closed, the next is 009), in the same session. — RNF-05
 - [ ] `/atualizar-docs`, then `/fechar-sessao` (commit, push, PR; no merge).

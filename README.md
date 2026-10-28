@@ -202,6 +202,10 @@ answer, then shows each of the five rules as a meter against its limit, the spli
 in four situations, one column per day of the period, the senders and the failing sources. It
 follows `--lang`, switches to dark with the system, and prints on paper.
 
+![MailVigil HTML report of a DMARC verdict: NOT READY for p=reject, five rules as meters against their limits, the message mix and a day-by-day chart](https://raw.githubusercontent.com/ryanvmorais/mailvigil/main/docs/images/dmarc-reject-verdict-html-report.png)
+
+*The page for an invented domain (`example.com`, documentation addresses): unrecognized sources fail 1.1% of the messages, above the 0.5% limit, so the answer is `NOT READY`.*
+
 ```bash
 uv run mailvigil verdict --config mailvigil.toml reports/ --html > report.html
 ```
