@@ -1,6 +1,6 @@
 """Reading DMARC aggregate reports safely into a typed record model."""
 
-from mailvigil.reports.discovery import discover
+from mailvigil.reports.discovery import Source, discover
 from mailvigil.reports.errors import Reason, ReportRefused
 from mailvigil.reports.ingest import ingest
 from mailvigil.reports.mail import (
@@ -44,6 +44,7 @@ __all__ = [
     "Report",
     "ReportRefused",
     "SkippedFile",
+    "Source",
     "SpfResult",
     "discover",
     "ingest",
