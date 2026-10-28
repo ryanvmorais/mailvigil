@@ -31,6 +31,11 @@ file/--domain ──resolve──▶ Config ─┴─summarize──▶ Summary 
   (resolve the configuration, ingest, refuse when nothing was kept), then judges, prints and maps
   the answer to an exit code.
 
+Two additions after testing the command end to end (issue #28; RF-08 and RF-09): the verdict text
+no longer prints a share that reads as a pass beside a `FAIL`, and the verdict carries and prints
+what was left out of the numbers. Both are in `verdict.py`, `render_verdict.py` and one new public
+helper of `render.py`; the rules and the thresholds do not change.
+
 `summarize`, `Summary` and `render_summary` do not change. `judge` does no I/O and never raises on
 data it is given (RNF-02).
 
@@ -42,6 +47,7 @@ src/mailvigil/
                       # constants, judge                                      (RF-01..05, RNF-05)
   render_verdict.py   # render_verdict and the English text of the verdict   (RF-03, RF-04, RF-05)
   render.py           # + the helpers the verdict text reuses become public: fit, address, count_noun
+                      # + share_tenths, the integer under format_share, public for RF-08
   cli.py              # + the `verdict` subcommand, _load shared with `summary`, exit codes 3 and 4
 tests/
   test_verdict.py         # RF-01..05, RF-07, RNF-02, RNF-04, RNF-05
@@ -98,6 +104,11 @@ class Note:
     numbers: tuple[int, ...] = ()
     texts: tuple[str, ...] = ()
 
+class LeftOut:                             # RF-09: what the Summary did not count
+    skipped: int = 0                       # files refused (unsafe, too large, malformed, unreadable)
+    duplicates: int = 0                    # reports dropped as already seen
+    other_domain: int = 0                  # reports of another domain
+
 class Verdict:
     domain: str
     answer: Answer
@@ -107,6 +118,7 @@ class Verdict:
     recognized_failing: tuple[FailingSource, ...]    # all of them, worst first (from 004)
     unrecognized_failing: tuple[FailingSource, ...]  # all of them, worst first
     notes: tuple[Note, ...]                # in the order of NoteKind
+    left_out: LeftOut = LeftOut()          # RF-09; the default keeps a hand-built Verdict valid
 ```
 
 The units of `needed` are fixed per rule and documented on the constants: days (rule 1), percent of
@@ -163,7 +175,10 @@ retyped numbers, and a test fails if the rendered column and the constants disag
    - `POLICY_CHANGED` when `summary.earlier_p` is not empty.
    - `SUBDOMAIN_POLICY` when `sp` or `np` is present and differs from `p`.
    - `CURRENTLY_QUARANTINE` when the latest `p` is `quarantine`.
-6. **Enforcing.** `enforcing = policy.p.strip().lower()` (`""` without reports). Comparisons use this
+6. **Left out (RF-09).** `left_out = LeftOut(len(summary.skipped), summary.duplicates,
+   summary.other_domain)`: three figures the `Summary` already holds, copied, never recomputed. They
+   take no part in the rules or the answer.
+7. **Enforcing.** `enforcing = policy.p.strip().lower()` (`""` without reports). Comparisons use this
    normalized value; `?` (a report that does not say) is neither `reject` nor `quarantine`.
 
 `judge` neither sorts nor filters beyond step 4, so the same `Summary` gives the same `Verdict`
@@ -194,12 +209,19 @@ columns, ASCII, no color or control code). Sections, one blank line apart:
 3. **Rules table.** Columns `rule`, `measured`, `needed`, `result`, with the id and the name. A share
    is printed with `format_share` and always beside its count (`27 of 28`, `0.3%`; 004 RF-06). The
    result is `pass`, `FAIL` for a failed problem rule and `fail (too early)` for a failed data rule.
+   A failed rule whose share would print equal to its limit prints it beyond the limit (RF-08,
+   ADR-8): `>0.5%` for rule 5, `<80%` for rule 2, here and in the reason. The decision is taken from
+   `Rule.passed` and `share_tenths`, both integers; the counts stay beside it.
 4. **Notes** (RF-04), one sentence each, only those present.
 5. **Next step.** One sentence chosen by `deciding`: rule 4 → make the service sign with the domain or
    add its servers to SPF, then collect another period; rule 5 → look at the sources above, add the
    selectors of the ones that are yours to `[senders]`; rules 1 to 3 → collect reports until the
    rules pass. Not printed for `READY`.
-6. **Caveat.** Always, in one fixed sentence: the verdict reads only the reports given; mail that no
+6. **Left out** (RF-09), only when `left_out` has a figure above zero: one sentence, wrapped at 80
+   columns, for example `Left out of this verdict: 2 files skipped, 1 duplicate, 3 reports of
+   other domains. mailvigil summary shows why.` The parts at zero are omitted; no file name is
+   printed. Placed between the next step and the caveat.
+7. **Caveat.** Always, in one fixed sentence: the verdict reads only the reports given; mail that no
    receiver reports on, and senders quiet in this period, are not covered.
 
 ### cli.py — the command (RF-06)
@@ -229,6 +251,11 @@ command then continues from its result. The refusals, their text and the code `1
 
 ### render.py — helpers made public
 
+`share_tenths(part, whole) -> int` is added (RF-08): the tenths of a percent, round half up, that
+`format_share` already computes inside; `format_share` calls it, with no change of output, so the
+004 suite passes untouched. `render_verdict` uses it to tell whether a failed share would print
+equal to its limit.
+
 `_fit`, `_address` and `_count` become `fit`, `address` and `count_noun`, because a second module now
 uses them (ADR-5). The change is a rename with its call sites and `test_render.py`; no behavior
 changes, and the 004 suite must pass untouched apart from those names.
@@ -243,6 +270,8 @@ changes, and the 004 suite must pass untouched apart from those names.
 | `mailvigil.verdict.Verdict` and its parts | the frozen dataclasses above; the input of `006`'s JSON |
 | thresholds | `MIN_DAYS_SPANNED`, `MIN_COVERAGE_PERCENT`, `MIN_MESSAGES`, `MAX_UNRECOGNIZED_PER_MILLE` |
 | `mailvigil.render_verdict.render_verdict(verdict)` | `Verdict -> str` |
+| `mailvigil.verdict.LeftOut` | `skipped`, `duplicates`, `other_domain`: the counts the verdict printed under RF-09 |
+| `mailvigil.render.share_tenths(part, whole)` | `int`; tenths of a percent, the integer behind `format_share` |
 
 Nothing here is a public contract before `0.1`. The rule ids, the threshold values and the exit
 codes become one at the first version.
@@ -331,11 +360,42 @@ sharper form of the same finding.
 **Trade-off.** The data rules read oddly for a domain that has enforced for a year and has a short
 batch of reports; the table shows why, and the title already says `reject` is on. (RF-05)
 
+### ADR-8 — A failed share that prints equal to its limit is printed beyond it
+
+**Decision.** For rules 2 and 5, when the rule fails and `share_tenths` equals the limit in tenths
+(5 for rule 5, 800 for rule 2), the share prints as `>0.5%` or `<80%`. Otherwise it prints as
+before.
+**Alternatives.** Two decimals when near the limit; truncating instead of rounding half up; printing
+the exact fraction.
+**Why.** No fixed number of decimals works: 151 of 30000 is `0.50%`, and 100001 of 20000000 is
+`0.500005%`, so a failure just over the limit can always print as the limit. Truncating would make
+the passing case (exactly 0.5%) and a failing one (0.5001%) print alike. The comparison symbol says
+the one thing that matters, "over", and the counts beside it carry the rest. The test uses
+integers, not the text, so the printed form cannot drift from the rule.
+**Trade-off.** A share near the limit is printed in a form `format_share` never produces; the
+verdict text is the only place that has it. (RF-08)
+
+### ADR-9 — The verdict carries what was left out, as counts, and prints one line
+
+**Decision.** `Verdict.left_out` holds the skipped files, duplicates and reports of another domain,
+copied from the `Summary`; `render_verdict` prints one sentence when any is above zero.
+**Alternatives.** Print the whole "Left out of these numbers" section of `summary`; print only when
+a file was skipped; leave it to `summary`; make a skipped file lower the answer.
+**Why.** The answer depends on which reports were read, so the reader must see that some were not.
+The full section, with file names, belongs to `summary`, where the reasons are; a verdict that
+repeated it would grow to hold paths. Counting duplicates and other domains too follows the
+README's rule that a number never silently drops out. A skipped file is not a failing message, so
+changing the answer for it would invent a rule with no evidence behind it. Carrying counts as data
+(not a string) lets `006` print them in `--json`.
+**Trade-off.** A `ready` can still be printed with skipped files; the line is a prompt to look, not a
+block. (RF-09)
+
 ## Impact on existing code
 
 - **New files:** `src/mailvigil/verdict.py`, `render_verdict.py` and three test files.
 - **Changed:** `cli.py` (the `verdict` subcommand, a parent parser, `_load` extracted from
-  `_run_summary`, two exit codes); `render.py` (three renames).
+  `_run_summary`, two exit codes); `render.py` (three renames, then `share_tenths`); and for
+  RF-08 and RF-09 `verdict.py` (`LeftOut`, `Verdict.left_out`) and `render_verdict.py`.
 - **Unchanged on purpose:** `summary.py`, `summarize`, `render_summary`, the output and exit codes
   of `mailvigil summary`, `pyproject.toml` (`dependencies` stays empty).
 - **Docs:** the README (status rows, Quick start gains `mailvigil verdict` with an invented
@@ -378,6 +438,8 @@ services and addresses are invented (RNF-06).
 | RF-05 | with `p=reject` the same inputs give the same answer and the reject wording; with `p=quarantine` the note; with `p=none` and with `?` neither |
 | RF-06 | `verdict` returns 0, 3 and 4 for the three answers; a refused configuration, a conflicting domain and no kept report give the lines and code `1` of `summary`; no path is a usage error `2`; `summary` output and codes are byte-for-byte as before; `--help` lists both commands |
 | RF-07 | the list of RF-07 is the list of the rows above |
+| RF-08 | 151 of 30000 prints `>0.5%` in the table and in the reason, 150 of 30000 still prints `0.5%`; a rule 2 failure whose share rounds to 80.0% prints `<80%`; a share clearly over or under its limit prints as before; the counts stay; the choice follows `Rule.passed`, not the text |
+| RF-09 | `judge` copies skipped, duplicates and other-domain counts from the `Summary` and the answer does not change; the line appears with each count alone and together, omits the parts at zero, names no file, stays at 80 columns and sits before the caveat; with nothing left out the output is byte-for-byte what it was; a `ready` with skipped files stays `ready`; through `main(argv)` a real skipped, duplicate and other-domain file reach the line |
 | RNF-02 | the same `Summary` judged twice, and built from the same reports in two orders, gives equal verdicts |
 | RNF-03 | `judge` imports no text module (checked by import); `Verdict` has no `str` field built for display, only names, ids and the sources |
 | RNF-04 | `Verdict` and its parts raise `FrozenInstanceError` on assignment and expose only tuples |
