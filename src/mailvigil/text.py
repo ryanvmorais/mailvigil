@@ -23,6 +23,10 @@ _SPACING = str.maketrans({"\t": " ", "\r": " ", "\n": " "})
 # bidirectional overrides and isolates), and the line and paragraph separators (ADR-6 of 002).
 DROPPED_CATEGORIES = frozenset({"Cc", "Cf", "Zl", "Zp"})
 
+# The longest text a field may hold once cleaned (RF-05 of 002): a report field or the name of a
+# mail attachment (RF-07 of 007). One constant, so raising it is one edit.
+MAX_TEXT = 255
+
 # ---------------------------------------------------------------------------
 # Text
 # ---------------------------------------------------------------------------

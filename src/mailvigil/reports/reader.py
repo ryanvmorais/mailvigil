@@ -34,7 +34,7 @@ MAX_BYTES = 5 * 1024 * 1024
 type Kind = Literal["xml", "gz", "zip"]
 
 # The suffix of each form; any other suffix is refused before the file opens.
-_KINDS: dict[str, Kind] = {".xml": "xml", ".gz": "gz", ".zip": "zip"}
+KIND_BY_SUFFIX: dict[str, Kind] = {".xml": "xml", ".gz": "gz", ".zip": "zip"}
 
 # What the standard library raises for an archive it cannot read. ``BadGzipFile`` is an ``OSError``,
 # so this tuple must be caught before ``OSError``. ``NotImplementedError`` is a compression method
@@ -198,7 +198,7 @@ def read_xml(path: Path) -> bytes:
             ``MULTIPLE_XML_MEMBERS`` for a zip without exactly one ``.xml``.
     """
     suffix = path.suffix.lower()
-    kind = _KINDS.get(suffix)
+    kind = KIND_BY_SUFFIX.get(suffix)
     if kind is None:
         raise ReportRefused(Reason.UNSUPPORTED_EXTENSION, f"suffix {suffix or '(none)'}")
 

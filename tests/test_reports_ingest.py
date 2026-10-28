@@ -335,7 +335,12 @@ def test_nothing_is_written_besides_the_inputs(
 def test_the_public_api_is_exactly_what_the_design_lists() -> None:
     assert set(mailvigil.reports.__all__) == {
         "MAX_BYTES",
+        "MAX_DEPTH",
+        "MAX_LINES",
+        "MAX_MESSAGE_BYTES",
+        "MAX_PARTS",
         "MAX_TEXT",
+        "Attachment",
         "DkimResult",
         "IngestionResult",
         "OverrideReason",
@@ -348,8 +353,12 @@ def test_the_public_api_is_exactly_what_the_design_lists() -> None:
         "SpfResult",
         "discover",
         "ingest",
+        "iter_mailbox",
         "parse_report",
+        "read_message",
+        "read_message_file",
         "read_xml",
+        "read_xml_bytes",
     }
     for name in mailvigil.reports.__all__:
         assert hasattr(mailvigil.reports, name)
