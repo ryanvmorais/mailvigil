@@ -80,11 +80,13 @@ src/mailvigil/
   summary.py         # summarize(result, config) → frozen Summary: rows per sender, failing sources, period,
                      # policy, what was left out (spec 004); never imports render
   render.py          # render_summary(summary, config_source) → 80-column ASCII text; no_reports_message;
-                     # also the public helpers fit, address, count_noun, format_share
+                     # also the public helpers fit, address, count_noun, format_share, share_tenths
   verdict.py         # judge(summary) → frozen Verdict: Answer (READY/TOO_EARLY/NOT_READY), five Rules
-                     # with the four threshold constants, Notes; integer arithmetic; never imports a
+                     # with the four threshold constants, Notes, LeftOut (what the summary did not
+                     # count; it never changes the answer); integer arithmetic; never imports a
                      # text module (spec 005)
-  render_verdict.py  # render_verdict(verdict) → 80-column ASCII text: reason, rules table, notes, next step
+  render_verdict.py  # render_verdict(verdict) → 80-column ASCII text: reason, rules table, notes,
+                     # what was left out, next step
 tests/               # pytest, one test file per module (test_reports_*.py, test_text.py, test_config.py,
                      # test_senders.py, test_summary.py, test_render.py, test_verdict.py,
                      # test_render_verdict.py, test_cli_summary.py, test_cli_verdict.py); fixtures
