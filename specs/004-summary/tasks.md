@@ -76,26 +76,27 @@ command, then the close. The computation (`summary.py`) never imports `render` (
 
 ## Stage 3 — Period, policy and what was left out (RF-03, RF-05)
 
-- [ ] Tests for the period, written first: from the earliest begin to the latest end; a report from
+- [x] Tests for the period, written first: from the earliest begin to the latest end; a report from
   midnight to the next midnight touches one day, and one ending at 23:59:59 the same; a report that
   crosses midnight touches two; a gap day lowers `days_with_reports` below `days_spanned`;
   overlapping reports are not counted twice; `last_day` is the last day touched, not the day of the
   latest `end` when that is a midnight; a zero-length period counts the day of `begin`; a report
   with a period of 500 years is summarized at once and shows the long span. — RF-03, ADR-3, RNF-09
-- [ ] `summary.py`: `Period` and the merged day intervals. — RF-03, ADR-3
-- [ ] Tests for the policy and the counts, written first: one policy gives `p`, `sp`, `np` and `pct`
+- [x] `summary.py`: `Period` and the merged day intervals. — RF-03, ADR-3
+- [x] Tests for the policy and the counts, written first: one policy gives `p`, `sp`, `np` and `pct`
   of the latest report; a changed `p` fills `earlier_p`, oldest first and without repeats, and the
   latest wins whatever the order of the input; the number of reports; two reporters with one
   repeated count as two, and an absent reporter (`?`) as one; no reports gives zero totals and a
   `None` period and policy. — RF-03
-- [ ] `summary.py`: `policy`, `earlier_p`, `reports`, `reporters`, `selectors_configured`, and the
+- [x] `summary.py`: `policy`, `earlier_p`, `reports`, `reporters`, `selectors_configured`, and the
   empty-input result. — RF-03
-- [ ] Tests for what was left out, written first: `duplicates` and `other_domain` copied from the
+- [x] Tests for what was left out, written first: `duplicates` and `other_domain` copied from the
   `IngestionResult`, also at zero; `skipped` ordered by path whatever the input order;
   `skipped_by_reason` ordered by count descending then reason; the order does not change when the
   discovery order does. — RF-05, RNF-05
-- [ ] `summary.py`: the left-out fields. — RF-05
-- [ ] Quality gate. — result recorded when run
+- [x] `summary.py`: the left-out fields. — RF-05
+- [x] Quality gate. — result recorded when run: all green on 2026-10-27; 401 passed (382 before,
+  19 new), coverage 100% (Python 3.12)
 
 ## Stage 4 — The text (RF-04, RF-05, RF-06, RF-09, RF-10, RNF-08)
 
