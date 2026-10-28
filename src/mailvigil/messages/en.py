@@ -241,6 +241,7 @@ _REFUSALS = RefusalMessages(
 
 # What only the HTML report says; the rest of the page reads the areas above.
 _HTML = HtmlMessages(
+    lang="en",
     page_title="DMARC report for {domain}",
     eyebrow="Ready for p=reject?",
     policy_label="Published policy",
@@ -278,6 +279,7 @@ _HTML = HtmlMessages(
     show_numbers="Show the numbers",
     numbers_region="Messages per day",
     senders_region="Senders table",
+    failing_heading="Failing sources",
     col_day="Day",
     range_label="{first} to {last}",
     footer=(
