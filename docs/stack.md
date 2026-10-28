@@ -6,9 +6,9 @@ and the handful of concepts worth learning first if it is new to you.
 This is not exhaustive: the full version graph is pinned in `uv.lock`, and per-feature decisions
 live in the `### ADR-N` blocks of `specs/*/design.md`. This page is the map: the *shape* of the
 project and the reasoning behind each piece. Entries marked **(planned)** are decided but not
-built yet. The project is pre-0.1: the report-ingestion layer (`mailvigil.reports`) is built and
-tested, but the configuration, summary, verdict and output are not, and the CLI does not call the
-ingestion layer yet.
+built yet. The project is pre-0.1: the report-ingestion layer (`mailvigil.reports`), the
+configuration loader and the sender identification are built and tested, but the summary, verdict
+and output are not, and the CLI does not call any of these layers yet.
 
 The project is one small program with no runtime dependency:
 
@@ -20,8 +20,10 @@ report files (.zip, .gz, .xml)
         │
         ▼
  Report and Record objects (ipaddress, sanitized text)   ◄── built
+        │
+        ▼
+ sender named from the DKIM selector ◄── a TOML file (tomllib)   ◄── built
  ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
- grouped by sender ◄── mailvigil.toml (tomllib)           ◄── planned
         │
         ▼
  summary + verdict ──► terminal text, or --json, plus an exit code
@@ -151,15 +153,20 @@ library and handles IPv4 and IPv6.
 
 **Docs:** [ipaddress](https://docs.python.org/3/library/ipaddress.html)
 
-### `tomllib` **(planned)**
+### `tomllib`
 
-Reads `mailvigil.toml`: the domain and the map from DKIM selector to service name.
+Reads the configuration file: the domain and the map from DKIM selector to service name.
+`mailvigil/config.py` reads the file as bytes (capped at 64 KiB), decodes it as strict UTF-8,
+parses it with `tomllib.loads` and then checks the shape of the result by hand. Every refusal is a
+`ConfigError` with a typed reason, never a stack trace.
 
 **Why this:** TOML is read-only in the standard library since 3.11, and it is the format
-`pyproject.toml` already taught every Python developer. No YAML parser to depend on.
+`pyproject.toml` already taught every Python developer. No YAML parser to depend on, and no
+include or variable syntax to defend against (ADR-1 and RNF-02 of spec 003).
 
-**Learn:** `tomllib.load` (binary file mode), the error type for invalid TOML, validating the
-shape of the loaded dict before using it.
+**Learn:** `tomllib.loads` (text) against `tomllib.load` (binary file), `TOMLDecodeError` and the
+line it carries, why a dotted key `a.b = "x"` is a nested table (so a selector with a dot is
+quoted), and validating the shape of the loaded dict before using it.
 
 **Docs:** [tomllib](https://docs.python.org/3/library/tomllib.html)
 
@@ -301,6 +308,8 @@ hands anything back.
 | `unicodedata` | drops control, format and line-separator characters from every text of a report, by Unicode category (ADR-6 of spec 002) |
 | `dataclasses`, `enum.StrEnum` | the immutable report model (`frozen=True, slots=True`) and the refusal reasons, which are plain strings a later spec can translate |
 | `os.path.realpath` | tells that one file given twice, or once directly and once through its folder, is the same file, so it is read once |
+| `difflib` | `get_close_matches` suggests the right key for a typo in the configuration (`domian` → `domain`) |
+| `types.MappingProxyType` | the selector map of a `Config` is a read-only view, so a frozen dataclass does not hide a mutable dict (ADR-5 of spec 003) |
 | `re` | the name pattern of an attachment (`provider!domain!begin!end…`), compiled with `re.ASCII` |
 | `NO_COLOR` | convention for turning terminal colors off, honored by the output (**planned**) |
 

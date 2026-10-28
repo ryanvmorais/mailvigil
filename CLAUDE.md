@@ -8,7 +8,8 @@ MailVigil is an open-source command-line tool that reads DMARC aggregate reports
 `.zip`, `.gz` or `.xml`) and says, in plain language, who is sending mail as a domain and whether
 it is safe to move the policy to `p=reject`. Python `>=3.12`, standard library only (zero runtime
 dependencies), offline. It is pre-0.1: the CLI only answers `mailvigil --version`, and the report
-ingestion layer (`mailvigil.reports`) is built and tested but not wired to the CLI yet; everything
+ingestion layer (`mailvigil.reports`), the configuration loader (`mailvigil.config`) and the sender
+identification (`mailvigil.senders`) are built and tested but not wired to the CLI yet; everything
 else is specified in [specs/](specs/) first. The repository has been public since
 2026-10-27 (the maintainer made it public, not Claude); nothing is announced or published to PyPI
 until the first version is ready.
@@ -66,7 +67,11 @@ src/mailvigil/
     parser.py        #   XML tree to Report: sanitized text, strict numbers, IPs normalized
     discovery.py     #   paths (files and folders) to an ordered, deduplicated list of files
     ingest.py        #   ingest(paths, domain): the entry point; refusals go to `skipped`
-tests/               # pytest, one test_reports_*.py per module; fixtures are synthetic, built in conftest.py
+  text.py            # text and domain rules shared by reports and config (clean_text, normalize_domain…)
+  config.py          # load_config(path) → frozen Config (domain + selector map); ConfigError is typed (spec 003)
+  senders.py         # identify_sender(record, config) → Identification; a selector counts only under the domain
+tests/               # pytest, one test file per module (test_reports_*.py, test_text.py, test_config.py,
+                     # test_senders.py); fixtures are synthetic, built in conftest.py or tmp_path
 specs/               # spec-driven development: requirements → design → tasks per feature
 docs/stack.md        # each technology of the stack, why it was chosen, what to study first
 .githooks/           # versioned pre-commit hook (core.hooksPath)

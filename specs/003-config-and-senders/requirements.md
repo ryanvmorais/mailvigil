@@ -1,6 +1,6 @@
 ---
 feature: Config and senders — a TOML file with the domain and a DKIM selector to service name map
-status: in progress
+status: done
 date: 2026-10-27
 related:
   - 001-foundation/requirements.md
