@@ -12,8 +12,10 @@ from __future__ import annotations
 from types import MappingProxyType
 
 from mailvigil.config import ConfigReason
+from mailvigil.fetch.errors import FetchReason
 from mailvigil.messages.model import (
     CommonMessages,
+    FetchMessages,
     HtmlMessages,
     Messages,
     Plural,
@@ -236,6 +238,45 @@ _REFUSALS = RefusalMessages(
 )
 
 # ---------------------------------------------------------------------------
+# Fetch
+# ---------------------------------------------------------------------------
+
+# What ``fetch`` prints. One phrase per reason: a test iterates ``FetchReason``, so a reason added
+# later cannot go without a sentence in both languages. A refused login carries no server text.
+_FETCH = FetchMessages(
+    title="Report messages fetched from the mailbox.",
+    key_matched="Matched:",
+    key_saved="Saved:",
+    key_already="Already saved:",
+    key_too_large="Too large:",
+    key_skipped="Skipped:",
+    key_left="Left for later:",
+    key_directory="Saved in:",
+    saved_before_stop=Plural(
+        "{n} message was saved before it stopped.",
+        "{n} messages were saved before it stopped.",
+    ),
+    reasons=MappingProxyType(
+        {
+            FetchReason.HOST_UNREACHABLE: "could not reach the server",
+            FetchReason.TIMEOUT: "the server took too long to answer",
+            FetchReason.DEADLINE_EXCEEDED: "the run took too long and was stopped",
+            FetchReason.CERTIFICATE_INVALID: "the server certificate was not accepted",
+            FetchReason.TLS_FAILED: "could not open a secure connection",
+            FetchReason.LOGIN_FAILED: "the server refused the user name or the password",
+            FetchReason.PASSWORD_UNUSABLE: (
+                "the password is empty, has a line break or has characters outside ASCII"
+            ),
+            FetchReason.PASSWORD_FILE: "could not read a password from the file",
+            FetchReason.FOLDER_NOT_FOUND: "the folder was not found",
+            FetchReason.PROTOCOL_ERROR: "the server sent an answer that could not be used",
+            FetchReason.TOO_MANY_MATCHES: "too many messages matched; narrow it with --since",
+            FetchReason.WRITE_FAILED: "could not write to the folder",
+        }
+    ),
+)
+
+# ---------------------------------------------------------------------------
 # HTML
 # ---------------------------------------------------------------------------
 
@@ -298,5 +339,10 @@ _HTML = HtmlMessages(
 # ---------------------------------------------------------------------------
 
 ENGLISH = Messages(
-    common=_COMMON, summary=_SUMMARY, verdict=_VERDICT, refusals=_REFUSALS, html=_HTML
+    common=_COMMON,
+    summary=_SUMMARY,
+    verdict=_VERDICT,
+    refusals=_REFUSALS,
+    fetch=_FETCH,
+    html=_HTML,
 )

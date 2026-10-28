@@ -14,6 +14,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 
 from mailvigil.config import ConfigReason
+from mailvigil.fetch.errors import FetchReason
 from mailvigil.reports import Reason
 from mailvigil.senders import Outcome
 from mailvigil.verdict import Answer, NoteKind, RuleId
@@ -297,6 +298,37 @@ class RefusalMessages:
 
 
 @dataclass(frozen=True, slots=True)
+class FetchMessages:
+    """
+    What ``fetch`` says (spec 009): the outcome of a run and the phrase of each refusal.
+
+    Attributes:
+        title (str): The first line of the outcome.
+        key_matched (str): The label of the messages the search listed.
+        key_saved (str): The label of the messages written in this run.
+        key_already (str): The label of the messages already on disk.
+        key_too_large (str): The label of the messages over the size cap.
+        key_skipped (str): The label of the messages that could not be used.
+        key_left (str): The label of the new messages left for a later run.
+        key_directory (str): The label of the folder the messages were saved in.
+        saved_before_stop (Plural): The second line of a refusal after some work; ``{n}`` is the
+            files saved, which are valid.
+        reasons (Mapping[FetchReason, str]): One phrase per refusal of a run.
+    """
+
+    title: str
+    key_matched: str
+    key_saved: str
+    key_already: str
+    key_too_large: str
+    key_skipped: str
+    key_left: str
+    key_directory: str
+    saved_before_stop: Plural
+    reasons: Mapping[FetchReason, str]
+
+
+@dataclass(frozen=True, slots=True)
 class HtmlMessages:
     """
     What only the HTML report says (spec 008). Every sentence the text format already has (rule
@@ -397,6 +429,7 @@ class Messages:
         summary (SummaryMessages): What ``summary`` says.
         verdict (VerdictMessages): What ``verdict`` says.
         refusals (RefusalMessages): The refusal lines and the no-reports explanation.
+        fetch (FetchMessages): What ``fetch`` says.
         html (HtmlMessages): What only the HTML report says.
     """
 
@@ -404,4 +437,5 @@ class Messages:
     summary: SummaryMessages
     verdict: VerdictMessages
     refusals: RefusalMessages
+    fetch: FetchMessages
     html: HtmlMessages

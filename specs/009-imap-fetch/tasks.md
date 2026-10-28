@@ -25,31 +25,31 @@ signature changed (the parent parser split); if any other one fails, the code is
 
 ## Stage 1 — Vocabulary, texts and the ignore rule (RF-08, RNF-01, RNF-07, ADR-1, ADR-8)
 
-- [ ] `tests/test_fetch_model.py`, written first: the twelve keys of `FetchReason` exist with the exact
+- [x] `tests/test_fetch_model.py`, written first: the twelve keys of `FetchReason` exist with the exact
   strings of the design; `FetchRefused` carries `reason`, a `detail` cleaned and cut at 200 and an
-  optional partial `FetchOutcome`; `FetchOutcome` is frozen and slotted; the constants have the
+  optional partial `FetchOutcome`; `SearchResult` (the valid UIDs and the count of dropped tokens, what `Mailbox.search` returns); `FetchOutcome` is frozen and slotted; the constants have the
   values of the design table; `MAX_MESSAGE_BYTES` in `fetch` is the object of `reports.mail`;
   importing `mailvigil.fetch.errors` and `mailvigil.fetch.model` does not put `imaplib` in
   `sys.modules` (a fresh interpreter). — RF-08, ADR-1, ADR-7
-- [ ] `src/mailvigil/fetch/__init__.py` (docstring only), `errors.py`, `model.py`: `FetchReason`,
+- [x] `src/mailvigil/fetch/__init__.py` (docstring only), `errors.py`, `model.py`: `FetchReason`,
   `FetchRefused`, `FetchOutcome`, the constants and the `Mailbox` protocol, with docstrings
   (`Args:` / `Returns:` / `Raises:`). — RF-08, ADR-1
-- [ ] `tests/test_messages.py`, `tests/test_render_fetch.py`, first: every `FetchReason` has a
+- [x] `tests/test_messages.py`, `tests/test_render_fetch.py`, first: every `FetchReason` has a
   sentence in both languages (the coverage test fails for all of them, which is the point); the
   texts are ASCII; `render_fetch` writes the six numbers and the directory, at most 80 columns, in
   English and in Portuguese, with a hostile directory name (control characters, a bidirectional
   override, 300 characters) cleaned and cut; the refusal line is `mailvigil: <phrase>[: <detail>]`
   plus the line with the saved count only when `saved > 0`. — RF-08
-- [ ] `src/mailvigil/messages/model.py`, `en.py`, `pt_br.py` (ASCII only) and
+- [x] `src/mailvigil/messages/model.py`, `en.py`, `pt_br.py` (ASCII only) and
   `src/mailvigil/render_fetch.py`: `FetchMessages`, one sentence per reason and per label in each
   language, `render_fetch`, `refusal_line`. `messages/` imports `fetch.errors` and nothing else of
   `fetch/`. — RF-08
-- [ ] `.gitignore` and a test: `*.eml` and `*.mbox` are ignored outside `tests/`, and the negations
+- [x] `.gitignore` and a test: `*.eml` and `*.mbox` are ignored outside `tests/`, and the negations
   keep `tests/**` tracked (`git check-ignore` over `tmp` paths in a test, or a text check of the
   file if the repository state cannot be assumed). — RNF-07
-- [ ] Quality gate of the stage: `uv run ruff check .` → `uv run black --check .` → `uv run mypy` →
+- [x] Quality gate of the stage: `uv run ruff check .` → `uv run black --check .` → `uv run mypy` →
   `uv run pytest --cov`. Record the result here, with the number of tests and the coverage.
-  **Result:** _pending_.
+  **Result:** ruff, black and mypy clean; 2346 tests passed, coverage 100%.
 
 ## Stage 2 — The store (RF-06, RF-07, RNF-05, ADR-6)
 

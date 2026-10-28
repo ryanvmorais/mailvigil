@@ -118,7 +118,7 @@ saves is always one `007` would accept.
 
 - **`Mailbox`** (a `Protocol`, in `model.py`):
   `select(folder) -> int` (read-only; returns the validity number) ·
-  `search(since: date | None) -> list[int]` (UIDs, ascending) ·
+  `search(since: date | None) -> SearchResult` (the valid UIDs, ascending, and the count of dropped tokens) ·
   `sizes(uids) -> dict[int, int]` (announced sizes) ·
   `message(uid, limit) -> bytes | None` (at most `limit + 1` bytes; `None` when the server gives
   no body) · `close() -> None`.

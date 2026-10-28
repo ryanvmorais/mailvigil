@@ -14,8 +14,10 @@ from __future__ import annotations
 from types import MappingProxyType
 
 from mailvigil.config import ConfigReason
+from mailvigil.fetch.errors import FetchReason
 from mailvigil.messages.model import (
     CommonMessages,
+    FetchMessages,
     HtmlMessages,
     Messages,
     Plural,
@@ -251,6 +253,44 @@ _REFUSALS = RefusalMessages(
 )
 
 # ---------------------------------------------------------------------------
+# Fetch
+# ---------------------------------------------------------------------------
+
+# O que o fetch diz, no mesmo molde de en.py.
+_FETCH = FetchMessages(
+    title="Mensagens de relatorio baixadas da caixa de e-mail.",
+    key_matched="Encontradas:",
+    key_saved="Salvas:",
+    key_already="Ja salvas:",
+    key_too_large="Grandes demais:",
+    key_skipped="Ignoradas:",
+    key_left="Ficaram para depois:",
+    key_directory="Salvas em:",
+    saved_before_stop=Plural(
+        "{n} mensagem foi salva antes de parar.",
+        "{n} mensagens foram salvas antes de parar.",
+    ),
+    reasons=MappingProxyType(
+        {
+            FetchReason.HOST_UNREACHABLE: "nao foi possivel alcancar o servidor",
+            FetchReason.TIMEOUT: "o servidor demorou demais para responder",
+            FetchReason.DEADLINE_EXCEEDED: "a execucao demorou demais e foi interrompida",
+            FetchReason.CERTIFICATE_INVALID: "o certificado do servidor nao foi aceito",
+            FetchReason.TLS_FAILED: "nao foi possivel abrir uma conexao segura",
+            FetchReason.LOGIN_FAILED: "o servidor recusou o usuario ou a senha",
+            FetchReason.PASSWORD_UNUSABLE: (
+                "a senha esta vazia, tem quebra de linha ou tem caracteres fora do ASCII"
+            ),
+            FetchReason.PASSWORD_FILE: "nao foi possivel ler a senha do arquivo",
+            FetchReason.FOLDER_NOT_FOUND: "a pasta nao foi encontrada",
+            FetchReason.PROTOCOL_ERROR: "o servidor enviou uma resposta que nao deu para usar",
+            FetchReason.TOO_MANY_MATCHES: "mensagens demais; restrinja com --since",
+            FetchReason.WRITE_FAILED: "nao foi possivel gravar na pasta",
+        }
+    ),
+)
+
+# ---------------------------------------------------------------------------
 # HTML
 # ---------------------------------------------------------------------------
 
@@ -313,5 +353,10 @@ _HTML = HtmlMessages(
 # ---------------------------------------------------------------------------
 
 PORTUGUESE = Messages(
-    common=_COMMON, summary=_SUMMARY, verdict=_VERDICT, refusals=_REFUSALS, html=_HTML
+    common=_COMMON,
+    summary=_SUMMARY,
+    verdict=_VERDICT,
+    refusals=_REFUSALS,
+    fetch=_FETCH,
+    html=_HTML,
 )
