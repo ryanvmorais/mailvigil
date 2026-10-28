@@ -1,6 +1,6 @@
 ---
 feature: HTML report — one static file with the summary and the verdict
-status: approved
+status: in progress
 date: 2026-10-28
 related:
   - 008-html-report/requirements.md
@@ -30,27 +30,29 @@ maintainer, not decided here.
 
 ## Stage 1 — The shared sentences become public (ADR-2, RNF-05)
 
-- [ ] `tests/test_render_verdict.py`, written first and green on the current code: the text of
+- [x] `tests/test_render_verdict.py`, written first and green on the current code: the text of
   `render_verdict` for fixed verdicts, in English and in `pt-BR`, is pinned as exact strings: ready
   (with and without a still-failing unrecognized source), too early (no report kept, and with
   missing days and messages), not ready by recognized failures (one service, several services,
   more than the limit), not ready by unrecognized failures (the share that rounds to its limit),
   every `NoteKind` at least once, and what was left out. This is the guard of the refactor: it
   must pass before and after. — RNF-05, ADR-2
-- [ ] `tests/test_render_verdict.py`, the new public names, first: `reason_sentence` for each of
+- [x] `tests/test_render_verdict.py`, the new public names, first: `reason_sentence` for each of
   the five cases (ready, too early, no report kept, recognized, unrecognized) returns the sentence
   without its label; `next_sentence` is empty for `READY` and one sentence otherwise;
   `measured_text`, `needed_text` and `missing_text` for each rule; `note_sentence` for every
   `NoteKind` (the test iterates the enum, so a kind added later cannot reach the page as a bare
   key). — RF-02, ADR-2
-- [ ] `src/mailvigil/render_verdict.py`: `reason_sentence`, `next_sentence`, `measured_text`,
+- [x] `src/mailvigil/render_verdict.py`: `reason_sentence`, `next_sentence`, `measured_text`,
   `needed_text`, `missing_text` and `note_sentence` lose their underscore (or are extracted from
   `_why`, `_next_step`, `_measured`, `_needed`, `_missing` and the note functions); `_why` and
   `_next_step` are rewritten on top of them, so the two renderers cannot drift. No text changes.
   Docstrings with `Args:` / `Returns:`. — ADR-2
-- [ ] Quality gate of the stage: `uv run ruff check .` → `uv run black --check .` → `uv run mypy` →
+- [x] Quality gate of the stage: `uv run ruff check .` → `uv run black --check .` → `uv run mypy` →
   `uv run pytest --cov`. Record the result here, with the number of tests and the coverage.
-  **Result:** _to fill in when the stage runs._
+  **Result:** ruff, black, mypy strict clean; 1220 tests pass, coverage 100%. The text of 13
+  fixed verdicts in both languages is pinned in `tests/render_verdict_golden.py` (recorded before
+  the refactor, green after it, byte for byte).
 
 ## Stage 2 — The `Summary` learns the days (RF-04, RF-08, ADR-3)
 

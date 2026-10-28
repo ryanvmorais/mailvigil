@@ -258,7 +258,7 @@ def _title(verdict: Verdict, messages: Messages) -> list[str]:
     return [text.title.format(domain=fit(domain, room)), phrase[:1].upper() + phrase[1:]]
 
 
-def _missing(rule: Rule, messages: Messages) -> str:
+def missing_text(rule: Rule, messages: Messages) -> str:
     """
     Say what a failed data rule lacks.
 
@@ -274,6 +274,38 @@ def _missing(rule: Rule, messages: Messages) -> str:
     return phrase.of(rule.missing)
 
 
+def reason_sentence(verdict: Verdict, messages: Messages) -> str:
+    """
+    Say why the answer is what it is, in one sentence and without its label (RF-03).
+
+    The text format and the HTML report both read this sentence, so the rounding rule of the share
+    (``_share``) lives once (008 ADR-2).
+
+    Args:
+        verdict (Verdict): The verdict.
+        messages (Messages): The language.
+
+    Returns:
+        str: For ``READY`` and ``TOO_EARLY`` the fixed sentence of the answer (a run with no report
+            kept is also ``TOO_EARLY``); for ``NOT_READY`` the sentence of the rule that decided,
+            with the share of rule 5 filled in.
+    """
+    text = messages.verdict
+    if verdict.answer is Answer.READY:
+        return text.why_ready
+    if verdict.answer is Answer.TOO_EARLY:
+        return text.why_too_early
+    if verdict.deciding is RuleId.RECOGNIZED_FAILURES:
+        return text.why_recognized
+    rule = _rule(verdict, RuleId.UNRECOGNIZED_FAILURES)
+    return text.why_unrecognized.format(
+        share=_share(rule),
+        measured=rule.measured,
+        whole=rule.whole,
+        limit=_per_mille(rule.needed),
+    )
+
+
 def _why(verdict: Verdict, messages: Messages) -> list[str]:
     """
     Write the reason: the rule that decided and the sources or amounts behind it (RF-03).
@@ -287,8 +319,9 @@ def _why(verdict: Verdict, messages: Messages) -> list[str]:
     """
     text = messages.verdict
     label = text.why_label
+    sentence = f"{label} {reason_sentence(verdict, messages)}"
     if verdict.answer is Answer.READY:
-        lines = [f"{label} {text.why_ready}"]
+        lines = [sentence]
         if verdict.unrecognized_failing:
             lines.append(text.still_failing)
             lines.extend(
@@ -302,17 +335,17 @@ def _why(verdict: Verdict, messages: Messages) -> list[str]:
         return lines
 
     if verdict.answer is Answer.TOO_EARLY:
-        lines = [f"{label} {text.why_too_early}"]
+        lines = [sentence]
         if _rule(verdict, RuleId.PERIOD).measured == 0:
             lines.append("  " + text.no_report_kept)
             return lines
         for rule in verdict.rules:
             if rule.kind is RuleKind.DATA and not rule.passed:
-                lines.append(f"  {text.rule_names[rule.id]}: {_missing(rule, messages)}")
+                lines.append(f"  {text.rule_names[rule.id]}: {missing_text(rule, messages)}")
         return lines
 
     if verdict.deciding is RuleId.RECOGNIZED_FAILURES:
-        lines = [f"{label} {text.why_recognized}"]
+        lines = [sentence]
         lines.extend(
             _sources(
                 verdict.recognized_failing,
@@ -323,13 +356,6 @@ def _why(verdict: Verdict, messages: Messages) -> list[str]:
         )
         return lines
 
-    rule = _rule(verdict, RuleId.UNRECOGNIZED_FAILURES)
-    sentence = f"{label} " + text.why_unrecognized.format(
-        share=_share(rule),
-        measured=rule.measured,
-        whole=rule.whole,
-        limit=_per_mille(rule.needed),
-    )
     lines = _wrap(sentence, rest=" " * (len(label) + 1))
     lines.extend(
         _sources(
@@ -342,7 +368,7 @@ def _why(verdict: Verdict, messages: Messages) -> list[str]:
     return lines
 
 
-def _measured(rule: Rule, messages: Messages) -> str:
+def measured_text(rule: Rule, messages: Messages) -> str:
     """
     Write what a rule measured, a share always beside its count (004 RF-06).
 
@@ -365,7 +391,7 @@ def _measured(rule: Rule, messages: Messages) -> str:
     return str(rule.measured)
 
 
-def _needed(rule: Rule) -> str:
+def needed_text(rule: Rule) -> str:
     """
     Write the threshold of a rule, in the unit it is kept in.
 
@@ -418,8 +444,8 @@ def _table(verdict: Verdict, messages: Messages) -> list[str]:
     rows = [
         (
             f"{int(rule.id)}  {text.rule_names[rule.id]}",
-            _measured(rule, messages),
-            _needed(rule),
+            measured_text(rule, messages),
+            needed_text(rule),
             _result(rule, messages),
         )
         for rule in verdict.rules
@@ -485,6 +511,20 @@ _NOTE_TEXT: dict[NoteKind, Callable[[Note, Messages], str]] = {
 }
 
 
+def note_sentence(note: Note, messages: Messages) -> str:
+    """
+    Write one note as a sentence, whatever its kind.
+
+    Args:
+        note (Note): The note.
+        messages (Messages): The language.
+
+    Returns:
+        str: The template of the note's kind with its numbers and texts filled in.
+    """
+    return _NOTE_TEXT[note.kind](note, messages)
+
+
 def _notes(verdict: Verdict, messages: Messages) -> list[str]:
     """
     Write the notes, one sentence each, only those present (RF-04).
@@ -500,13 +540,36 @@ def _notes(verdict: Verdict, messages: Messages) -> list[str]:
         return []
     lines = [messages.verdict.notes_title]
     for note in verdict.notes:
-        lines.extend(_wrap(_NOTE_TEXT[note.kind](note, messages), "  - ", "    "))
+        lines.extend(_wrap(note_sentence(note, messages), "  - ", "    "))
     return lines
+
+
+def next_sentence(verdict: Verdict, messages: Messages) -> str:
+    """
+    Say the next step in one sentence, chosen by the rule that decided, without its label (RF-03).
+
+    Args:
+        verdict (Verdict): The verdict.
+        messages (Messages): The language.
+
+    Returns:
+        str: The sentence; empty for ``READY``.
+    """
+    if verdict.deciding is None:
+        return ""
+    text = messages.verdict
+    if verdict.deciding is RuleId.RECOGNIZED_FAILURES:
+        services = list(dict.fromkeys(source.service for source in verdict.recognized_failing))
+        who = fit(services[0], _NAME_MAX) if len(services) == 1 else text.next_each_service
+        return text.next_recognized.format(who=who)
+    if verdict.deciding is RuleId.UNRECOGNIZED_FAILURES:
+        return text.next_unrecognized
+    return text.next_data.format(marker=text.result_too_early)
 
 
 def _next_step(verdict: Verdict, messages: Messages) -> list[str]:
     """
-    Write the next step, one sentence chosen by the rule that decided (RF-03).
+    Write the next step, labeled and wrapped (RF-03).
 
     Args:
         verdict (Verdict): The verdict.
@@ -515,18 +578,11 @@ def _next_step(verdict: Verdict, messages: Messages) -> list[str]:
     Returns:
         list[str]: The sentence; nothing for ``READY``.
     """
-    if verdict.deciding is None:
+    body = next_sentence(verdict, messages)
+    if not body:
         return []
-    text = messages.verdict
-    if verdict.deciding is RuleId.RECOGNIZED_FAILURES:
-        services = list(dict.fromkeys(source.service for source in verdict.recognized_failing))
-        who = fit(services[0], _NAME_MAX) if len(services) == 1 else text.next_each_service
-        body = text.next_recognized.format(who=who)
-    elif verdict.deciding is RuleId.UNRECOGNIZED_FAILURES:
-        body = text.next_unrecognized
-    else:
-        body = text.next_data.format(marker=text.result_too_early)
-    return _wrap(f"{text.next_label} {body}", rest=" " * (len(text.next_label) + 1))
+    label = messages.verdict.next_label
+    return _wrap(f"{label} {body}", rest=" " * (len(label) + 1))
 
 
 def _left_out(verdict: Verdict, messages: Messages) -> list[str]:
