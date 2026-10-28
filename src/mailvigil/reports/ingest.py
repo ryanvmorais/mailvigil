@@ -17,6 +17,7 @@ from mailvigil.reports.errors import ReportRefused
 from mailvigil.reports.model import IngestionResult, Report, SkippedFile
 from mailvigil.reports.parser import parse_report
 from mailvigil.reports.reader import read_xml
+from mailvigil.text import normalize_domain
 
 # ---------------------------------------------------------------------------
 # Ingestion
@@ -41,7 +42,7 @@ def ingest(paths: Sequence[Path], domain: str) -> IngestionResult:
     Raises:
         ValueError: When ``domain`` is empty. That is a mistake in the caller, not a bad input file.
     """
-    wanted = domain.strip().lower().rstrip(".")
+    wanted = normalize_domain(domain)
     if not wanted:
         raise ValueError("domain must not be empty")
 
