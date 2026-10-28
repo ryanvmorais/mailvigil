@@ -337,6 +337,9 @@ class HtmlMessages:
         numbers_region (str): The accessible name of that table.
         senders_region (str): The accessible name of the senders table.
         failing_heading (str): The title of the failing-sources block.
+        next_each_service (str): ``VerdictMessages.next_each_service`` for the page, where the
+            sources come after the next step, not before it.
+        next_unrecognized (str): ``VerdictMessages.next_unrecognized`` for the page, same reason.
         col_day (str): The header of the day column.
         range_label (str): A column of several days; ``{first}`` and ``{last}``.
         footer (str): The last line; ``{version}``.
@@ -372,6 +375,8 @@ class HtmlMessages:
     numbers_region: str
     senders_region: str
     failing_heading: str
+    next_each_service: str
+    next_unrecognized: str
     col_day: str
     range_label: str
     footer: str

@@ -280,6 +280,11 @@ _HTML = HtmlMessages(
     numbers_region="Messages per day",
     senders_region="Senders table",
     failing_heading="Failing sources",
+    next_each_service="each service listed below",
+    next_unrecognized=(
+        "look at the sources below and add the selectors of the ones that are yours to "
+        "[senders] in the configuration."
+    ),
     col_day="Day",
     range_label="{first} to {last}",
     footer=(

@@ -560,13 +560,16 @@ def _notes(verdict: Verdict, messages: Messages) -> list[str]:
     return lines
 
 
-def next_sentence(verdict: Verdict, messages: Messages) -> str:
+def next_sentence(verdict: Verdict, messages: Messages, *, on_page: bool = False) -> str:
     """
     Say the next step in one sentence, chosen by the rule that decided, without its label (RF-03).
 
     Args:
         verdict (Verdict): The verdict.
         messages (Messages): The language.
+        on_page (bool, optional): ``True`` for the HTML page, which lists the failing sources
+            after the next step where the text lists them before it, so the two sentences that
+            point at them say "below" instead of "above". Default: ``False``.
 
     Returns:
         str: The sentence; empty for ``READY``.
@@ -574,12 +577,14 @@ def next_sentence(verdict: Verdict, messages: Messages) -> str:
     if verdict.deciding is None:
         return ""
     text = messages.verdict
+    each_service = messages.html.next_each_service if on_page else text.next_each_service
+    unrecognized = messages.html.next_unrecognized if on_page else text.next_unrecognized
     if verdict.deciding is RuleId.RECOGNIZED_FAILURES:
         services = list(dict.fromkeys(source.service for source in verdict.recognized_failing))
-        who = fit(services[0], _NAME_MAX) if len(services) == 1 else text.next_each_service
+        who = fit(services[0], _NAME_MAX) if len(services) == 1 else each_service
         return text.next_recognized.format(who=who)
     if verdict.deciding is RuleId.UNRECOGNIZED_FAILURES:
-        return text.next_unrecognized
+        return unrecognized
     return text.next_data.format(marker=text.result_too_early)
 
 

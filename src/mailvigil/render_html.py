@@ -245,7 +245,7 @@ def _banner(summary: Summary, verdict: Verdict, messages: Messages) -> Safe:
     ]
     if verdict.answer is Answer.TOO_EARLY and _rule(verdict, RuleId.PERIOD).measured == 0:
         body.append(el("p", text(messages.verdict.no_report_kept), class_="why"))
-    following = next_sentence(verdict, messages)
+    following = next_sentence(verdict, messages, on_page=True)
     if following:
         label = messages.verdict.next_label
         body.append(el("p", el("strong", text(label)), text(f" {following}"), class_="next"))

@@ -315,7 +315,7 @@ def test_the_answer_the_reason_and_the_next_step_are_the_ones_of_the_text(answer
     sentence = reason_sentence(verdict, ENGLISH)
     assert sentence in page.texts
     assert " ".join(sentence.split()) in " ".join(text.split())
-    following = next_sentence(verdict, ENGLISH)
+    following = next_sentence(verdict, ENGLISH, on_page=True)
     if following:
         assert following in page.texts
 
