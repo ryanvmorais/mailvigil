@@ -22,6 +22,7 @@ from mailvigil.config import (
     Config,
     ConfigError,
     ConfigReason,
+    check_domain,
     load_config,
 )
 from mailvigil.text import normalize_domain
@@ -306,6 +307,66 @@ def test_a_non_ascii_domain_is_refused_with_the_punycode_advice(tmp_path: Path, 
     assert error.reason is ConfigReason.NON_ASCII_DOMAIN
     assert error.key == "domain"
     assert "xn--" in error.detail
+
+
+# ---------------------------------------------------------------------------
+# The domain rules on a bare value (ADR-7)
+# ---------------------------------------------------------------------------
+
+
+def test_check_domain_normalizes_like_the_loader() -> None:
+    """A value from a flag gets the same normalization as the one from the file."""
+    assert check_domain(" Example.COM. ") == "example.com"
+
+
+@pytest.mark.parametrize(
+    ("value", "reason"),
+    [
+        (42, ConfigReason.INVALID_DOMAIN),
+        ("", ConfigReason.INVALID_DOMAIN),
+        ("https://example.com", ConfigReason.INVALID_DOMAIN),
+        ("a..com", ConfigReason.INVALID_DOMAIN),
+        ("localhost", ConfigReason.INVALID_DOMAIN),
+        ("a" * 64 + ".com", ConfigReason.INVALID_DOMAIN),
+        ("exämple.com", ConfigReason.NON_ASCII_DOMAIN),
+        (chr(0x212A) + "ample.com", ConfigReason.NON_ASCII_DOMAIN),
+    ],
+    ids=[
+        "integer",
+        "empty",
+        "scheme",
+        "empty-label",
+        "single-label",
+        "label-64",
+        "non-ascii",
+        "kelvin-sign",
+    ],
+)
+def test_check_domain_refuses_what_the_loader_refuses(value: object, reason: ConfigReason) -> None:
+    """The same inputs fail with the same reasons, so the flag and the file agree."""
+    with pytest.raises(ConfigError) as caught:
+        check_domain(value)
+
+    assert caught.value.reason is reason
+
+
+def test_check_domain_reports_the_key_it_was_given() -> None:
+    """The refusal names the flag when the value came from one, and ``domain`` by default."""
+    with pytest.raises(ConfigError) as default:
+        check_domain("localhost")
+    with pytest.raises(ConfigError) as flag:
+        check_domain("localhost", key="--domain")
+
+    assert default.value.key == "domain"
+    assert flag.value.key == "--domain"
+
+
+def test_check_domain_cleans_a_hostile_key() -> None:
+    """The key is cleaned like any key of a ``ConfigError``: a flag name is still text."""
+    with pytest.raises(ConfigError) as caught:
+        check_domain("localhost", key="--do\nmain‮")
+
+    assert caught.value.key == "--do main"
 
 
 @pytest.mark.parametrize(
