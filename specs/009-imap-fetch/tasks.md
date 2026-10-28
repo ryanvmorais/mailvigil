@@ -53,7 +53,7 @@ signature changed (the parent parser split); if any other one fails, the code is
 
 ## Stage 2 — The store (RF-06, RF-07, RNF-05, ADR-6)
 
-- [ ] `tests/test_fetch_store.py`, written first: the tag is eight hex digits, stable for the same
+- [x] `tests/test_fetch_store.py`, written first: the tag is eight hex digits, stable for the same
   host, user and folder and different when any of the three changes; a hostile host, user and
   folder (separators, `..`, a reserved Windows name, control characters, a bidirectional override)
   give a tag of eight hex digits and nothing else; `name(validity, uid)` is
@@ -63,10 +63,11 @@ signature changed (the parent parser split); if any other one fails, the code is
   `write_failed` and leave no `.eml` and no temporary file; two saves of one message leave one
   correct file; `clean_stale` removes a `.mailvigil-*.partial` older than a day and keeps a younger
   one and every other file (an `.eml` among them). — RF-06, RF-07, ADR-6
-- [ ] `src/mailvigil/fetch/store.py`: `Store`, `tag_of`, `name`, `has`, `save` (unique temporary
+- [x] `src/mailvigil/fetch/store.py`: `Store`, `tag_of`, `name`, `has`, `save` (unique temporary
   file in the same directory, `flush`, `fsync`, `os.replace`), `clean_stale`. Docstrings with
   `Args:` / `Returns:` / `Raises:`. — RF-06, RF-07, RNF-05, ADR-6
-- [ ] Quality gate of the stage: the same four commands. **Result:** _pending_.
+- [x] Quality gate of the stage: the same four commands. **Result:** ruff, black and mypy clean;
+  2379 tests passed, coverage 100%.
 
 ## Stage 3 — The loop against a fake (RF-04, RF-05, RF-07, RF-08, RNF-03, RNF-04, ADR-1, ADR-8)
 
