@@ -21,6 +21,7 @@ import pytest
 
 from mailvigil.cli import _config_line
 from mailvigil.config import ConfigError, ConfigReason
+from mailvigil.fetch.errors import FetchReason
 from mailvigil.messages import ENGLISH, PORTUGUESE, Messages, Plural, language_by_code
 from mailvigil.reports import Reason
 from mailvigil.senders import Outcome
@@ -222,6 +223,7 @@ def test_every_template_formats_with_its_placeholders(messages: Messages) -> Non
         (lambda m: m.verdict.rule_names, RuleId, set()),
         (lambda m: m.verdict.notes, NoteKind, set()),
         (lambda m: m.refusals.config_reasons, ConfigReason, set()),
+        (lambda m: m.fetch.reasons, FetchReason, set()),
     ],
 )
 def test_every_enum_keyed_mapping_covers_its_enum(
@@ -291,10 +293,44 @@ def test_importing_the_catalog_does_not_import_a_renderer() -> None:
     code = (
         "import sys, mailvigil.messages; "
         "bad = [m for m in ('mailvigil.render', 'mailvigil.render_verdict', 'mailvigil.cli', "
-        "'mailvigil.render_json') if m in sys.modules]; "
+        "'mailvigil.render_json', 'mailvigil.render_fetch') if m in sys.modules]; "
         "sys.exit(len(bad))"
     )
     assert subprocess.run([sys.executable, "-I", "-c", code], check=False).returncode == 0
+
+
+def test_importing_the_catalog_takes_only_the_fetch_reasons_from_the_fetch_package() -> None:
+    """``messages/`` imports ``fetch.errors`` and nothing else, so no network code is loaded."""
+    code = (
+        "import sys, mailvigil.messages; "
+        "bad = [m for m in ('imaplib', 'mailvigil.fetch.imap', 'mailvigil.fetch.model', "
+        "'mailvigil.fetch.store', 'mailvigil.fetch.run') if m in sys.modules]; "
+        "sys.exit(len(bad))"
+    )
+    assert subprocess.run([sys.executable, "-I", "-c", code], check=False).returncode == 0
+
+
+@_BOTH
+def test_the_fetch_catalog_is_filled(messages: Messages) -> None:
+    """Every field of ``FetchMessages`` is a non-empty template or a ``Plural`` with both forms."""
+    fields = dataclasses.fields(messages.fetch)
+    assert fields
+    for field in fields:
+        value = getattr(messages.fetch, field.name)
+        if isinstance(value, Mapping):
+            continue  # the reasons are checked by the coverage test above
+        forms = [value.one, value.many] if isinstance(value, Plural) else [value]
+        for form in forms:
+            assert isinstance(form, str)
+            assert form.strip(), field.name
+
+
+@_BOTH
+def test_a_fetch_phrase_is_not_the_reason_key(messages: Messages) -> None:
+    """The phrase is for a person, the key is for a log."""
+    for reason, phrase in messages.fetch.reasons.items():
+        assert phrase != reason.value
+        assert "_" not in phrase
 
 
 # ---------------------------------------------------------------------------

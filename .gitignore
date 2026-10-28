@@ -21,7 +21,7 @@ venv/
 .coverage
 htmlcov/
 
-# --- 4. REAL DMARC REPORTS ---
+# --- 4. REAL DMARC REPORTS AND SAVED MAIL ---
 # Real reports carry source IPs and domains: never commit them. Providers send them as .zip
 # (Google), .gz or plain .xml, so all three are ignored, not only the double extensions. Test and
 # README samples are synthetic and live under tests/ (the negations below keep them tracked).
@@ -35,6 +35,14 @@ htmlcov/
 !tests/**/*.zip
 # Exception: a synthetic gzipped report.
 !tests/**/*.gz
+# `mailvigil fetch` saves the report messages as .eml (spec 009), and a mailbox export is .mbox: both
+# carry sender addresses, subjects and the reports themselves, so a fetch folder inside the
+# repository cannot be committed by accident.
+*.eml
+*.mbox
+# Exception: synthetic messages under tests/ are committed on purpose.
+!tests/**/*.eml
+!tests/**/*.mbox
 
 # --- 5. SECRETS AND LOCAL CONFIG ---
 # Machine-specific overrides. There is no committed .env; the tool reads a TOML config.
