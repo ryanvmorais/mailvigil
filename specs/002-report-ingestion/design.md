@@ -210,7 +210,12 @@ unnoticed and had its entity expanded.
    `_clean(value)` implements RF-05: tab, CR and LF become a space, then every character whose
    Unicode category is `Cc`, `Cf`, `Zl` or `Zp` (this covers C1 controls and the bidirectional
    overrides and isolates) is dropped, the result is stripped and cut to `MAX_TEXT = 255`
-   characters. Domains are additionally lower-cased.
+   characters. Domains (`policy_published/domain`, `header_from`, and the DKIM and SPF domains) are
+   additionally lower-cased. `_text` also returns its default for an element that is present but
+   empty. Numbers (`count`, the period, `pct`) are read by `_raw_text`, which neither cleans nor
+   cuts, and must be ASCII digits only: cutting at 255 would turn a 5,000-digit `count` into a
+   different, valid number (found by the Stage 4 test). A missing `count`, period or
+   `policy_published/domain` is `INVALID_FIELD`.
 
 Missing optional elements take the defaults of the data model; a missing required container
 (`report_metadata`, `policy_published`) → `NOT_A_REPORT`. Lookups use only `find`/`findall` on
