@@ -84,25 +84,28 @@ public entry point.
 
 ## Stage 4 — Parsing a report (RF-04, RF-05)
 
-- [ ] `tests/test_reports_parser.py`, text cleaning first: a C1 control, a bidirectional override, a
+- [x] `tests/test_reports_parser.py`, text cleaning first: a C1 control, a bidirectional override, a
   line break and a tab inside a field are removed or replaced; a 1,000-character field is cut at
   255; domains are lower-cased; an ESC and a NUL in the document are refused by the parser (the
   test documents that behavior). — RF-05, ADR-6
-- [ ] `src/mailvigil/reports/parser.py`, part 1: `MAX_TEXT`, `_clean`, `_text`. — RF-05
-- [ ] Tests for the report skeleton: full RFC 7489-style report to the model (every field
+- [x] `src/mailvigil/reports/parser.py`, part 1: `MAX_TEXT`, `_clean`, `_text`. — RF-05 (plus
+  `_raw_text`: numbers are read uncut, see the design)
+- [x] Tests for the report skeleton: full RFC 7489-style report to the model (every field
   asserted); the same report in the RFC 9990 namespace gives an equal `Report`; wrong root and
   foreign-namespace root (`NOT_A_REPORT`); `version` `1.0` and absent accepted, `2.0`
   (`UNSUPPORTED_VERSION`); missing `report_metadata` or `policy_published` (`NOT_A_REPORT`); bad
   timestamp, `end < begin` and `pct` 101 (`INVALID_FIELD`, detail names the field, not the value).
   — RF-04
-- [ ] `parser.py`, part 2: `parse_report` up to metadata and `PolicyPublished`. — RF-04
-- [ ] Tests for records: negative, non-integer and 5,000-digit `count` (`INVALID_FIELD`); whitespace
+- [x] `parser.py`, part 2: `parse_report` up to metadata and `PolicyPublished`. — RF-04
+- [x] Tests for records: negative, non-integer and 5,000-digit `count` (`INVALID_FIELD`); whitespace
   around values; two `dkim` blocks and two `spf` blocks; override reasons; absent optionals take the
   defaults; IPv6 `source_ip` normalized (`2001:DB8::1` and `2001:db8:0::1` equal); an invalid
   address kept sanitized; `header_from` lower-cased; elements in a foreign namespace ignored.
   — RF-04
-- [ ] `parser.py`, part 3: `Record` parsing with `ipaddress`. — RF-04
-- [ ] Quality gate. — result recorded when run: ___
+- [x] `parser.py`, part 3: `Record` parsing with `ipaddress`. — RF-04
+- [x] Quality gate. — result recorded when run: all green on 2026-10-27; 145 passed, coverage 100%
+  (Python 3.12). Mutation checks: with no category dropped by `_clean`, the cleaning tests fail; with
+  `pct` read through the 255-character cut, the long-number test fails.
 
 ## Stage 5 — Discovery and ingestion (RF-06 to RF-09)
 
