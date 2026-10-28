@@ -233,6 +233,25 @@ def _sources(
 # ---------------------------------------------------------------------------
 
 
+def answer_phrase(verdict: Verdict, messages: Messages) -> str:
+    """
+    Say the answer as a phrase, with the policy already in force when it is ``p=reject`` (RF-05).
+
+    The text format and the HTML report both read this phrase (008 ADR-2).
+
+    Args:
+        verdict (Verdict): The verdict.
+        messages (Messages): The language.
+
+    Returns:
+        str: The phrase of the answer, in lower case as the title writes it after the colon.
+    """
+    text = messages.verdict
+    if verdict.enforcing == "reject":
+        return text.enforcing.format(words=text.words_enforcing[verdict.answer])
+    return text.words[verdict.answer]
+
+
 def _title(verdict: Verdict, messages: Messages) -> list[str]:
     """
     Write the title: the domain and the answer (RF-03, RF-05).
@@ -246,10 +265,7 @@ def _title(verdict: Verdict, messages: Messages) -> list[str]:
             cut at the first and the answer, capitalized, alone on the second.
     """
     text = messages.verdict
-    if verdict.enforcing == "reject":
-        phrase = text.enforcing.format(words=text.words_enforcing[verdict.answer])
-    else:
-        phrase = text.words[verdict.answer]
+    phrase = answer_phrase(verdict, messages)
     domain = fit(verdict.domain, len(verdict.domain))
     one = f"{text.title.format(domain=domain)}: {phrase}"
     if len(one) <= _WIDTH:
@@ -585,18 +601,19 @@ def _next_step(verdict: Verdict, messages: Messages) -> list[str]:
     return _wrap(f"{label} {body}", rest=" " * (len(label) + 1))
 
 
-def _left_out(verdict: Verdict, messages: Messages) -> list[str]:
+def left_out_parts(verdict: Verdict, messages: Messages) -> list[str]:
     """
-    Say what the summary did not count, in one sentence, only when something was left out (RF-09).
+    Name what the summary did not count, one phrase per kind, only the kinds above zero (RF-09).
 
-    The sentence gives counts and no file name: the names and the reasons are in ``summary``.
+    The phrases give counts and no file name: the names and the reasons are in ``summary``. The
+    text format and the HTML report both read them (008 ADR-2).
 
     Args:
         verdict (Verdict): The verdict.
         messages (Messages): The language.
 
     Returns:
-        list[str]: The wrapped sentence; nothing when every count is zero.
+        list[str]: For example ``2 files skipped``; empty when every count is zero.
     """
     text = messages.verdict
     left = verdict.left_out
@@ -605,10 +622,24 @@ def _left_out(verdict: Verdict, messages: Messages) -> list[str]:
         text.duplicate.of(left.duplicates) if left.duplicates else "",
         text.other_domain.of(left.other_domain) if left.other_domain else "",
     ]
-    shown = [part for part in parts if part]
+    return [part for part in parts if part]
+
+
+def _left_out(verdict: Verdict, messages: Messages) -> list[str]:
+    """
+    Say what the summary did not count, in one sentence, only when something was left out (RF-09).
+
+    Args:
+        verdict (Verdict): The verdict.
+        messages (Messages): The language.
+
+    Returns:
+        list[str]: The wrapped sentence; nothing when every count is zero.
+    """
+    shown = left_out_parts(verdict, messages)
     if not shown:
         return []
-    return _wrap(text.left_out.format(parts=", ".join(shown)), rest=" " * 4)
+    return _wrap(messages.verdict.left_out.format(parts=", ".join(shown)), rest=" " * 4)
 
 
 # ---------------------------------------------------------------------------
