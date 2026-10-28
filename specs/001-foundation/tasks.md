@@ -31,10 +31,10 @@ in pull request #1 (already checked) and Stages 1 and 2 are the work left to mak
 
 ## Stage 1 — Close the gaps found by the design
 
-- [ ] `tests/test_smoke.py`: add `test_unknown_flag_exits_two` — `main(["--nope"])` raises
+- [x] `tests/test_smoke.py`: add `test_unknown_flag_exits_two` — `main(["--nope"])` raises
   `SystemExit` with code `2`, and `capsys` shows the usage message on stderr and nothing on stdout.
   — RF-02, RF-10
-- [ ] `tests/test_smoke.py`: add `test_version_falls_back_without_install` — patch
+- [x] `tests/test_smoke.py`: add `test_version_falls_back_without_install` — patch
   `importlib.metadata.version` to raise `PackageNotFoundError`, `importlib.reload(mailvigil)`, assert
   `__version__ == "0.0.0.dev0"`, and reload again in teardown (`monkeypatch` plus `finally`) so the
   other tests see the real value. — RF-01, RF-10
@@ -42,8 +42,9 @@ in pull request #1 (already checked) and Stages 1 and 2 are the work left to mak
   confirm with `git check-ignore` that `reports/a.xml` is ignored and `tests/reports/a.xml` is not.
   Done with the pre-public security audit, which also ignores `*.xml`, `*.zip` and `*.gz` (Google
   sends reports as `.zip`) with `tests/` negations. — RF-09
-- [ ] Quality gate (`uv run ruff check .`, `uv run black --check .`, `uv run mypy`,
-  `uv run pytest --cov`). — result recorded when run: ___
+- [x] Quality gate (`uv run ruff check .`, `uv run black --check .`, `uv run mypy`,
+  `uv run pytest --cov`). — green locally on Python 3.12.13 on 2026-10-27: ruff and black clean,
+  mypy no issues in 2 source files, 5 tests passed, 100% coverage
 
 ## Stage 2 — Acceptance on GitHub
 
