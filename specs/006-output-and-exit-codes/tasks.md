@@ -81,29 +81,41 @@ wrong (RNF-02). Per Resolved decision 6, if stage 3 outgrows this spec it become
 
 Behavior-neutral: the output is byte-equal to today's. No Portuguese is written in this stage.
 
-- [ ] Inventory (a list in the pull request description, not a file): every literal that reaches a
+- [x] Inventory (a list in the pull request description, not a file): every literal that reaches a
   reader in `render.py`, `render_verdict.py`, `no_reports_message` and the refusal lines of
   `cli.py`, grouped by area (`common`, `summary`, `verdict`, `refusals`). Everything dynamic
   (domain, service, address, selector) stays outside the templates. — RF-06
-- [ ] `tests/test_messages.py`, written first: `ENGLISH` is a `Messages`; every enum-keyed mapping
+  Done: `messages/model.py` documents each field and the list is in the pull request description.
+- [x] `tests/test_messages.py`, written first: `ENGLISH` is a `Messages`; every enum-keyed mapping
   (`Answer`, `RuleId`, `NoteKind`, `Outcome`, `Reason`, `ConfigReason`) covers its enum; no template
   is empty; every template formats with the placeholders its field declares and no others;
   `Plural.of` gives the singular for 1 and the plural for 0 and for 2; `language_by_code` accepts
   `en` in any case and rejects anything else. — RF-06, RF-07
-- [ ] `src/mailvigil/messages/`: `model.py` (`Plural`, the nested frozen dataclasses), `en.py`
+  — plus the English configuration line equal to `str(error)` for every `ConfigReason`.
+- [x] `src/mailvigil/messages/`: `model.py` (`Plural`, the nested frozen dataclasses), `en.py`
   (`ENGLISH`, the inventory moved verbatim), `__init__.py` (re-exports and `language_by_code`).
   Nothing imports a renderer. — ADR-3
-- [ ] `src/mailvigil/render.py`: `render_summary`, `no_reports_message` and the private helpers take
+  — the sentence labels `Why:` and `Next:` are catalog fields of their own (`why_label`,
+  `next_label`), so the hanging indent of a wrapped sentence is `len(label) + 1` and not a typed 5
+  and 6.
+- [x] `src/mailvigil/render.py`: `render_summary`, `no_reports_message` and the private helpers take
   a last parameter `messages: Messages = ENGLISH` and read every sentence from it; `count_noun` goes
   through `Plural`; widths counted from an English prefix (`_WIDTH - 22`, `_WIDTH - 30`) are computed
   from the template. The 004 tests pass untouched. — RF-06, ADR-4
-- [ ] `src/mailvigil/render_verdict.py`: the same for `render_verdict`; the thresholds and limits in
+  — `count_noun` is removed instead of kept (nothing used it once the phrases went through
+  `Plural`); `_REASON_PHRASES` stays as an alias of the English reasons because the 004 tests import
+  it.
+- [x] `src/mailvigil/render_verdict.py`: the same for `render_verdict`; the thresholds and limits in
   the sentences are passed as template values from the constants, never typed (RNF-05). The 005
   tests pass untouched. — RF-06, RNF-05
-- [ ] `src/mailvigil/cli.py`: the refusal lines come from the catalog; the configuration refusal in
+- [x] `src/mailvigil/cli.py`: the refusal lines come from the catalog; the configuration refusal in
   English stays `str(error)` (ADR-5). The CLI tests pass untouched. — RF-06, ADR-5
-- [ ] Quality gate. The suites of 002 to 005 and of stage 1 pass with no edit and the same count
-  plus the new catalog tests. — result recorded when run: ___
+  — done without a language check: the English `config_reasons` are 003's own reason words and
+  `config_detail` lists every reason, so the one builder gives `str(error)` in English and a
+  Portuguese catalog only has to fill other values.
+- [x] Quality gate. The suites of 002 to 005 and of stage 1 pass with no edit and the same count
+  plus the new catalog tests. — ruff, black and mypy clean; `pytest --cov` 849 passed, 100% coverage
+  (2026-10-28); no existing test file was edited.
 
 ## Stage 3 — Portuguese and `--lang` (RF-06, RF-07, ADR-5, ADR-6)
 

@@ -21,6 +21,7 @@ from typing import TextIO
 
 from mailvigil import __version__
 from mailvigil.config import Config, ConfigError, check_domain, load_config
+from mailvigil.messages import ENGLISH, Messages
 from mailvigil.render import no_reports_message, render_summary
 from mailvigil.render_json import dumps, summary_document, verdict_document
 from mailvigil.render_verdict import render_verdict
@@ -95,7 +96,34 @@ def _echo(value: str | Path) -> str:
 # ---------------------------------------------------------------------------
 
 
-def resolve_config(config_path: Path | None, domain: str | None) -> tuple[Config, str | None]:
+def _config_line(error: ConfigError, messages: Messages) -> str:
+    """
+    Write the line of a refused configuration or ``--domain`` value.
+
+    The phrase of the reason, then the key, then the detail only for the reasons the language keeps
+    it for: ``config.py`` writes the detail in English, so a translation drops it where the reason
+    already says what it said (ADR-5). In English every reason keeps it, so the line is what
+    ``str(error)`` has always been.
+
+    Args:
+        error (ConfigError): The refusal.
+        messages (Messages): The language.
+
+    Returns:
+        str: The line, without the path it concerns.
+    """
+    refusals = messages.refusals
+    line = refusals.config_reasons[error.reason]
+    if error.key:
+        line += f" [{error.key}]"
+    if error.detail and error.reason in refusals.config_detail:
+        line += f": {error.detail}"
+    return line
+
+
+def resolve_config(
+    config_path: Path | None, domain: str | None, messages: Messages = ENGLISH
+) -> tuple[Config, str | None]:
     """
     Decide the domain and the selector map of a run.
 
@@ -107,6 +135,7 @@ def resolve_config(config_path: Path | None, domain: str | None) -> tuple[Config
     Args:
         config_path (Path | None): The ``--config`` value, ``None`` when not given.
         domain (str | None): The ``--domain`` value, ``None`` when not given.
+        messages (Messages, optional): The language of the refusal lines. Default: English.
 
     Returns:
         tuple[Config, str | None]: The configuration and the path of the file used as it should be
@@ -120,7 +149,7 @@ def resolve_config(config_path: Path | None, domain: str | None) -> tuple[Config
         try:
             wanted = check_domain(domain, key="--domain")
         except ConfigError as error:
-            raise _Refusal(str(error)) from error
+            raise _Refusal(_config_line(error, messages)) from error
 
     # ``exists``, not ``is_file``: a folder with that name is refused as unreadable by the loader
     # instead of being silently ignored.
@@ -132,16 +161,18 @@ def resolve_config(config_path: Path | None, domain: str | None) -> tuple[Config
 
     if path is None:
         if wanted is None:
-            raise _Refusal("pass --domain or --config (or put a mailvigil.toml in this folder)")
+            raise _Refusal(messages.refusals.no_domain.format(default=DEFAULT_CONFIG))
         return Config(wanted, MappingProxyType({})), None
 
     try:
         config = load_config(path)
     except ConfigError as error:
-        raise _Refusal(f"{_echo(path)}: {error}") from error
+        raise _Refusal(f"{_echo(path)}: {_config_line(error, messages)}") from error
     if wanted is not None and wanted != config.domain:
         raise _Refusal(
-            f"--domain {wanted} does not match the domain {config.domain} of {_echo(path)}"
+            messages.refusals.domain_mismatch.format(
+                wanted=wanted, domain=config.domain, path=_echo(path)
+            )
         )
     return config, str(path)
 
@@ -231,13 +262,16 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _load(args: argparse.Namespace) -> tuple[Config, str | None, IngestionResult] | None:
+def _load(
+    args: argparse.Namespace, messages: Messages = ENGLISH
+) -> tuple[Config, str | None, IngestionResult] | None:
     """
     Resolve the configuration and read the reports, the part both commands share.
 
     Args:
         args (argparse.Namespace): The parsed arguments: ``paths``, ``config``, ``domain`` and
             ``json``.
+        messages (Messages, optional): The language of the refusal lines. Default: English.
 
     Returns:
         tuple[Config, str | None, IngestionResult] | None: The configuration, the path of the file
@@ -245,14 +279,14 @@ def _load(args: argparse.Namespace) -> tuple[Config, str | None, IngestionResult
             the one line on standard error.
     """
     try:
-        config, source = resolve_config(args.config, args.domain)
+        config, source = resolve_config(args.config, args.domain, messages)
     except _Refusal as refusal:
         _write(sys.stderr, f"mailvigil: {refusal.message}")
         return None
 
     result = ingest(args.paths, config.domain)
     if not result.reports:
-        _write(sys.stderr, no_reports_message(result, config.domain))
+        _write(sys.stderr, no_reports_message(result, config.domain, messages))
         return None
     return config, source, result
 

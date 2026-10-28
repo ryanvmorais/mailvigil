@@ -1,11 +1,13 @@
 """
 The text of the summary: a frozen ``Summary`` turned into the five sections of the command.
 
-Everything the command says in English lives here, so spec 006 replaces one module (language,
-``--json``) without touching the computation (RNF-03). The limits of 10 and their "and N more" lines
-are applied here and never in ``summarize``, which keeps the complete data (ADR-1). The layout is
-ASCII, 80 columns at most, with the widths taken from the data (ADR-6); the text is returned without
-a trailing newline and writing it is the command's.
+The layout lives here and the words live in ``mailvigil.messages``: every sentence is read from the
+``Messages`` the caller passes (English by default), so a second language does not need a second
+layout (spec 006, ADR-3 and ADR-4). The limits of 10 and their "and N more" lines are applied here
+and never in ``summarize``, which keeps the complete data (ADR-1). The layout is ASCII, 80 columns
+at most, with the widths taken from the data (ADR-6) and from the templates, so a longer translation
+cannot push a value past the screen; the text is returned without a trailing newline and writing it
+is the command's.
 """
 
 from __future__ import annotations
@@ -14,6 +16,7 @@ from collections.abc import Sequence
 from types import MappingProxyType
 
 from mailvigil.config import Config
+from mailvigil.messages import ENGLISH, Messages
 from mailvigil.reports import IngestionResult, Reason, SkippedFile
 from mailvigil.senders import Outcome
 from mailvigil.summary import FailingSource, SenderRow, Summary, summarize
@@ -37,34 +40,9 @@ _LIMIT = 10
 _LABEL_MIN = 10
 _LABEL_MAX = len("255.255.255.255 (failing signature)")
 
-# Keys of the header and of the "left out" section are padded to the longest key of their block plus
-# two spaces, so the values line up.
-_HEADER_KEY = 10
-_LEFT_OUT_KEY = 15
-
-# How a row that was not recognized is described. ``KNOWN`` has no entry: it prints its service.
-_KIND_NOTES = {
-    Outcome.UNKNOWN: "unrecognized",
-    Outcome.FOREIGN_DOMAIN: "foreign domain",
-    Outcome.FAILING_SIGNATURE: "failing signature",
-}
-
-# One phrase per refusal. A test iterates ``Reason``, so a reason added by a later spec cannot reach
-# the output as a bare key.
-_REASON_PHRASES = {
-    Reason.UNSUPPORTED_EXTENSION: "unsupported file type",
-    Reason.UNREADABLE: "could not be read",
-    Reason.FILE_TOO_LARGE: "too large",
-    Reason.DECOMPRESSED_TOO_LARGE: "too large once decompressed",
-    Reason.NOT_AN_ARCHIVE: "not a valid archive",
-    Reason.NO_XML_MEMBER: "no XML file inside",
-    Reason.MULTIPLE_XML_MEMBERS: "more than one XML file inside",
-    Reason.FORBIDDEN_DECLARATION: "unsafe XML (DOCTYPE or ENTITY)",
-    Reason.MALFORMED_XML: "malformed XML",
-    Reason.NOT_A_REPORT: "not a DMARC report",
-    Reason.UNSUPPORTED_VERSION: "unsupported report version",
-    Reason.INVALID_FIELD: "invalid value in the report",
-}
+# The English phrase of each refusal, under the name the 004 tests know it by. The phrases live in
+# the catalog; the code below reads them from the ``Messages`` it is given.
+_REASON_PHRASES = ENGLISH.summary.reasons
 
 
 # ---------------------------------------------------------------------------
@@ -143,41 +121,58 @@ def fit(text: str, width: int) -> str:
     return cleaned[: width - 3] + "..."
 
 
-def count_noun(number: int, singular: str, plural: str = "") -> str:
-    """
-    Write a count with its noun.
-
-    Args:
-        number (int): The count.
-        singular (str): The noun for one.
-        plural (str, optional): The noun for any other number. Default: the singular plus ``s``.
-
-    Returns:
-        str: For example ``1 day`` or ``28 days``.
-    """
-    return f"{number} {singular if number == 1 else plural or singular + 's'}"
-
-
-def address(source_ip: str) -> str:
+def address(source_ip: str, missing: str = ENGLISH.common.no_address) -> str:
     """
     Name a source address, which a report may leave empty.
 
     Args:
         source_ip (str): The address as the summary holds it.
+        missing (str, optional): What to write for an empty address. Default: the English phrase.
 
     Returns:
-        str: The address, or ``no address``.
+        str: The address, or ``missing``.
     """
-    return source_ip or "no address"
+    return source_ip or missing
 
 
-def _label(row: SenderRow, width: int) -> str:
+def _room(template: str, **blanks: str) -> int:
+    """
+    Count the columns a template leaves for the value that is cut to fit.
+
+    The width is taken from the template, not typed, so a longer translation of the same sentence
+    cannot push the value past the screen.
+
+    Args:
+        template (str): The sentence, with one placeholder for the value that gives way.
+        **blanks (str): That placeholder, as an empty string.
+
+    Returns:
+        int: The screen width less the template's own characters.
+    """
+    return _WIDTH - len(template.format(**blanks))
+
+
+def _key_width(*keys: str) -> int:
+    """
+    Size the key column of a block of ``key  value`` lines.
+
+    Args:
+        *keys (str): The keys of the block.
+
+    Returns:
+        int: The longest key plus two spaces, so the values line up.
+    """
+    return max(len(key) for key in keys) + 2
+
+
+def _label(row: SenderRow, width: int, messages: Messages = ENGLISH) -> str:
     """
     Write the label of a row of the senders table.
 
     Args:
         row (SenderRow): The row.
         width (int): The widest the label may be.
+        messages (Messages, optional): The language. Default: English.
 
     Returns:
         str: The service name for a recognized sender, otherwise ``ADDRESS (kind)``. When it is too
@@ -185,22 +180,22 @@ def _label(row: SenderRow, width: int) -> str:
     """
     if row.outcome is Outcome.KNOWN:
         return fit(row.service, width)
-    text = address(row.source_ip)
-    suffix = f" ({_KIND_NOTES[row.outcome]})"
+    text = address(row.source_ip, messages.common.no_address)
+    suffix = f" ({messages.common.kinds[row.outcome]})"
     room = width - len(suffix)
     if room < 4:
         return fit(text + suffix, width)
     return fit(text, room) + suffix
 
 
-def _field(key: str, value: str, key_width: int = _HEADER_KEY) -> str:
+def _field(key: str, value: str, key_width: int) -> str:
     """
     Write one ``key  value`` line, indented by two.
 
     Args:
         key (str): The name of the field.
         value (str): Its text.
-        key_width (int, optional): The width the key is padded to. Default: the header's.
+        key_width (int): The width the key is padded to.
 
     Returns:
         str: The line, with the value cut to what is left of the width.
@@ -214,7 +209,7 @@ def _field(key: str, value: str, key_width: int = _HEADER_KEY) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _header(summary: Summary, config_source: str | None) -> list[str]:
+def _header(summary: Summary, config_source: str | None, messages: Messages) -> list[str]:
     """
     Write the title and the five facts about the run (RF-03, RF-09).
 
@@ -222,45 +217,56 @@ def _header(summary: Summary, config_source: str | None) -> list[str]:
         summary (Summary): The data.
         config_source (str | None): The configuration path as the command resolved it, ``None`` for
             no file.
+        messages (Messages): The language.
 
     Returns:
-        list[str]: The lines: ``config``, ``period``, ``reports``, ``policy`` and ``messages``, each
-            note on its own line below the field it explains.
+        list[str]: The lines: config, period, reports, policy and messages, each note on its own
+            line below the field it explains.
     """
-    indent = " " * (2 + _HEADER_KEY)
-    lines = [f"MailVigil summary for {fit(summary.domain, _WIDTH - 22)}"]
+    text = messages.summary
+    common = messages.common
+    key_width = _key_width(
+        text.key_config, text.key_period, text.key_reports, text.key_policy, text.key_messages
+    )
+    indent = " " * (2 + key_width)
+    domain = fit(summary.domain, _room(text.title, domain=""))
+    lines = [text.title.format(domain=domain)]
 
     if config_source is None:
-        lines.append(_field("config", "none"))
+        lines.append(_field(text.key_config, text.config_none, key_width))
     else:
-        suffix = f" ({count_noun(summary.selectors_configured, 'selector')})"
+        suffix = f" ({text.selector.of(summary.selectors_configured)})"
         room = _WIDTH - len(indent) - len(suffix)
-        lines.append(_field("config", fit(config_source, room) + suffix))
+        lines.append(_field(text.key_config, fit(config_source, room) + suffix, key_width))
     if summary.selectors_configured == 0:
-        lines.append(indent + "no selectors are configured, so every sender is unrecognized")
-        lines.append(indent + "(see the Configuration section of the README)")
+        lines.append(indent + text.no_selectors)
+        lines.append(indent + text.no_selectors_hint)
 
     period = summary.period
     if period is None:
-        lines.append(_field("period", "no reports"))
+        lines.append(_field(text.key_period, text.no_period, key_width))
     else:
-        verb = "has" if period.days_with_reports == 1 else "have"
-        days = count_noun(period.days_spanned, "day")
         lines.append(
             _field(
-                "period",
-                f"{period.first_day.isoformat()} to {period.last_day.isoformat()} "
-                f"({period.days_with_reports} of {days} {verb} a report)",
+                text.key_period,
+                text.period.of(
+                    period.days_with_reports,
+                    first=period.first_day.isoformat(),
+                    last=period.last_day.isoformat(),
+                    days=common.day.of(period.days_spanned),
+                ),
+                key_width,
             )
         )
 
-    lines.append(
-        _field("reports", f"{summary.reports} from {count_noun(summary.reporters, 'reporter')}")
+    reports = text.reports_line.format(
+        reports=summary.reports, reporters=text.reporter.of(summary.reporters)
     )
+    lines.append(_field(text.key_reports, reports, key_width))
 
     policy = summary.policy
     if policy is None:
-        lines.append(_field("policy", "none"))
+        lines.append(_field(text.key_policy, text.policy_none, key_width))
     else:
         parts = [f"p={policy.p}"]
         if policy.sp:
@@ -268,41 +274,51 @@ def _header(summary: Summary, config_source: str | None) -> list[str]:
         if policy.np:
             parts.append(f"np={policy.np}")
         parts.append(f"pct={policy.pct}")
-        lines.append(_field("policy", ", ".join(parts)))
+        lines.append(_field(text.key_policy, ", ".join(parts), key_width))
         if summary.earlier_p:
-            earlier = ", ".join(summary.earlier_p)
-            lines.append(
-                indent + fit(f"changed during the period, earlier p: {earlier}", _WIDTH - 12)
-            )
+            earlier = text.policy_changed.format(earlier=", ".join(summary.earlier_p))
+            lines.append(indent + fit(earlier, _WIDTH - len(indent)))
 
     total = summary.totals.total
-    share = format_share(summary.recognized_messages, total)
     lines.append(
         _field(
-            "messages", f"{total} ({summary.recognized_messages} from recognized senders, {share})"
+            text.key_messages,
+            text.messages_line.format(
+                total=total,
+                recognized=summary.recognized_messages,
+                share=format_share(summary.recognized_messages, total),
+            ),
+            key_width,
         )
     )
     return lines
 
 
-def _situations(summary: Summary) -> list[str]:
+def _situations(summary: Summary, messages: Messages) -> list[str]:
     """
     Write the situations with their exact counts and shares (RF-06).
 
     Args:
         summary (Summary): The data.
+        messages (Messages): The language.
 
     Returns:
-        list[str]: The title and one line for each of ``ok``, ``fragile`` and ``failing``.
+        list[str]: The title and one line for each of ok, fragile and failing.
     """
+    text = messages.summary
     totals = summary.totals
-    rows = (("ok", totals.ok), ("fragile", totals.fragile), ("failing", totals.failing))
+    rows = (
+        (text.col_ok, totals.ok),
+        (text.col_fragile, totals.fragile),
+        (text.col_failing, totals.failing),
+    )
     shares = [format_share(number, totals.total) for _name, number in rows]
+    name_width = max(len(name) for name, _number in rows)
     count_width = max(len(str(number)) for _name, number in rows)
     share_width = max(len(share) for share in shares)
-    lines = ["Situations"]
+    lines = [text.situations_title]
     for (name, number), share in zip(rows, shares, strict=True):
-        lines.append(f"  {name:<7}  {number:>{count_width}}  {share:>{share_width}}")
+        lines.append(f"  {name:<{name_width}}  {number:>{count_width}}  {share:>{share_width}}")
     return lines
 
 
@@ -332,23 +348,26 @@ def _shown_rows(senders: Sequence[SenderRow]) -> tuple[list[SenderRow], list[Sen
     return shown, hidden
 
 
-def _senders(summary: Summary) -> list[str]:
+def _senders(summary: Summary, messages: Messages) -> list[str]:
     """
     Write the senders table (RF-02, RF-04).
 
     Args:
         summary (Summary): The data.
+        messages (Messages): The language.
 
     Returns:
         list[str]: The title, the header, a line per shown row (starting with ``!`` when it has
             failing messages) and, when rows were left out, one line that still counts their
             failing messages.
     """
+    text = messages.summary
+    common = messages.common
     shown, hidden = _shown_rows(summary.senders)
     if not shown and not hidden:
-        return ["Senders", "  no messages counted"]
+        return [text.senders_title, "  " + text.no_messages]
 
-    headers = ("ok", "fragile", "failing", "total")
+    headers = (text.col_ok, text.col_fragile, text.col_failing, text.col_total)
     cells = [
         (
             str(row.counts.ok),
@@ -365,38 +384,41 @@ def _senders(summary: Summary) -> list[str]:
     # The label takes what the numbers leave: two columns for the marker, two spaces per number.
     left = _WIDTH - 2 - sum(2 + width for width in widths)
     labels = [_label(row, _WIDTH) for row in shown]
-    longest = max([len("sender"), *(len(label) for label in labels)])
+    longest = max([len(text.col_sender), *(len(label) for label in labels)])
     label_width = max(_LABEL_MIN, min(_LABEL_MAX, left, longest))
 
-    lines = ["Senders"]
+    lines = [text.senders_title]
     lines.append(
         "  "
-        + "sender".ljust(label_width)
+        + text.col_sender.ljust(label_width)
         + "".join(f"  {header:>{width}}" for header, width in zip(headers, widths, strict=True))
     )
     for row, row_cells in zip(shown, cells, strict=True):
         marker = "!" if row.counts.failing else " "
         lines.append(
             f"{marker} "
-            + _label(row, label_width).ljust(label_width)
+            + _label(row, label_width, messages).ljust(label_width)
             + "".join(f"  {cell:>{width}}" for cell, width in zip(row_cells, widths, strict=True))
         )
     if hidden:
-        messages = sum(row.counts.total for row in hidden)
-        failing = sum(row.counts.failing for row in hidden)
         lines.append(
-            f"  ... and {count_noun(len(hidden), 'other source')}: "
-            f"{count_noun(messages, 'message')}, {failing} failing"
+            "  "
+            + text.senders_more.format(
+                sources=common.other_source.of(len(hidden)),
+                messages=common.message.of(sum(row.counts.total for row in hidden)),
+                failing=sum(row.counts.failing for row in hidden),
+            )
         )
     return lines
 
 
-def _who(source: FailingSource) -> str:
+def _who(source: FailingSource, messages: Messages) -> str:
     """
     Name the sender of a failing source.
 
     Args:
         source (FailingSource): The source.
+        messages (Messages): The language.
 
     Returns:
         str: The service name for a recognized sender; ``unrecognized, KIND`` for a foreign domain
@@ -406,72 +428,86 @@ def _who(source: FailingSource) -> str:
     """
     if source.outcome is Outcome.KNOWN:
         return source.service
-    who = f"unrecognized, {_KIND_NOTES[source.outcome]}"
+    common = messages.common
+    who = messages.summary.unrecognized_who.format(kind=common.kinds[source.outcome])
     if source.selectors:
-        noun = "selector" if len(source.selectors) == 1 else "selectors"
-        who += f" ({noun} {', '.join(source.selectors)})"
+        names = ", ".join(source.selectors)
+        who += f" ({common.selectors_named.of(len(source.selectors), names=names)})"
     return who
 
 
-def _source_lines(source: FailingSource) -> list[str]:
+def _source_lines(source: FailingSource, messages: Messages) -> list[str]:
     """
     Write the two lines of one failing source.
 
     Args:
         source (FailingSource): The source.
+        messages (Messages): The language.
 
     Returns:
         list[str]: ``  ! WHO``, then the address, the failing messages, the reason per mechanism and
             the override types the receiver gave. A source that was only unrecognized has no name
             to give, so the address is its ``WHO`` and the second line starts at the messages.
     """
-    dkim = "/".join(source.dkim) or "none"
-    spf = "/".join(source.spf) or "none"
-    detail = f"{count_noun(source.messages, 'message')}  dkim: {dkim}, spf: {spf}"
+    text = messages.summary
+    where = address(source.source_ip, messages.common.no_address)
+    detail = text.source_detail.format(
+        messages=messages.common.message.of(source.messages),
+        dkim="/".join(source.dkim) or text.mechanism_none,
+        spf="/".join(source.spf) or text.mechanism_none,
+    )
     if source.override_reasons:
         detail += "; " + ", ".join(source.override_reasons)
     if source.outcome is Outcome.UNKNOWN:
-        who = address(source.source_ip)
+        who = where
     else:
-        who = _who(source)
-        detail = f"{address(source.source_ip)}  {detail}"
+        who = _who(source, messages)
+        detail = f"{where}  {detail}"
     return ["  ! " + fit(who, _WIDTH - 4), "      " + fit(detail, _WIDTH - 6)]
 
 
-def _failures(summary: Summary) -> list[str]:
+def _failures(summary: Summary, messages: Messages) -> list[str]:
     """
     Write the failures section (RF-04).
 
     Args:
         summary (Summary): The data.
+        messages (Messages): The language.
 
     Returns:
-        list[str]: ``No failing messages.`` when there is none; otherwise the title and two groups,
+        list[str]: The sentence that says there is none; otherwise the title and two groups,
             recognized senders first, each limited to ``_LIMIT`` sources with a remainder line that
             still counts the failing messages it hides. An empty group is not printed.
     """
+    text = messages.summary
+    common = messages.common
     if not summary.failing:
-        return ["No failing messages."]
-    messages = sum(source.messages for source in summary.failing)
-    source_count = count_noun(len(summary.failing), "source")
-    lines = [f"! FAILING: {count_noun(messages, 'message')} in {source_count}"]
+        return [text.no_failures]
+    lines = [
+        text.failing_title.format(
+            messages=common.message.of(sum(source.messages for source in summary.failing)),
+            sources=text.source.of(len(summary.failing)),
+        )
+    ]
     recognized = [source for source in summary.failing if source.outcome is Outcome.KNOWN]
     unrecognized = [source for source in summary.failing if source.outcome is not Outcome.KNOWN]
     for title, sources in (
-        ("Recognized senders that fail", recognized),
-        ("Unrecognized sources that fail", unrecognized),
+        (text.failing_recognized, recognized),
+        (text.failing_unrecognized, unrecognized),
     ):
         if not sources:
             continue
         lines.append(f"  {title}")
         for source in sources[:_LIMIT]:
-            lines.extend(_source_lines(source))
+            lines.extend(_source_lines(source, messages))
         rest = sources[_LIMIT:]
         if rest:
-            hidden = sum(source.messages for source in rest)
             lines.append(
-                f"  ... and {count_noun(len(rest), 'other source')}: "
-                f"{count_noun(hidden, 'failing message')}"
+                "  "
+                + common.more_failing.format(
+                    sources=common.other_source.of(len(rest)),
+                    messages=common.failing_message.of(sum(source.messages for source in rest)),
+                )
             )
     return lines
 
@@ -481,6 +517,7 @@ def _left_out(
     by_reason: Sequence[tuple[Reason, int]],
     duplicates: int,
     other_domain: int,
+    messages: Messages,
 ) -> list[str]:
     """
     Write what was left out of the numbers (RF-05); it always prints, also at zero.
@@ -491,23 +528,26 @@ def _left_out(
             print them.
         duplicates (int): Reports dropped as already seen.
         other_domain (int): Reports dropped for belonging to another domain.
+        messages (Messages): The language.
 
     Returns:
         list[str]: The skipped count with its reasons, the first ``_LIMIT`` files with their reason
             and a line with how many more, then the duplicates and the other domains.
     """
-    reasons = ", ".join(f"{number} {_REASON_PHRASES[reason]}" for reason, number in by_reason)
+    text = messages.summary
+    key_width = _key_width(text.key_skipped, text.key_duplicates, text.key_other_domains)
+    reasons = ", ".join(f"{number} {text.reasons[reason]}" for reason, number in by_reason)
     count = str(len(skipped)) + (f" ({reasons})" if reasons else "")
-    lines = [_field("skipped files", count, _LEFT_OUT_KEY)]
+    lines = [_field(text.key_skipped, count, key_width)]
     for file in skipped[:_LIMIT]:
-        phrase = _REASON_PHRASES[file.reason]
+        phrase = text.reasons[file.reason]
         # The phrase is the part that must survive, so it is the name that is cut.
         name = fit(file.path.name or str(file.path), _WIDTH - 4 - len(phrase) - 2)
         lines.append(f"    {name}: {phrase}")
     if len(skipped) > _LIMIT:
-        lines.append(f"    ... and {len(skipped) - _LIMIT} more")
-    lines.append(_field("duplicates", str(duplicates), _LEFT_OUT_KEY))
-    lines.append(_field("other domains", str(other_domain), _LEFT_OUT_KEY))
+        lines.append("    " + text.skipped_more.format(n=len(skipped) - _LIMIT))
+    lines.append(_field(text.key_duplicates, str(duplicates), key_width))
+    lines.append(_field(text.key_other_domains, str(other_domain), key_width))
     return lines
 
 
@@ -516,7 +556,9 @@ def _left_out(
 # ---------------------------------------------------------------------------
 
 
-def render_summary(summary: Summary, config_source: str | None) -> str:
+def render_summary(
+    summary: Summary, config_source: str | None, messages: Messages = ENGLISH
+) -> str:
     """
     Turn a summary into the text of the command.
 
@@ -524,27 +566,32 @@ def render_summary(summary: Summary, config_source: str | None) -> str:
         summary (Summary): The data, complete: the limits are applied here.
         config_source (str | None): The configuration path as the command resolved it, ``None`` for
             no file. It is run metadata, not part of the data.
+        messages (Messages, optional): The language. Default: English.
 
     Returns:
         str: The five sections (header, situations, senders, failures, left out), separated by one
             blank line, without a trailing newline.
     """
     sections = [
-        _header(summary, config_source),
-        _situations(summary),
-        _senders(summary),
-        _failures(summary),
+        _header(summary, config_source, messages),
+        _situations(summary, messages),
+        _senders(summary, messages),
+        _failures(summary, messages),
         [
-            "Left out of these numbers",
+            messages.summary.left_out_title,
             *_left_out(
-                summary.skipped, summary.skipped_by_reason, summary.duplicates, summary.other_domain
+                summary.skipped,
+                summary.skipped_by_reason,
+                summary.duplicates,
+                summary.other_domain,
+                messages,
             ),
         ],
     ]
     return "\n\n".join("\n".join(lines) for lines in sections)
 
 
-def no_reports_message(result: IngestionResult, domain: str) -> str:
+def no_reports_message(result: IngestionResult, domain: str, messages: Messages = ENGLISH) -> str:
     """
     Explain an empty result, for standard error (RF-10).
 
@@ -554,21 +601,27 @@ def no_reports_message(result: IngestionResult, domain: str) -> str:
     Args:
         result (IngestionResult): What ``ingest`` returned, with no report kept.
         domain (str): The domain the reports were filtered for.
+        messages (Messages, optional): The language. Default: English.
 
     Returns:
         str: The domain, the skipped files with their reasons, the duplicates and the reports of
             other domains, without a trailing newline.
     """
+    text = messages.refusals
     summary = summarize(result, Config(domain, MappingProxyType({})))
-    lines = [f"No DMARC report for {fit(domain, _WIDTH - 30)} was kept."]
+    lines = [text.no_reports.format(domain=fit(domain, _room(text.no_reports, domain="")))]
     if not (summary.skipped or summary.duplicates or summary.other_domain):
         # A folder yields only the providers' attachment names, so a renamed file is not "missing
         # from the paths": say how to read it anyway.
-        lines.append("No report file was found. A folder is searched only for names like")
-        lines.append("  provider!domain!begin!end.zip; or name the file itself to read it.")
+        lines.append(text.no_file_found)
+        lines.append("  " + text.no_file_hint)
     lines.extend(
         _left_out(
-            summary.skipped, summary.skipped_by_reason, summary.duplicates, summary.other_domain
+            summary.skipped,
+            summary.skipped_by_reason,
+            summary.duplicates,
+            summary.other_domain,
+            messages,
         )
     )
     return "\n".join(lines)
