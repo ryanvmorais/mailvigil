@@ -21,8 +21,8 @@ It is built for site owners, developers, agencies and infrastructure freelancers
 out DMARC, and it runs entirely on your machine: your reports are never sent to anyone.
 
 > **Status:** under development (pre-0.1). Nothing is released yet and the interface will change
-> until the first version is out. Rows marked "Built" work today through `mailvigil summary`; the
-> rest of the table is the plan.
+> until the first version is out. Rows marked "Built" work today through `mailvigil summary` and
+> `mailvigil verdict`; the rest of the table is the plan.
 
 ## What it will do
 
@@ -32,7 +32,7 @@ out DMARC, and it runs entirely on your machine: your reports are never sent to 
 | Hostile input | Cap decompressed size (zip bombs) and refuse XML with `DOCTYPE` or `ENTITY` (entity expansion) | v0.1 | Built (`mailvigil summary`) |
 | Configuration | A TOML file with your domain and a map from DKIM selector to service name; a signature only counts under your own domain | v0.1 | Built (`mailvigil summary`) |
 | Summary | Per sender and per situation (ok, fragile, failing), failures highlighted | v0.1 | Built (`mailvigil summary`) |
-| Verdict | "Ready for `reject`?" with a declared criterion (minimum window, minimum volume, no legitimate failures) | v0.1 | Planned |
+| Verdict | "Ready for `reject`?" with a declared criterion: 28 days covered, reports on 80% of the days, 1000 messages, no failure from a recognized sender, at most 0.5% of the messages failing from unrecognized sources | v0.1 | Built (`mailvigil verdict`) |
 | Output | `--json` and stable exit codes for scripts and CI | v0.1 | Planned |
 
 Out of scope for now: a web dashboard, Elasticsearch, fetching reports over IMAP and sending
@@ -95,9 +95,12 @@ uv run mailvigil --version
 uv run mailvigil summary reports/
 uv run mailvigil summary --config mailvigil.toml reports/
 uv run mailvigil summary --domain example.com report.xml.gz
+
+# Ask if the domain is ready for p=reject (same arguments as summary)
+uv run mailvigil verdict --config mailvigil.toml reports/
 ```
 
-The command prints the summary and nothing else; it only reads your files and touches no network.
+The commands print their text and nothing else; they only read your files and touch no network.
 A folder is searched, one level deep, only for the names providers use for their attachments
 (`provider!domain!begin!end.zip`, also `.gz` and `.xml`). A file named on the command line is read
 whatever its name. The output looks like this (invented data):
@@ -142,7 +145,40 @@ Left out of these numbers
 A `!` marks a sender with failing messages. Files that were refused, duplicates and reports of
 another domain are counted at the bottom, so a number never silently drops out.
 
-Exit codes: not defined yet. They arrive with the output spec and become a stable contract at the
+### The verdict
+
+`mailvigil verdict` answers one of three things, each with the rule that decided it. This is a
+`NOT READY` (invented data):
+
+```text
+MailVigil verdict for example.com: NOT READY for p=reject
+
+Why: failures from unrecognized sources are 0.8% of the messages (56 of 7056);
+     the limit is 0.5%.
+  203.0.113.5  unrecognized: 56 failing messages
+
+Rules
+  rule                      measured         needed   result
+  1  period covered         29 days          >= 28    pass
+  2  days with a report     29 of 29 (100%)  >= 80%   pass
+  3  messages seen          7056             >= 1000  pass
+  4  recognized failures    0                <= 0     pass
+  5  unrecognized failures  56 (0.8%)        <= 0.5%  FAIL
+
+Next: look at the sources above and add the selectors of the ones that are yours
+      to [senders] in the configuration.
+
+This reads only the reports you gave it: mail that no receiver reports on, and
+senders that were quiet in this period, are not covered.
+```
+
+`READY` means every rule passes. `TOO_EARLY` means the data rules (1 to 3) fail and nothing is
+failing yet: wait for more reports. `NOT READY` means a source fails (rules 4 and 5), and the
+command names it.
+
+Exit codes: `summary` returns 0 when it printed the summary. `verdict` returns 0 for ready, 3 for
+too early and 4 for not ready; 1 means the reports or the configuration were refused and 2 is a
+usage error. They are provisional: they become a stable contract with the output spec, at the
 first release.
 
 Installing with `pipx install mailvigil` or `uv tool install mailvigil` will be possible once the

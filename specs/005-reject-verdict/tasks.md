@@ -132,13 +132,16 @@ module (RNF-03).
   enter the repository). Record only what was learned and changed, in a sentence, without domains,
   addresses or counts that identify them. If a threshold is wrong, change the constant, its tests
   and the requirements' Resolved decision, tests first. — Risk 1, RF-02
-- [ ] Zero-dependency guard: `uv build`, then check the wheel metadata has no `Requires-Dist`, holds
+- [x] Zero-dependency guard: `uv build`, then check the wheel metadata has no `Requires-Dist`, holds
   `verdict.py` and `render_verdict.py`, importable from the built wheel, and that
   `mailvigil verdict` runs from it on a synthetic report. — RNF-01
-- [ ] Run `/atualizar-docs`: the README gains the `mailvigil verdict` quick start with an invented
+- [x] Run `/atualizar-docs`: the README gains the `mailvigil verdict` quick start with an invented
   example output and its status row, and keeps the exit codes as provisional; `CLAUDE.md`'s
   architecture block and status paragraph gain the two modules and the command; `docs/stack.md`
   gains `IntEnum`, integer comparison of thresholds and `argparse` parent parsers. — docs
 - [ ] Mark the three files `done` and move the roadmap row of `005` in `specs/README.md` to `done`.
   — all
-- [ ] Quality gate and CI. — result recorded when run: ___ (the CI run URL)
+- [ ] Quality gate and CI. — result recorded when run: local gate green on 2026-10-28 (658 tests,
+  coverage 100%, Python 3.12); the CI run URL goes here once the PR is open. The built wheel declares
+  no `Requires-Dist`, holds both new modules, imports in a clean environment, and `mailvigil verdict`
+  on 28 synthetic daily reports prints `READY` with code 0
