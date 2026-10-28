@@ -32,8 +32,10 @@ _LIMIT = 10
 
 # The label column of the senders table takes what the numbers leave, but not less than the first
 # bound, which keeps a short IP readable, nor more than the second, which keeps the numbers close.
+# The second is the longest IPv4 address with the longest kind, so a long service name never makes
+# the column cut the address of an unrecognized row.
 _LABEL_MIN = 10
-_LABEL_MAX = 30
+_LABEL_MAX = len("255.255.255.255 (failing signature)")
 
 # Keys of the header and of the "left out" section are padded to the longest key of their block plus
 # two spaces, so the values line up.
@@ -377,18 +379,17 @@ def _who(source: FailingSource) -> str:
         source (FailingSource): The source.
 
     Returns:
-        str: The service name for a recognized sender; ``unrecognized`` otherwise, followed for a
-            foreign domain and a failing signature by the kind and the configured selectors involved
-            (RF-04), so the owner can tell a copied selector from a broken one.
+        str: The service name for a recognized sender; ``unrecognized, KIND`` for a foreign domain
+            or a failing signature, followed by the configured selectors involved (RF-04), so the
+            owner can tell a copied selector from a broken one. Not for ``UNKNOWN``, which is
+            named by its address.
     """
     if source.outcome is Outcome.KNOWN:
         return source.service
-    who = "unrecognized"
-    if source.outcome is not Outcome.UNKNOWN:
-        who += f", {_KIND_NOTES[source.outcome]}"
-        if source.selectors:
-            noun = "selector" if len(source.selectors) == 1 else "selectors"
-            who += f" ({noun} {', '.join(source.selectors)})"
+    who = f"unrecognized, {_KIND_NOTES[source.outcome]}"
+    if source.selectors:
+        noun = "selector" if len(source.selectors) == 1 else "selectors"
+        who += f" ({noun} {', '.join(source.selectors)})"
     return who
 
 
@@ -401,17 +402,20 @@ def _source_lines(source: FailingSource) -> list[str]:
 
     Returns:
         list[str]: ``  ! WHO``, then the address, the failing messages, the reason per mechanism and
-            the override types the receiver gave.
+            the override types the receiver gave. A source that was only unrecognized has no name
+            to give, so the address is its ``WHO`` and the second line starts at the messages.
     """
     dkim = "/".join(source.dkim) or "none"
     spf = "/".join(source.spf) or "none"
-    detail = (
-        f"{_address(source.source_ip)}  {_count(source.messages, 'message')}  "
-        f"dkim: {dkim}, spf: {spf}"
-    )
+    detail = f"{_count(source.messages, 'message')}  dkim: {dkim}, spf: {spf}"
     if source.override_reasons:
         detail += "; " + ", ".join(source.override_reasons)
-    return ["  ! " + _fit(_who(source), _WIDTH - 4), "      " + _fit(detail, _WIDTH - 6)]
+    if source.outcome is Outcome.UNKNOWN:
+        who = _address(source.source_ip)
+    else:
+        who = _who(source)
+        detail = f"{_address(source.source_ip)}  {detail}"
+    return ["  ! " + _fit(who, _WIDTH - 4), "      " + _fit(detail, _WIDTH - 6)]
 
 
 def _failures(summary: Summary) -> list[str]:
@@ -539,7 +543,10 @@ def no_reports_message(result: IngestionResult, domain: str) -> str:
     summary = summarize(result, Config(domain, MappingProxyType({})))
     lines = [f"No DMARC report for {_fit(domain, _WIDTH - 30)} was kept."]
     if not (summary.skipped or summary.duplicates or summary.other_domain):
-        lines.append("No .xml, .gz or .zip file was found in the paths given.")
+        # A folder yields only the providers' attachment names, so a renamed file is not "missing
+        # from the paths": say how to read it anyway.
+        lines.append("No report file was found. A folder is searched only for names like")
+        lines.append("  provider!domain!begin!end.zip; or name the file itself to read it.")
     lines.extend(
         _left_out(
             summary.skipped, summary.skipped_by_reason, summary.duplicates, summary.other_domain

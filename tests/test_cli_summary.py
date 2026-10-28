@@ -371,7 +371,7 @@ def test_a_folder_with_nothing_in_it_prints_what_was_read(
     assert code == 1
     assert captured.out == ""
     assert "No DMARC report for example.com was kept." in captured.err
-    assert "No .xml, .gz or .zip file was found" in captured.err
+    assert "No report file was found." in captured.err
 
 
 def test_every_file_refused_prints_the_skipped_counts(

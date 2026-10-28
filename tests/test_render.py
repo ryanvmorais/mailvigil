@@ -269,6 +269,16 @@ def test_a_narrow_label_cuts_the_address_and_keeps_the_kind() -> None:
     assert label.endswith("... (foreign domain)")
 
 
+def test_the_address_is_not_cut_when_a_long_service_name_widens_the_column() -> None:
+    """A long name takes the column to its cap; an IPv4 address with any kind must still fit."""
+    senders = (
+        known("S" * 100, ok=500),
+        other("255.255.255.255", Outcome.FAILING_SIGNATURE, failing=3),
+    )
+    lines = section(render(make_summary(senders=senders)), "Senders")
+    assert any(line.startswith("! 255.255.255.255 (failing signature) ") for line in lines)
+
+
 # ---------------------------------------------------------------------------
 # Header and situations (RF-03, RF-06, RF-09)
 # ---------------------------------------------------------------------------
@@ -461,15 +471,15 @@ def test_recognized_sources_come_before_unrecognized_ones_and_take_two_lines_eac
         "  Unrecognized sources that fail",
         "  ! unrecognized, foreign domain (selector newsletter)",
         "      203.0.113.50  25 messages  dkim: fail, spf: fail",
-        "  ! unrecognized",
-        "      198.51.100.77  3 messages  dkim: fail, spf: fail; forwarded",
+        "  ! 198.51.100.77",
+        "      3 messages  dkim: fail, spf: fail; forwarded",
     ]
 
 
 def test_several_reasons_for_one_mechanism_are_joined_with_a_slash() -> None:
     source = failing_source(dkim=("fail", "none"), spf=("unaligned",))
     lines = section(render(make_summary(failing=(source,))), "! FAILING")
-    assert lines[-1] == "      192.0.2.10  12 messages  dkim: fail/none, spf: unaligned"
+    assert lines[-1] == "      12 messages  dkim: fail/none, spf: unaligned"
 
 
 def test_several_override_types_are_listed() -> None:
@@ -494,9 +504,15 @@ def test_a_foreign_source_without_a_selector_names_only_its_kind() -> None:
     assert "  ! unrecognized, foreign domain" in lines
 
 
+def test_an_unrecognized_source_is_named_by_its_address_on_the_first_line() -> None:
+    """The group title already says "unrecognized"; repeating it per source hides the address."""
+    lines = section(render(make_summary(failing=(failing_source("192.0.2.10"),))), "! FAILING")
+    assert lines[-2:] == ["  ! 192.0.2.10", "      12 messages  dkim: fail, spf: fail"]
+
+
 def test_an_empty_address_in_a_failing_source_reads_as_no_address() -> None:
     lines = section(render(make_summary(failing=(failing_source(""),))), "! FAILING")
-    assert lines[-1].startswith("      no address  12 messages")
+    assert lines[-2:] == ["  ! no address", "      12 messages  dkim: fail, spf: fail"]
 
 
 def test_an_empty_group_is_not_printed() -> None:
@@ -677,10 +693,13 @@ def test_no_reports_message_names_the_domain_and_what_was_left_out() -> None:
 
 
 def test_no_reports_message_for_nothing_found_says_where_to_look() -> None:
+    """A folder only yields the providers' names, so the message says so and how to bypass it."""
     lines = no_reports_message(IngestionResult(), "example.com").split("\n")
     assert lines[0] == "No DMARC report for example.com was kept."
-    assert lines[1] == "No .xml, .gz or .zip file was found in the paths given."
-    assert lines[2:] == ["  skipped files  0", "  duplicates     0", "  other domains  0"]
+    assert lines[1] == "No report file was found. A folder is searched only for names like"
+    assert lines[2] == "  provider!domain!begin!end.zip; or name the file itself to read it."
+    assert lines[3:] == ["  skipped files  0", "  duplicates     0", "  other domains  0"]
+    assert max(len(line) for line in lines) <= 80
 
 
 def test_no_reports_message_is_short_enough_and_ends_without_a_newline() -> None:
