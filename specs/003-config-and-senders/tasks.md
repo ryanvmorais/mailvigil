@@ -40,42 +40,44 @@ first and alone), the loader, then identification, then the close.
 
 ## Stage 2 — The loader (RF-01 to RF-05, RF-07)
 
-- [ ] `src/mailvigil/config.py`, vocabulary only: `ConfigReason` (the thirteen members of the
+- [x] `src/mailvigil/config.py`, vocabulary only: `ConfigReason` (the thirteen members of the
   design), `ConfigError(reason, key, detail)` with `key` passed through `clean_text` and cut, and the
   frozen `Config`. Test first in `tests/test_config.py`: members are unique strings; `ConfigError`
   keeps `reason`, `key` and `detail`; `str(error)` mentions the reason and the key; a key with a
   line break and U+202E comes out of `ConfigError.key` clean and cut at 100; assigning a `Config`
   field raises `FrozenInstanceError`; assigning into `Config.senders` raises `TypeError`. — RF-07,
   RNF-04, ADR-5
-- [ ] Tests for reading the file, written first: a minimal valid file; a missing path and a folder
+- [x] Tests for reading the file, written first: a minimal valid file; a missing path and a folder
   (`UNREADABLE`); exactly 64 KiB accepted and 64 KiB + 1 refused as `FILE_TOO_LARGE` without being
   parsed; non-UTF-8 bytes (`NOT_UTF8`); UTF-8 with a byte order mark accepted; malformed TOML
-  (`MALFORMED_TOML`, and the detail mentions `line`); a 40,000-deep nested array refused as
-  `MALFORMED_TOML` instead of crashing; nothing created or written next to the config. — RF-01,
+  (`MALFORMED_TOML`, and the detail mentions `line`); a 30,000-deep nested array (40,000 would
+  pass the 64 KiB cap) refused as `MALFORMED_TOML` instead of crashing; nothing created or written next to the config. — RF-01,
   RNF-02
-- [ ] `config.py`, part 1: `load_config` up to the parsed table (steps 1 to 4 of the design), with
+- [x] `config.py`, part 1: `load_config` up to the parsed table (steps 1 to 4 of the design), with
   `MAX_CONFIG_BYTES`. — RF-01
-- [ ] Tests for the domain, written first: `Example.COM.` and padded input give `example.com`; the
+- [x] Tests for the domain, written first: `Example.COM.` and padded input give `example.com`; the
   loaded domain is the one `ingest` would use for the same text; missing (`MISSING_DOMAIN`); empty,
   an integer, `https://example.com`, `example.com/path`, `user@example.com`, `a..com`, a 64-character
   label, a 254-character name, `localhost`, `-a.example.com` and `a-.example.com`, a domain with a
-  space and one with a control character (`INVALID_DOMAIN`); `exämple.com` (`NON_ASCII_DOMAIN`);
+  space and one with a control character (`INVALID_DOMAIN`); `exämple.com` and the Kelvin sign U+212A,
+  which lower-cases to an ASCII `k` (`NON_ASCII_DOMAIN`, checked before lower-casing);
   unknown top-level keys: `domian` suggests `domain`, `sender` suggests `senders`, an unrelated key
   has no suggestion, and a hostile key is cleaned in `ConfigError.key`. — RF-02, RF-04, RF-05
-- [ ] `config.py`, part 2: unknown keys (step 5) and the domain (step 6). — RF-02, RF-04
-- [ ] Tests for the selector map, written first: keys stored lower case and the map is read-only;
+- [x] `config.py`, part 2: unknown keys (step 5) and the domain (step 6). — RF-02, RF-04
+- [x] Tests for the selector map, written first: keys stored lower case and the map is read-only;
   `Resend` plus `resend` is `DUPLICATE_SELECTOR` whichever comes first; empty, spaced and `bad key!`
   selectors (`INVALID_SELECTOR`); `senders` as a string (`WRONG_TYPE`); a value that is an integer,
   empty, blank, 101 characters, a list, a nested table, and a dotted key `a.b = "x"`
   (`INVALID_SERVICE_NAME`); a quoted `"a.b" = "x"` accepted; a name with a line break, U+202E, U+0085
   and a zero-width space (`FORBIDDEN_CHARACTER`); names stripped when stored; absent and empty
   `[senders]` accepted. — RF-03, RF-04, RF-05
-- [ ] `config.py`, part 3: the senders table (step 7) and the final `Config` built in sorted order
+- [x] `config.py`, part 3: the senders table (step 7) and the final `Config` built in sorted order
   (step 8). — RF-03, RNF-05
-- [ ] Order and determinism tests: a file with two problems reports the same one whichever order its
+- [x] Order and determinism tests: a file with two problems reports the same one whichever order its
   lines are in; the same content with keys in two orders gives equal `Config` values. — RF-07,
   RNF-05
-- [ ] Quality gate. — result recorded when run
+- [x] Quality gate. — result recorded when run: all green on 2026-10-27; 289 passed (207 before,
+  82 new), coverage 100% (Python 3.12)
 
 ## Stage 3 — Identifying the sender (RF-06)
 
