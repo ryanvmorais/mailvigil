@@ -637,7 +637,7 @@ def test_a_value_that_comes_from_the_data_is_printed_unchanged() -> None:
     senders = (summary_known("Cafe Mailer", ok=1),)
     assert "Cafe Mailer" in summary_pt(make_summary(senders=senders))
     verdict = make_verdict(domain="example.net", sources=(known(3, service="Example Billing"),))
-    assert "example.net" in verdict_pt(verdict)
+    assert verdict_pt(verdict).startswith("Veredito do MailVigil para example.net: ")
     assert "Example Billing" in verdict_pt(verdict)
 
 
