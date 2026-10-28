@@ -1,6 +1,6 @@
 ---
 feature: Report ingestion — read DMARC aggregate reports safely into a typed record model
-status: approved
+status: done
 date: 2026-10-27
 related:
   - 001-foundation/requirements.md

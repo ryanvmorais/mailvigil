@@ -1,6 +1,6 @@
 ---
 feature: Report ingestion — read DMARC aggregate reports safely into a typed record model
-status: in progress
+status: done
 date: 2026-10-27
 related:
   - 002-report-ingestion/requirements.md
@@ -148,12 +148,19 @@ public entry point.
 
 ## Stage 6 — Close the spec
 
-- [ ] Run `/atualizar-docs`: `CLAUDE.md` architecture tree gets `reports/`, `docs/stack.md` gets the
+- [x] Run `/atualizar-docs`: `CLAUDE.md` architecture tree gets `reports/`, `docs/stack.md` gets the
   standard-library modules this spec relies on (`expat`, `zipfile`, `gzip`, `ipaddress`). — docs
-- [ ] The maintainer runs the layer over the real reports of his domain, locally and outside the
+  (merged in #12; the README status rows and the stale "private repository" wording went with it)
+- [x] The maintainer runs the layer over the real reports of his domain, locally and outside the
   repository (a throwaway script), and tells Claude only the counts per `Reason` and whether
   anything refused looked legitimate. No report content is pasted into a conversation, an issue or
   a PR. Findings become follow-up tasks or an ADR, not silent edits. — Risk 2 of the design
-- [ ] Mark the three files `done`, move the roadmap row of `002` in `specs/README.md` to `done`, and
-  fill the gold-standard note there if `001` is also `done`. — all
-- [ ] Quality gate and CI. — result recorded when run: ___ (the CI run URL)
+  (result on 2026-10-27: the maintainer ran it and reported that everything was fine, with no
+  refusal that looked legitimate; the per-`Reason` counts were not shared, so there is no number
+  to record and no follow-up task)
+- [x] Mark the three files `done`, move the roadmap row of `002` in `specs/README.md` to `done`, and
+  fill the gold-standard note there if `001` is also `done`. — all (`001` is not `done` yet, so the
+  note stays as it is)
+- [x] Quality gate and CI. — result recorded when run: all green on 2026-10-27; 178 passed, coverage
+  100% (Python 3.12); CI on `main` at the merge of #12 passed all four jobs (Quality on 3.12 and
+  3.15, Package, Security): https://github.com/ryanvmorais/mailvigil/actions/runs/40615130889
