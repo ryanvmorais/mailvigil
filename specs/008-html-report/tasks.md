@@ -111,25 +111,25 @@ maintainer, not decided here.
 
 ## Stage 4 — The catalog and the charts (RF-03, RF-04, RF-07, RF-08, ADR-4, ADR-5, ADR-9)
 
-- [ ] `tests/test_messages.py`, first: `HtmlMessages` exists in both languages and every
+- [x] `tests/test_messages.py`, first: `HtmlMessages` exists in both languages and every
   `Mapping` and `Plural` in it is filled; the `pt-BR` catalog stays ASCII; no key of
   `HtmlMessages` repeats a sentence that `common`, `summary` or `verdict` already has. — RF-08
-- [ ] `src/mailvigil/messages/model.py`, `en.py`, `pt_br.py`: `HtmlMessages` (the eyebrow, the two
+- [x] `src/mailvigil/messages/model.py`, `en.py`, `pt_br.py`: `HtmlMessages` (the eyebrow, the two
   group titles of the rules, the section titles, the meter legend, the policy box labels, the
   timeline captions, the accessible names, the footer) and its two instances. Sentences the text
   format already has are read from the other dataclasses. — RF-08
-- [ ] `tests/test_html_charts.py`, the meter, written first: the table of ADR-5 with the numbers of
+- [x] `tests/test_html_charts.py`, the meter, written first: the table of ADR-5 with the numbers of
   the approved mockup (period 29 against 28: fill 1000, tick 965; unrecognized failures 48 of
   7,323 against 0.5%: fill 655, tick 500), a value exactly at the limit, a value far above it
   (the fill is capped and the real value is printed), rule 4 with and without failures, `whole ==
   0`, a very large count; the fill never exceeds 1000; each meter has `role="img"`, an
   `aria-label` with the numbers, and the status as an icon and a word; a "stay below" meter says
   so in words; a failed data rule says how much is missing. — RF-03, ADR-5
-- [ ] `tests/test_html_charts.py`, the stacked bar, first: the four situations with their counts
+- [x] `tests/test_html_charts.py`, the stacked bar, first: the four situations with their counts
   and shares in the legend (the shares of the text format), a zero segment drawn with no width and
   still named in the legend, a tiny failing share keeps a minimum width, the `aria-label` states
   the figures. — RF-04
-- [ ] `tests/test_html_charts.py`, the timeline, first: a month gives one column per day; a period
+- [x] `tests/test_html_charts.py`, the timeline, first: a month gives one column per day; a period
   of 90 days is one column per day and of 91 days groups of two; a year gives groups of 5 and a
   century gives at most 90 columns and a bounded number of elements, in bounded time (it must not
   loop over the days); the failing segment is the base of the column, never shorter than 3 units
@@ -139,11 +139,16 @@ maintainer, not decided here.
   are the first, middle and last date; the `<details>` table has one row per column with the same
   figures; the caption says how many days a column is when grouped and that a report counts on
   the day it begins. — RF-04, ADR-3, ADR-4, ADR-9
-- [ ] `src/mailvigil/html_charts.py`: `meter`, `stacked_bar`, `timeline`, each a pure function
+- [x] `src/mailvigil/html_charts.py`: `meter`, `stacked_bar`, `timeline`, each a pure function
   from the data and a `Messages` to a `Safe`; the geometry as small integer helpers a test can call
   alone; the SVG built with `htmlkit`. — RF-03, RF-04, ADR-4, ADR-5, ADR-9
-- [ ] Quality gate of the stage (same four commands). **Result:** _to fill in when the stage
-  runs._
+- [x] Quality gate of the stage (same four commands). **Result:** ruff, black, mypy strict clean;
+  2088 tests pass, coverage 100%. Decisions the stage took: the meters print the numbers with no
+  thousands separator (the text format has none, so the two stay equal), where the mockup wrote
+  `7,323`; a zero segment of the stacked bar is not drawn at all (a flex gap would add 2 px for
+  nothing) but stays in the legend; the hatch of SPF only is defined in a hidden SVG outside the
+  plot, so its stroke rule does not cross the tile; `timeline_label` is a `Plural` on the columns.
+  The look of the hatch under `preserveAspectRatio="none"` is for the browser check of stage 5.
 
 ## Stage 5 — The renderer and the flag (RF-01, RF-02, RF-05, RF-06, RF-07, RF-08, RF-09, RNF-03, RNF-04, ADR-6, ADR-8)
 
