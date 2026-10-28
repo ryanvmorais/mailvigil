@@ -79,7 +79,7 @@ maintainer, not decided here.
 
 ## Stage 3 — The one module that builds markup, and the palette (RF-06, RF-07, ADR-1, ADR-7, ADR-8, ADR-10, RNF-01, RNF-02)
 
-- [ ] `tests/test_htmlkit.py`, written first: `text()` escapes `<`, `>`, `&`, `"` and `'`;
+- [x] `tests/test_htmlkit.py`, written first: `text()` escapes `<`, `>`, `&`, `"` and `'`;
   `el()` escapes attribute values, refuses a tag or an attribute name outside the allowlist
   (`script`, `iframe`, `object`, `embed`, `form`, `link`, `base`, `meta` outside the head helper,
   any `on…` attribute, `href` and `src` other than `#…`), and builds void and non-void elements
@@ -87,25 +87,27 @@ maintainer, not decided here.
   one reference, and a lone surrogate does not raise; `mypy` on a snippet that passes a `str` where
   a `Safe` is expected reports an error (run through `mypy.api` in the test). — RF-06, ADR-1,
   ADR-7
-- [ ] `tests/test_htmlkit.py`, the source guards: an AST scan of `htmlkit.py`, `html_style.py`,
+- [x] `tests/test_htmlkit.py`, the source guards: an AST scan of `htmlkit.py`, `html_style.py`,
   `html_charts.py` and `render_html.py` finds every call to `raw(` and each argument is a string
   literal or an upper-case module constant; no module other than `htmlkit.py` imports `html` or
   calls `escape`; no module builds a tag with an f-string. — RF-06, ADR-1
-- [ ] `tests/test_html_style.py`, first: every text and background pair of the palette (light and
+- [x] `tests/test_html_style.py`, first: every text and background pair of the palette (light and
   dark) is at least 4.5:1 and every graphic that carries meaning (the four segments, the limit
   tick, the failing marker, the gap outline) is at least 3:1 against its surface, computed with the
   WCAG formula; the stylesheet has the `prefers-color-scheme: dark` block and a print block, and
   no `url(`, `@import` or `expression(`; the CSP constant is exactly the string of ADR-8 and has no
   `img-src`. — RF-06, RF-07, ADR-8, ADR-10
-- [ ] `src/mailvigil/htmlkit.py`: `Safe`, `text`, `el` with the allowlists, `raw`, `finish`, and the
+- [x] `src/mailvigil/htmlkit.py`: `Safe`, `text`, `el` with the allowlists, `raw`, `finish`, and the
   document helper that writes the `head` (charset, viewport, the CSP, the title). It imports
   nothing of the project. — RF-06, ADR-1, ADR-7, ADR-8
-- [ ] `src/mailvigil/html_style.py`: the two palettes as dicts taken from the mockup, the
+- [x] `src/mailvigil/html_style.py`: the two palettes as dicts taken from the mockup, the
   stylesheet built from them (tokens on `:root`, dark by `prefers-color-scheme`, the rest of the
   CSS as a constant), the print rules. If a pair of the mockup fails the contrast test, the token
   is darkened and the change is listed here and reported, not hidden. — RF-07, ADR-10
-- [ ] Quality gate of the stage (same four commands). **Result:** _to fill in when the stage
-  runs._
+- [x] Quality gate of the stage (same four commands). **Result:** ruff, black, mypy strict clean;
+  1378 tests pass, coverage 100%. Every pair of the mockup's palette passed the contrast test as it
+  was, so no token was darkened. The warn tokens (`warn`, `warn-bg`) come from board B, where they
+  were defined for the too-early banner.
 
 ## Stage 4 — The catalog and the charts (RF-03, RF-04, RF-07, RF-08, ADR-4, ADR-5, ADR-9)
 
