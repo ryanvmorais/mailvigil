@@ -16,6 +16,7 @@ from types import MappingProxyType
 from mailvigil.config import ConfigReason
 from mailvigil.messages.model import (
     CommonMessages,
+    HtmlMessages,
     Messages,
     Plural,
     RefusalMessages,
@@ -250,7 +251,60 @@ _REFUSALS = RefusalMessages(
 )
 
 # ---------------------------------------------------------------------------
+# HTML
+# ---------------------------------------------------------------------------
+
+# O que so o relatorio HTML diz; o resto da pagina le as areas acima.
+_HTML = HtmlMessages(
+    page_title="Relatorio DMARC de {domain}",
+    eyebrow="Pronto para p=reject?",
+    policy_label="Politica publicada",
+    rules_title="As cinco regras por tras da resposta",
+    group_data="Ha evidencia suficiente?",
+    group_problem="Algo esta errado?",
+    meter_legend="A marca escura e o limite de cada regra.",
+    at_least="minimo necessario: {value}",
+    at_most="maximo permitido: {value}",
+    none_allowed="nenhuma permitida",
+    meter_label="{name}: {measured}, {needed}",
+    of_messages=Plural("de {n} mensagem", "de {n} mensagens"),
+    mix_title=Plural("O que aconteceu com {n} mensagem", "O que aconteceu com as {n} mensagens"),
+    situation_ok="Passam nos dois",
+    situation_dkim="So DKIM",
+    situation_spf="So SPF",
+    situation_failing="Falham",
+    situation_label="{name}: {count} ({share})",
+    days_title="Dia a dia",
+    column_note=Plural(
+        "Cada coluna e um dia, em UTC. Um relatorio conta no dia em que comeca.",
+        "Cada coluna e de {n} dias, em UTC. Um relatorio conta no dia em que comeca.",
+    ),
+    legend_failing_day="Dia com mensagens que falharam",
+    legend_no_report="Sem relatorio",
+    legend_covered="Coberto por um relatorio que conta em outro dia",
+    scale_note=(
+        "Coluna mais alta, mais mensagens. A mais alta teve {tallest}. "
+        "As mensagens que falharam ficam na base de cada coluna."
+    ),
+    timeline_label=Plural(
+        "Mensagens por dia de {first} a {last}: {n} coluna, {failing} com mensagens que falharam.",
+        "Mensagens por dia de {first} a {last}: {n} colunas, {failing} com mensagens que falharam.",
+    ),
+    show_numbers="Mostrar os numeros",
+    numbers_region="Mensagens por dia",
+    senders_region="Tabela de remetentes",
+    col_day="Dia",
+    range_label="{first} a {last}",
+    footer=(
+        "Gerado offline pelo MailVigil {version}. "
+        "Este arquivo nao tem scripts e nao faz requisicoes de rede."
+    ),
+)
+
+# ---------------------------------------------------------------------------
 # The catalog
 # ---------------------------------------------------------------------------
 
-PORTUGUESE = Messages(common=_COMMON, summary=_SUMMARY, verdict=_VERDICT, refusals=_REFUSALS)
+PORTUGUESE = Messages(
+    common=_COMMON, summary=_SUMMARY, verdict=_VERDICT, refusals=_REFUSALS, html=_HTML
+)

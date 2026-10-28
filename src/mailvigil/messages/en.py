@@ -14,6 +14,7 @@ from types import MappingProxyType
 from mailvigil.config import ConfigReason
 from mailvigil.messages.model import (
     CommonMessages,
+    HtmlMessages,
     Messages,
     Plural,
     RefusalMessages,
@@ -235,7 +236,60 @@ _REFUSALS = RefusalMessages(
 )
 
 # ---------------------------------------------------------------------------
+# HTML
+# ---------------------------------------------------------------------------
+
+# What only the HTML report says; the rest of the page reads the areas above.
+_HTML = HtmlMessages(
+    page_title="DMARC report for {domain}",
+    eyebrow="Ready for p=reject?",
+    policy_label="Published policy",
+    rules_title="The five rules behind the answer",
+    group_data="Is there enough evidence?",
+    group_problem="Is anything wrong?",
+    meter_legend="The dark mark is the limit of each rule.",
+    at_least="at least {value} needed",
+    at_most="at most {value} allowed",
+    none_allowed="none allowed",
+    meter_label="{name}: {measured}, {needed}",
+    of_messages=Plural("of {n} message", "of {n} messages"),
+    mix_title=Plural("What happened to the {n} message", "What happened to the {n} messages"),
+    situation_ok="Pass both",
+    situation_dkim="DKIM only",
+    situation_spf="SPF only",
+    situation_failing="Failing",
+    situation_label="{name}: {count} ({share})",
+    days_title="Day by day",
+    column_note=Plural(
+        "Each column is one day, in UTC. A report counts on the day it begins.",
+        "Each column is {n} days, in UTC. A report counts on the day it begins.",
+    ),
+    legend_failing_day="Day with failing messages",
+    legend_no_report="No report",
+    legend_covered="Covered by a report that counts on another day",
+    scale_note=(
+        "Taller column, more messages. The tallest column had {tallest}. "
+        "Failing messages sit at the base of each column."
+    ),
+    timeline_label=Plural(
+        "Messages per day from {first} to {last}: {n} column, {failing} with failing messages.",
+        "Messages per day from {first} to {last}: {n} columns, {failing} with failing messages.",
+    ),
+    show_numbers="Show the numbers",
+    numbers_region="Messages per day",
+    senders_region="Senders table",
+    col_day="Day",
+    range_label="{first} to {last}",
+    footer=(
+        "Generated offline by MailVigil {version}. "
+        "This file has no scripts and makes no network requests."
+    ),
+)
+
+# ---------------------------------------------------------------------------
 # The catalog
 # ---------------------------------------------------------------------------
 
-ENGLISH = Messages(common=_COMMON, summary=_SUMMARY, verdict=_VERDICT, refusals=_REFUSALS)
+ENGLISH = Messages(
+    common=_COMMON, summary=_SUMMARY, verdict=_VERDICT, refusals=_REFUSALS, html=_HTML
+)

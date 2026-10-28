@@ -59,6 +59,15 @@ _PLACEHOLDERS: dict[str, frozenset[str]] = {
     "verdict.next_recognized": frozenset({"who"}),
     "verdict.next_data": frozenset({"marker"}),
     "verdict.left_out": frozenset({"parts"}),
+    "html.page_title": frozenset({"domain"}),
+    "html.at_least": frozenset({"value"}),
+    "html.at_most": frozenset({"value"}),
+    "html.meter_label": frozenset({"name", "measured", "needed"}),
+    "html.situation_label": frozenset({"name", "count", "share"}),
+    "html.scale_note": frozenset({"tallest"}),
+    "html.timeline_label": frozenset({"first", "last", "failing"}),
+    "html.range_label": frozenset({"first", "last"}),
+    "html.footer": frozenset({"version"}),
     "refusals.no_domain": frozenset({"default"}),
     "refusals.domain_mismatch": frozenset({"wanted", "domain", "path"}),
     "refusals.no_reports": frozenset({"domain"}),
@@ -112,6 +121,8 @@ _SAME_IN_BOTH: frozenset[str] = frozenset(
         "summary.col_total",
         "summary.source_detail",
         "verdict.other_tail",
+        "html.meter_label",
+        "html.situation_label",
     }
 )
 
@@ -243,6 +254,37 @@ def test_every_portuguese_configuration_phrase_differs_from_its_reason_word() ->
     for reason, phrase in PORTUGUESE.refusals.config_reasons.items():
         assert phrase != reason.value
         assert "_" not in phrase
+
+
+@_BOTH
+def test_the_html_catalog_is_filled(messages: Messages) -> None:
+    """Every field of ``HtmlMessages`` is a non-empty template or a ``Plural`` with both forms."""
+    fields = dataclasses.fields(messages.html)
+    assert fields
+    for field in fields:
+        value = getattr(messages.html, field.name)
+        forms = [value.one, value.many] if isinstance(value, Plural) else [value]
+        for form in forms:
+            assert isinstance(form, str)
+            assert form.strip(), field.name
+
+
+def _sentences(messages: Messages, areas: tuple[str, ...]) -> set[str]:
+    """Collect every template of the named areas of a catalog, a ``Plural`` by its two forms."""
+    found: set[str] = set()
+    for path, template, _is_plural in _walk(messages):
+        if path.split(".")[0] in areas:
+            found.add(template)
+    return found
+
+
+@_BOTH
+def test_no_html_sentence_repeats_one_the_text_format_already_has(messages: Messages) -> None:
+    """The page reads the shared sentences from ``common``, ``summary`` and ``verdict`` (RF-08)."""
+    shared = _sentences(messages, ("common", "summary", "verdict"))
+    own = _sentences(messages, ("html",))
+    assert own
+    assert not own & shared, sorted(own & shared)
 
 
 def test_importing_the_catalog_does_not_import_a_renderer() -> None:
