@@ -1,22 +1,26 @@
 """
 The text of the verdict: a frozen ``Verdict`` turned into the sections of the command.
 
-Everything the verdict says in English lives here, so spec 006 replaces text modules (language,
-``--json``) without touching the rules (RNF-03). The limits on the sources and their "and N more"
-lines are applied here and never in ``judge``, which keeps the complete data. The thresholds shown
-come from the rules of the ``Verdict``, which ``judge`` builds from the constants of ``verdict.py``,
-so no number of the criterion is typed twice (RNF-05). The layout follows the summary's: ASCII, 80
-columns at most, no color; the text is returned without a trailing newline and writing it is the
-command's. The words "safe" and "attack" are not used anywhere: the verdict reads reports, it does
-not certify a domain and it does not guess intent.
+The layout lives here and the words live in ``mailvigil.messages``: every sentence is read from the
+``Messages`` the caller passes (English by default), so a second language does not need a second
+layout and the rules are untouched (spec 006, RNF-03). The limits on the sources and their "and N
+more" lines are applied here and never in ``judge``, which keeps the complete data. The thresholds
+shown come from the rules of the ``Verdict``, which ``judge`` builds from the constants of
+``verdict.py``, so no number of the criterion is typed twice, in either language (RNF-05). The
+layout follows the summary's: ASCII, 80 columns at most, no color; the text is returned without a
+trailing newline and writing it is the command's. The words "safe" and "attack" are not used
+anywhere in the English text: the verdict reads reports, it does not certify a domain and it does
+not guess intent.
 """
 
 from __future__ import annotations
 
 import textwrap
 from collections.abc import Callable, Sequence
+from functools import partial
 
-from mailvigil.render import address, count_noun, fit, format_share, share_tenths
+from mailvigil.messages import ENGLISH, Messages
+from mailvigil.render import address, fit, format_share, share_tenths
 from mailvigil.senders import Outcome
 from mailvigil.summary import FailingSource
 from mailvigil.verdict import Answer, Note, NoteKind, Rule, RuleId, RuleKind, Verdict
@@ -38,43 +42,6 @@ _UNRECOGNIZED_LIMIT = 5
 _NAME_MAX = 30
 _ADDRESS_MAX = 45
 _REASONS_MAX = 40
-
-# The title words. A test iterates ``Answer``, so an answer added later cannot reach the output as
-# a bare key.
-_WORDS = {
-    Answer.READY: "READY for p=reject",
-    Answer.TOO_EARLY: "TOO EARLY to say",
-    Answer.NOT_READY: "NOT READY for p=reject",
-}
-# Under ``p=reject`` the question is "is enforcement blocking mail it should not" (RF-05).
-_WORDS_ENFORCING = {
-    Answer.READY: "NO PROBLEM SEEN",
-    Answer.TOO_EARLY: "TOO EARLY to say",
-    Answer.NOT_READY: "BLOCKING REAL MAIL",
-}
-
-# One name per rule, short so the table fits in 80 columns beside a share and a count.
-_RULE_NAMES = {
-    RuleId.PERIOD: "period covered",
-    RuleId.COVERAGE: "days with a report",
-    RuleId.VOLUME: "messages seen",
-    RuleId.RECOGNIZED_FAILURES: "recognized failures",
-    RuleId.UNRECOGNIZED_FAILURES: "unrecognized failures",
-}
-
-# How a source that was not recognized is described, as the summary does. ``KNOWN`` has no entry:
-# it is named by its service.
-_KIND_WORDS = {
-    Outcome.UNKNOWN: "unrecognized",
-    Outcome.FOREIGN_DOMAIN: "foreign domain",
-    Outcome.FAILING_SIGNATURE: "failing signature",
-}
-
-# The one sentence that closes every verdict (design, Risk 3 and 4).
-_CAVEAT = (
-    "This reads only the reports you gave it: mail that no receiver reports on, and senders that "
-    "were quiet in this period, are not covered."
-)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -185,44 +152,54 @@ def _overrides(source: FailingSource) -> str:
     return f" ({reasons})" if reasons else ""
 
 
-def _recognized_line(source: FailingSource) -> str:
+def _recognized_line(source: FailingSource, messages: Messages) -> str:
     """
     Write a failing source of a recognized sender.
 
     Args:
         source (FailingSource): The source.
+        messages (Messages): The language.
 
     Returns:
         str: The service, its failing messages, its address and its override types.
     """
-    where = fit(address(source.source_ip), _ADDRESS_MAX)
-    messages = count_noun(source.messages, "failing message")
-    return _entry(source.service, f": {messages} from {where}{_overrides(source)}")
+    where = fit(address(source.source_ip, messages.common.no_address), _ADDRESS_MAX)
+    tail = messages.verdict.recognized_tail.format(
+        messages=messages.common.failing_message.of(source.messages), where=where
+    )
+    return _entry(source.service, tail + _overrides(source))
 
 
-def _other_line(source: FailingSource) -> str:
+def _other_line(source: FailingSource, messages: Messages) -> str:
     """
     Write a failing source that is not recognized.
 
     Args:
         source (FailingSource): The source.
+        messages (Messages): The language.
 
     Returns:
         str: The address, what kind of source it is (with the configured selectors involved, so the
             owner can tell a copied selector from a broken one), its failing messages and its
             override types.
     """
-    kind = _KIND_WORDS.get(source.outcome, "unrecognized")
+    common = messages.common
+    kind = common.kinds.get(source.outcome, common.kinds[Outcome.UNKNOWN])
     if source.selectors:
-        noun = "selector" if len(source.selectors) == 1 else "selectors"
-        kind += f" ({noun} {', '.join(fit(s, _NAME_MAX) for s in source.selectors)})"
-    messages = count_noun(source.messages, "failing message")
-    where = fit(address(source.source_ip), _ADDRESS_MAX)
-    return _entry(where, f"  {kind}: {messages}{_overrides(source)}")
+        names = ", ".join(fit(s, _NAME_MAX) for s in source.selectors)
+        kind += f" ({common.selectors_named.of(len(source.selectors), names=names)})"
+    where = fit(address(source.source_ip, common.no_address), _ADDRESS_MAX)
+    tail = messages.verdict.other_tail.format(
+        kind=kind, messages=common.failing_message.of(source.messages)
+    )
+    return _entry(where, tail + _overrides(source))
 
 
 def _sources(
-    sources: Sequence[FailingSource], limit: int, line: Callable[[FailingSource], str]
+    sources: Sequence[FailingSource],
+    limit: int,
+    line: Callable[[FailingSource], str],
+    messages: Messages,
 ) -> list[str]:
     """
     Write the first sources of a list and one line that still counts the others.
@@ -231,6 +208,7 @@ def _sources(
         sources (Sequence[FailingSource]): The sources, the worst first.
         limit (int): How many to print.
         line (Callable[[FailingSource], str]): How to write one.
+        messages (Messages): The language.
 
     Returns:
         list[str]: One line per printed source and, when some were left out, a line with how many
@@ -239,10 +217,13 @@ def _sources(
     lines = [line(source) for source in sources[:limit]]
     rest = sources[limit:]
     if rest:
-        hidden = sum(source.messages for source in rest)
+        common = messages.common
         lines.append(
-            f"  ... and {count_noun(len(rest), 'other source')}: "
-            f"{count_noun(hidden, 'failing message')}"
+            "  "
+            + common.more_failing.format(
+                sources=common.other_source.of(len(rest)),
+                messages=common.failing_message.of(sum(source.messages for source in rest)),
+            )
         )
     return lines
 
@@ -252,101 +233,133 @@ def _sources(
 # ---------------------------------------------------------------------------
 
 
-def _title(verdict: Verdict) -> list[str]:
+def _title(verdict: Verdict, messages: Messages) -> list[str]:
     """
     Write the title: the domain and the answer (RF-03, RF-05).
 
     Args:
         verdict (Verdict): The verdict.
+        messages (Messages): The language.
 
     Returns:
         list[str]: One line when the domain fits beside the answer; otherwise two, with the domain
             cut at the first and the answer, capitalized, alone on the second.
     """
+    text = messages.verdict
     if verdict.enforcing == "reject":
-        phrase = f"already at p=reject: {_WORDS_ENFORCING[verdict.answer]}"
+        phrase = text.enforcing.format(words=text.words_enforcing[verdict.answer])
     else:
-        phrase = _WORDS[verdict.answer]
-    head = "MailVigil verdict for "
+        phrase = text.words[verdict.answer]
     domain = fit(verdict.domain, len(verdict.domain))
-    one = f"{head}{domain}: {phrase}"
+    one = f"{text.title.format(domain=domain)}: {phrase}"
     if len(one) <= _WIDTH:
         return [one]
-    return [head + fit(domain, _WIDTH - len(head)), phrase[:1].upper() + phrase[1:]]
+    room = _WIDTH - len(text.title.format(domain=""))
+    return [text.title.format(domain=fit(domain, room)), phrase[:1].upper() + phrase[1:]]
 
 
-def _missing(rule: Rule) -> str:
+def _missing(rule: Rule, messages: Messages) -> str:
     """
     Say what a failed data rule lacks.
 
     Args:
         rule (Rule): A failed data rule.
+        messages (Messages): The language.
 
     Returns:
         str: For example ``need 1 more day`` or ``need 120 more messages``.
     """
-    noun = "message" if rule.id is RuleId.VOLUME else "day"
-    return f"need {rule.missing} more {noun if rule.missing == 1 else noun + 's'}"
+    text = messages.verdict
+    phrase = text.need_messages if rule.id is RuleId.VOLUME else text.need_days
+    return phrase.of(rule.missing)
 
 
-def _why(verdict: Verdict) -> list[str]:
+def _why(verdict: Verdict, messages: Messages) -> list[str]:
     """
     Write the reason: the rule that decided and the sources or amounts behind it (RF-03).
 
     Args:
         verdict (Verdict): The verdict.
+        messages (Messages): The language.
 
     Returns:
-        list[str]: The ``Why:`` sentence and its lines, by answer.
+        list[str]: The reason sentence, with its label, and its lines, by answer.
     """
+    text = messages.verdict
+    label = text.why_label
     if verdict.answer is Answer.READY:
-        lines = ["Why: every rule passes."]
+        lines = [f"{label} {text.why_ready}"]
         if verdict.unrecognized_failing:
-            lines.append("Still failing from unrecognized sources, under the limit:")
-            lines.extend(_sources(verdict.unrecognized_failing, _UNRECOGNIZED_LIMIT, _other_line))
+            lines.append(text.still_failing)
+            lines.extend(
+                _sources(
+                    verdict.unrecognized_failing,
+                    _UNRECOGNIZED_LIMIT,
+                    partial(_other_line, messages=messages),
+                    messages,
+                )
+            )
         return lines
 
     if verdict.answer is Answer.TOO_EARLY:
-        lines = ["Why: not enough reports to tell yet."]
+        lines = [f"{label} {text.why_too_early}"]
         if _rule(verdict, RuleId.PERIOD).measured == 0:
-            lines.append("  no report was kept for this domain")
+            lines.append("  " + text.no_report_kept)
             return lines
         for rule in verdict.rules:
             if rule.kind is RuleKind.DATA and not rule.passed:
-                lines.append(f"  {_RULE_NAMES[rule.id]}: {_missing(rule)}")
+                lines.append(f"  {text.rule_names[rule.id]}: {_missing(rule, messages)}")
         return lines
 
     if verdict.deciding is RuleId.RECOGNIZED_FAILURES:
-        lines = ["Why: a recognized sender fails DMARC."]
-        lines.extend(_sources(verdict.recognized_failing, _RECOGNIZED_LIMIT, _recognized_line))
+        lines = [f"{label} {text.why_recognized}"]
+        lines.extend(
+            _sources(
+                verdict.recognized_failing,
+                _RECOGNIZED_LIMIT,
+                partial(_recognized_line, messages=messages),
+                messages,
+            )
+        )
         return lines
 
     rule = _rule(verdict, RuleId.UNRECOGNIZED_FAILURES)
-    sentence = (
-        "Why: failures from unrecognized sources are "
-        f"{_share(rule)} of the messages ({rule.measured} of "
-        f"{rule.whole}); the limit is {_per_mille(rule.needed)}."
+    sentence = f"{label} " + text.why_unrecognized.format(
+        share=_share(rule),
+        measured=rule.measured,
+        whole=rule.whole,
+        limit=_per_mille(rule.needed),
     )
-    lines = _wrap(sentence, rest=" " * 5)
-    lines.extend(_sources(verdict.unrecognized_failing, _UNRECOGNIZED_LIMIT, _other_line))
+    lines = _wrap(sentence, rest=" " * (len(label) + 1))
+    lines.extend(
+        _sources(
+            verdict.unrecognized_failing,
+            _UNRECOGNIZED_LIMIT,
+            partial(_other_line, messages=messages),
+            messages,
+        )
+    )
     return lines
 
 
-def _measured(rule: Rule) -> str:
+def _measured(rule: Rule, messages: Messages) -> str:
     """
     Write what a rule measured, a share always beside its count (004 RF-06).
 
     Args:
         rule (Rule): The rule.
+        messages (Messages): The language.
 
     Returns:
         str: For example ``28 days``, ``27 of 28 (96.4%)`` or ``12 (0.1%)``.
     """
     share = _share(rule)
     if rule.id is RuleId.PERIOD:
-        return count_noun(rule.measured, "day")
+        return messages.common.day.of(rule.measured)
     if rule.id is RuleId.COVERAGE:
-        return f"{rule.measured} of {rule.whole} ({share})"
+        return messages.verdict.measured_coverage.format(
+            measured=rule.measured, whole=rule.whole, share=share
+        )
     if rule.id is RuleId.UNRECOGNIZED_FAILURES:
         return f"{rule.measured} ({share})"
     return str(rule.measured)
@@ -371,39 +384,43 @@ def _needed(rule: Rule) -> str:
     return f"{'>=' if rule.at_least else '<='} {value}"
 
 
-def _result(rule: Rule) -> str:
+def _result(rule: Rule, messages: Messages) -> str:
     """
     Write the result of a rule, telling the two kinds of failure apart (RF-01).
 
     Args:
         rule (Rule): The rule.
+        messages (Messages): The language.
 
     Returns:
-        str: ``pass``, ``FAIL`` for a problem rule or ``fail (too early)`` for a data rule.
+        str: The word for a pass, for a failed problem rule or for a failed data rule.
     """
+    text = messages.verdict
     if rule.passed:
-        return "pass"
-    return "FAIL" if rule.kind is RuleKind.PROBLEM else "fail (too early)"
+        return text.result_pass
+    return text.result_fail if rule.kind is RuleKind.PROBLEM else text.result_too_early
 
 
-def _table(verdict: Verdict) -> list[str]:
+def _table(verdict: Verdict, messages: Messages) -> list[str]:
     """
     Write the rules table: the whole criterion, rule by rule (RF-03).
 
     Args:
         verdict (Verdict): The verdict.
+        messages (Messages): The language.
 
     Returns:
         list[str]: The title, the header and one line per rule. The columns are as wide as their
             data; the measured column gives way if a huge count would push a line past the screen.
     """
-    header = ("rule", "measured", "needed", "result")
+    text = messages.verdict
+    header = (text.col_rule, text.col_measured, text.col_needed, text.col_result)
     rows = [
         (
-            f"{int(rule.id)}  {_RULE_NAMES[rule.id]}",
-            _measured(rule),
+            f"{int(rule.id)}  {text.rule_names[rule.id]}",
+            _measured(rule, messages),
             _needed(rule),
-            _result(rule),
+            _result(rule, messages),
         )
         for rule in verdict.rules
     ]
@@ -420,50 +437,46 @@ def _table(verdict: Verdict) -> list[str]:
             f"  {needed:<{widths[2]}}  {result}"
         )
 
-    return ["Rules", line(header), *(line(row) for row in rows)]
+    return [text.rules_title, line(header), *(line(row) for row in rows)]
 
 
 # What each note says. A test iterates ``NoteKind``, so a kind added later cannot reach the output
-# as a bare key.
+# as a bare key. Each function fills the template of its kind with the numbers of the note.
 
 
-def _fragile(note: Note) -> str:
+def _fragile(note: Note, messages: Messages) -> str:
     """Say how much traffic passes by one mechanism only, and how much of it by SPF."""
     fragile, spf_only, total = note.numbers
-    return (
-        f"Fragile traffic: {fragile} of {total} messages ({format_share(fragile, total)}) pass by "
-        f"only one of DKIM and SPF; {spf_only} of those by SPF only, which forwarding breaks."
+    return messages.verdict.notes[NoteKind.FRAGILE].format(
+        fragile=fragile, total=total, share=format_share(fragile, total), spf_only=spf_only
     )
 
 
-def _partial(note: Note) -> str:
+def _partial(note: Note, messages: Messages) -> str:
     """Say that the policy applies to part of the mail."""
-    pct = note.numbers[0]
-    return f"The policy applies to only {pct}% of the mail (pct={pct})."
+    return messages.verdict.notes[NoteKind.PARTIAL_POLICY].format(pct=note.numbers[0])
 
 
-def _changed(note: Note) -> str:
+def _changed(note: Note, messages: Messages) -> str:
     """Say that the figures mix two policies."""
     earlier = ", ".join(fit(text, _NAME_MAX) for text in note.texts)
-    return (
-        f"The policy changed during the period (earlier p: {earlier}), so the figures mix policies."
-    )
+    return messages.verdict.notes[NoteKind.POLICY_CHANGED].format(earlier=earlier)
 
 
-def _subdomains(note: Note) -> str:
+def _subdomains(note: Note, messages: Messages) -> str:
     """Show the policy subdomains already have, which moving ``p`` does not change."""
     sp, np = note.texts
     pairs = (("sp", sp), ("np", np))
     shown = ", ".join(f"{key}={fit(value, _NAME_MAX)}" for key, value in pairs if value)
-    return f"Subdomains have their own policy ({shown}): moving p does not change it."
+    return messages.verdict.notes[NoteKind.SUBDOMAIN_POLICY].format(shown=shown)
 
 
-def _quarantine(note: Note) -> str:
+def _quarantine(note: Note, messages: Messages) -> str:
     """Say that the current policy is ``quarantine``."""
-    return "The policy is p=quarantine now; this verdict is about moving to p=reject."
+    return messages.verdict.notes[NoteKind.CURRENTLY_QUARANTINE].format()
 
 
-_NOTE_TEXT: dict[NoteKind, Callable[[Note], str]] = {
+_NOTE_TEXT: dict[NoteKind, Callable[[Note, Messages], str]] = {
     NoteKind.FRAGILE: _fragile,
     NoteKind.PARTIAL_POLICY: _partial,
     NoteKind.POLICY_CHANGED: _changed,
@@ -472,54 +485,51 @@ _NOTE_TEXT: dict[NoteKind, Callable[[Note], str]] = {
 }
 
 
-def _notes(verdict: Verdict) -> list[str]:
+def _notes(verdict: Verdict, messages: Messages) -> list[str]:
     """
     Write the notes, one sentence each, only those present (RF-04).
 
     Args:
         verdict (Verdict): The verdict.
+        messages (Messages): The language.
 
     Returns:
         list[str]: The title and the notes; nothing when there are none.
     """
     if not verdict.notes:
         return []
-    lines = ["Notes"]
+    lines = [messages.verdict.notes_title]
     for note in verdict.notes:
-        lines.extend(_wrap(_NOTE_TEXT[note.kind](note), "  - ", "    "))
+        lines.extend(_wrap(_NOTE_TEXT[note.kind](note, messages), "  - ", "    "))
     return lines
 
 
-def _next_step(verdict: Verdict) -> list[str]:
+def _next_step(verdict: Verdict, messages: Messages) -> list[str]:
     """
     Write the next step, one sentence chosen by the rule that decided (RF-03).
 
     Args:
         verdict (Verdict): The verdict.
+        messages (Messages): The language.
 
     Returns:
         list[str]: The sentence; nothing for ``READY``.
     """
     if verdict.deciding is None:
         return []
+    text = messages.verdict
     if verdict.deciding is RuleId.RECOGNIZED_FAILURES:
         services = list(dict.fromkeys(source.service for source in verdict.recognized_failing))
-        who = fit(services[0], _NAME_MAX) if len(services) == 1 else "each service listed above"
-        text = (
-            f"Next: make {who} sign with your domain (DKIM) or add its servers to SPF, then "
-            "collect another period."
-        )
+        who = fit(services[0], _NAME_MAX) if len(services) == 1 else text.next_each_service
+        body = text.next_recognized.format(who=who)
     elif verdict.deciding is RuleId.UNRECOGNIZED_FAILURES:
-        text = (
-            "Next: look at the sources above and add the selectors of the ones that are yours to "
-            "[senders] in the configuration."
-        )
+        body = text.next_unrecognized
     else:
-        text = "Next: keep collecting reports until the rules marked 'fail (too early)' pass."
-    return _wrap(text, rest=" " * 6)
+        body = text.next_data.format(marker=text.result_too_early)
+    return _wrap(f"{text.next_label} {body}", rest=" " * (len(text.next_label) + 1))
 
 
-def _left_out(verdict: Verdict) -> list[str]:
+def _left_out(verdict: Verdict, messages: Messages) -> list[str]:
     """
     Say what the summary did not count, in one sentence, only when something was left out (RF-09).
 
@@ -527,25 +537,22 @@ def _left_out(verdict: Verdict) -> list[str]:
 
     Args:
         verdict (Verdict): The verdict.
+        messages (Messages): The language.
 
     Returns:
         list[str]: The wrapped sentence; nothing when every count is zero.
     """
+    text = messages.verdict
     left = verdict.left_out
     parts = [
-        count_noun(left.skipped, "file") + " skipped" if left.skipped else "",
-        count_noun(left.duplicates, "duplicate") if left.duplicates else "",
-        (
-            count_noun(left.other_domain, "report of another domain", "reports of other domains")
-            if left.other_domain
-            else ""
-        ),
+        text.skipped_file.of(left.skipped) if left.skipped else "",
+        text.duplicate.of(left.duplicates) if left.duplicates else "",
+        text.other_domain.of(left.other_domain) if left.other_domain else "",
     ]
     shown = [part for part in parts if part]
     if not shown:
         return []
-    text = f"Left out of this verdict: {', '.join(shown)}. mailvigil summary shows why."
-    return _wrap(text, rest=" " * 4)
+    return _wrap(text.left_out.format(parts=", ".join(shown)), rest=" " * 4)
 
 
 # ---------------------------------------------------------------------------
@@ -553,12 +560,13 @@ def _left_out(verdict: Verdict) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
-def render_verdict(verdict: Verdict) -> str:
+def render_verdict(verdict: Verdict, messages: Messages = ENGLISH) -> str:
     """
     Turn a verdict into the text of the command.
 
     Args:
         verdict (Verdict): The verdict, complete: the limits are applied here.
+        messages (Messages, optional): The language. Default: English.
 
     Returns:
         str: The title, the reason, the rules table, the notes (when present), the next step (unless
@@ -566,12 +574,12 @@ def render_verdict(verdict: Verdict) -> str:
             one blank line, without a trailing newline.
     """
     sections = [
-        _title(verdict),
-        _why(verdict),
-        _table(verdict),
-        _notes(verdict),
-        _next_step(verdict),
-        _left_out(verdict),
-        _wrap(_CAVEAT),
+        _title(verdict, messages),
+        _why(verdict, messages),
+        _table(verdict, messages),
+        _notes(verdict, messages),
+        _next_step(verdict, messages),
+        _left_out(verdict, messages),
+        _wrap(messages.verdict.caveat),
     ]
     return "\n\n".join("\n".join(lines) for lines in sections if lines)
