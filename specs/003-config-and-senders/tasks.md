@@ -81,7 +81,7 @@ first and alone), the loader, then identification, then the close.
 
 ## Stage 3 — Identifying the sender (RF-06)
 
-- [ ] `tests/test_senders.py`, written first, with `Record` and `DkimResult` built in the test and a
+- [x] `tests/test_senders.py`, written first, with `Record` and `DkimResult` built in the test and a
   `Config` built by a small helper: a passing signature under the domain and under a subdomain is
   `KNOWN` with service and selector; `fail` under the domain is `FAILING_SIGNATURE`; the right
   selector under `example.org` is `FOREIGN_DOMAIN`, with the selector filled in and the service
@@ -90,12 +90,13 @@ first and alone), the loader, then identification, then the close.
   first; foreign plus failing gives foreign; foreign plus known gives known; failing plus known gives
   known; selector compared case-insensitively; result `PASS` counts; a foreign signature that also
   failed is foreign; `Identification` is frozen. — RF-06, RF-08, RNF-04
-- [ ] `src/mailvigil/senders.py`: `Outcome`, `Identification`, `identify_sender` as in the design (one
+- [x] `src/mailvigil/senders.py`: `Outcome`, `Identification`, `identify_sender` as in the design (one
   pass, first of each kind remembered, precedence known > foreign > failing > unknown). Does not
   read `dkim_evaluated`, `header_from` or the IP. — RF-06, ADR-2, ADR-3, ADR-6
-- [ ] A test that `identify_sender` ignores the record's `dkim_evaluated`, `header_from` and
+- [x] A test that `identify_sender` ignores the record's `dkim_evaluated`, `header_from` and
   `source_ip`: the same DKIM blocks with those fields changed give equal results. — ADR-3
-- [ ] Quality gate. — result recorded when run
+- [x] Quality gate. — result recorded when run: all green on 2026-10-27; 329 passed (289 before,
+  40 new), coverage 100% (Python 3.12)
 
 ## Stage 4 — Close the spec
 
