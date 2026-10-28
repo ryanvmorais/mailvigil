@@ -1028,6 +1028,29 @@ def test_the_next_sentence_is_empty_when_ready_and_one_sentence_otherwise() -> N
         assert "\n" not in sentence
 
 
+@pytest.mark.parametrize(
+    ("messages", "above", "below"),
+    [(ENGLISH, "above", "below"), (PORTUGUESE, "acima", "abaixo")],
+    ids=["en", "pt-BR"],
+)
+def test_the_next_sentence_points_below_on_the_page_and_above_in_the_text(
+    messages: Messages, above: str, below: str
+) -> None:
+    """The text prints the sources before the next step and the page prints them after it."""
+    pointing = (
+        make_verdict(ok=29840, sources=(other(160),)),
+        make_verdict(sources=(known(30), known(20, service="Example Campaigns", ip="192.0.2.11"))),
+    )
+    for verdict in pointing:
+        assert above in next_sentence(verdict, messages)
+        assert below not in next_sentence(verdict, messages)
+        assert below in next_sentence(verdict, messages, on_page=True)
+        assert above not in next_sentence(verdict, messages, on_page=True)
+    # The other sentences do not say where the sources are, so the page repeats the text.
+    for verdict in (make_verdict(days=0), make_verdict(sources=(known(30),)), make_verdict()):
+        assert next_sentence(verdict, messages, on_page=True) == next_sentence(verdict, messages)
+
+
 def test_measured_needed_and_missing_text_for_each_rule() -> None:
     """The figures of the rules table, one rule at a time, are public."""
     verdict = make_verdict(days=10, with_reports=8, ok=50, sources=(other(1),))

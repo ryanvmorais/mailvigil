@@ -295,6 +295,11 @@ _HTML = HtmlMessages(
     numbers_region="Mensagens por dia",
     senders_region="Tabela de remetentes",
     failing_heading="Fontes que falham",
+    next_each_service="cada servico listado abaixo",
+    next_unrecognized=(
+        "olhe as origens abaixo e acrescente os seletores das que forem suas a [senders] na "
+        "configuracao."
+    ),
     col_day="Dia",
     range_label="{first} a {last}",
     footer=(
