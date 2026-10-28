@@ -269,9 +269,10 @@ def test_a_different_domain_in_the_flag_is_refused_naming_both(
     captured = capsys.readouterr()
     assert code == 1
     assert captured.out == ""
-    assert "example.org" in captured.err
-    assert "example.com" in captured.err
-    assert len(captured.err.strip().splitlines()) == 1
+    # why: the whole line, not a substring test, so it names both domains and is exactly one line
+    assert captured.err == (
+        f"mailvigil: --domain example.org does not match the domain example.com of {config}\n"
+    )
 
 
 @pytest.mark.parametrize(
