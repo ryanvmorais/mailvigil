@@ -56,7 +56,7 @@ merged or split, when its spec is opened.
 | Spec | Scope | Delivery | Status |
 |---|---|---|---|
 | [`001-foundation`](001-foundation/) | package skeleton, `mailvigil --version`, the local quality gate, CI, supply-chain hygiene | — | **in progress** |
-| `002-report-ingestion` | read folders and files (`.zip`, `.gz`, `.xml`), domain filter, the hostile-input defenses, the report record model | `v0.1` | planned |
+| [`002-report-ingestion`](002-report-ingestion/) | read folders and files (`.zip`, `.gz`, `.xml`), domain filter, the hostile-input defenses, the report record model | `v0.1` | **in progress** |
 | `003-config-and-senders` | TOML config with the domain and the DKIM selector → service name map | `v0.1` | planned |
 | `004-summary` | per-sender and per-situation summary (ok, fragile, failing), failures highlighted | `v0.1` | planned |
 | `005-reject-verdict` | "ready for `reject`?" with a declared criterion (minimum window, minimum volume, no legitimate failures); the thresholds are decided there | `v0.1` | planned |
