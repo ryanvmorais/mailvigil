@@ -215,8 +215,54 @@ named constants in one module (Resolved decisions 1 and 2).
   a clean table with a short window (`too early`); a recognized failure with a short window
   (`not ready`, not `too early`); zero messages with reports present; unrecognized failures exactly
   at and just over 0.5%; more than 5 unrecognized failing sources; a policy of `reject`, of
-  `quarantine` and of `none`; a changed policy; `pct` below 100; and the same reports in a different
-  order giving an equal verdict.
+  `quarantine` and of `none`; a changed policy; `pct` below 100; the same reports in a different
+  order giving an equal verdict; a share just over each percentage limit (RF-08); and skipped files,
+  duplicates and another domain each alone and together (RF-09).
+
+### RF-08 — A share never reads against its result
+
+Added after testing the command end to end (issue #28). The shares of rules 2 and 5 are printed to
+one decimal, so a failure just over its limit (151 of 30000 is 0.503%) printed as `0.5%` beside
+`<= 0.5%` and `FAIL`.
+
+- **Given** a rule with a percentage threshold (2 or 5) that fails
+  **When** its share, rounded for the text, would equal the threshold
+  **Then** the text prints the share as beyond the limit (`>0.5%` for rule 5, `<80%` for rule 2),
+  in the table and in the reason, so the printed value never reads as a pass.
+- **Given** the same rule when it passes
+  **When** its share is printed
+  **Then** the text is unchanged: a share that equals the threshold after rounding and passes still
+  prints as the rounded value.
+- **Given** the counts beside the share
+  **When** the text is built
+  **Then** they stay (`151 of 30000`), and the decision to print the beyond-the-limit form is
+  taken from the integers the rule compared, not from the rounded text.
+
+### RF-09 — The verdict says what was left out
+
+Added with RF-08. `summary` ends with "Left out of these numbers"; the verdict did not, so a `ready`
+could be printed while reports had been refused (unsafe XML, too large once decompressed, malformed).
+
+- **Given** a `Summary` in which at least one file was skipped, a report was dropped as a duplicate
+  or a report belonged to another domain
+  **When** the verdict is built
+  **Then** `Verdict` carries those counts as data (a frozen dataclass), whatever the answer.
+- **Given** a verdict with something left out
+  **When** it is printed
+  **Then** the text has one line, after the notes and before the closing sentence, with the count of
+  skipped files and, when above zero, of duplicates and of reports of another domain, and it points
+  to `mailvigil summary` for the reasons. It never lists file names: that stays in the summary.
+- **Given** a verdict with nothing left out
+  **When** it is printed
+  **Then** the text is exactly what it was before this requirement: no line, no empty section.
+- **Given** a `ready` verdict with skipped files
+  **When** it is printed
+  **Then** the answer stays `ready` (a refused file is not a failing message), and the line is the
+  only difference; the closing sentence still reads the same.
+- **Given** the line
+  **When** it is built
+  **Then** it is at most 80 columns, ASCII, and its numbers come from the `Summary`, not from
+  counting text (RNF-05 applied here).
 
 ## Non-functional requirements
 

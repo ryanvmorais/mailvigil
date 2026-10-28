@@ -126,7 +126,46 @@ module (RNF-03).
   evaluation (a failing signature is `FAILING_SIGNATURE`, not recognized), so the test builder
   signs correctly and fails SPF and the evaluation
 
-## Stage 5 — Close the spec
+## Stage 5 — The two output gaps found by hand (RF-08, RF-09; issue #28)
+
+Found by running the command on synthetic reports outside the repository. Tests first, as in the
+other stages; the rules, the thresholds and the exit codes do not change.
+
+- [x] `tests/test_render.py`: `share_tenths` returns the tenths of a percent, round half up, for no
+  part, no whole, a part equal to the whole and a small part; `format_share` prints exactly what it
+  printed before for the same inputs (the existing assertions pass untouched). — ADR-8
+- [x] `tests/test_render_verdict.py`, written first, from built `Verdict` values. RF-08: rule 5 at
+  151 and 160 of 30000 (both round to 0.5%) print `>0.5%` in the table and in the reason, 150 of
+  30000 (passes) prints `0.5%`, and 170 of 30000 (rounds to 0.6%) prints `0.6%`; a rule 2 failure
+  that rounds to 80.0% prints `<80%`; the counts stay beside the share; a hand-built `Rule` with
+  `passed=False` and a share clearly over its limit prints as before. — RF-08, ADR-8
+- [x] Same file, RF-09: no line when `left_out` is empty and the output is identical to the stage 3
+  expectations; the line with each count alone and together, omitting the parts at zero, with
+  singular and plural; no file name; at most 80 columns also with `10**12` counts; the line sits
+  between the next step and the caveat, and also appears for `READY`. — RF-09, ADR-9
+- [x] `tests/test_verdict.py`: `judge` copies `skipped`, `duplicates` and `other_domain` from the
+  `Summary` into `Verdict.left_out`, whatever the answer; the answer and the rules are equal with and
+  without them; `LeftOut` is frozen and `Verdict.left_out` defaults to all zero. — RF-09, ADR-9
+- [x] `tests/test_cli_verdict.py`: with one good report plus a malformed file, a duplicate and a
+  report of another domain, `verdict` prints the line with `1 file skipped, 1 duplicate, 1 report of
+  another domain` (the exact words are fixed in the test), the answer and the code are those of the
+  good reports alone; without them the output has no such line. — RF-09
+- [x] `src/mailvigil/render.py`: `share_tenths`, and `format_share` calls it; no change of output.
+  — ADR-8
+- [x] `src/mailvigil/verdict.py`: `LeftOut`, `Verdict.left_out` with a default, filled by `judge`.
+  — RF-09, ADR-9
+- [x] `src/mailvigil/render_verdict.py`: the beyond-the-limit form for a failed share equal to its
+  limit, in `_measured` and in the reason of rule 5, decided by `Rule.passed` and `share_tenths`;
+  the left-out sentence. — RF-08, RF-09
+- [x] Quality gate (`uv run ruff check .`, `uv run black --check .`, `uv run mypy`,
+  `uv run pytest --cov`); then run `mailvigil verdict` by hand on synthetic reports outside the
+  repository for the 151-of-30000 case and for a skipped file, and delete them. — result recorded
+  when run: all green on 2026-10-28; 46 new tests (704 in all), coverage 100% (Python 3.12). By hand,
+  on synthetic reports outside the repository (deleted afterwards): 151 failing of 30001 messages
+  prints `151 (>0.5%)` beside `<= 0.5%  FAIL`, and a malformed file adds the line `Left out of this
+  verdict: 1 file skipped.` with the answer and the code unchanged
+
+## Stage 6 — Close the spec
 
 - [ ] Validate the layout and the thresholds by hand on the maintainer's own reports (they never
   enter the repository). Record only what was learned and changed, in a sentence, without domains,

@@ -156,6 +156,25 @@ class Note:
 
 
 @dataclass(frozen=True, slots=True)
+class LeftOut:
+    """
+    What the summary did not count, so the reader knows the answer is about fewer reports (RF-09).
+
+    These are the figures ``summarize`` already holds, copied; they take no part in the rules or
+    the answer, because a refused file is not a failing message (ADR-9).
+
+    Attributes:
+        skipped (int): Files that were refused (unsafe, too large, malformed, unreadable...).
+        duplicates (int): Reports dropped as already seen.
+        other_domain (int): Reports that belong to another domain.
+    """
+
+    skipped: int = 0
+    duplicates: int = 0
+    other_domain: int = 0
+
+
+@dataclass(frozen=True, slots=True)
 class Verdict:
     """
     The answer to "is this domain ready for ``p=reject``", with the criterion behind it.
@@ -172,6 +191,7 @@ class Verdict:
         unrecognized_failing (tuple[FailingSource, ...]): Every other failing source, the worst
             first.
         notes (tuple[Note, ...]): The notes that apply, in the order of ``NoteKind``.
+        left_out (LeftOut): What the summary did not count. Default: nothing.
     """
 
     domain: str
@@ -182,6 +202,7 @@ class Verdict:
     recognized_failing: tuple[FailingSource, ...]
     unrecognized_failing: tuple[FailingSource, ...]
     notes: tuple[Note, ...]
+    left_out: LeftOut = LeftOut()
 
 
 # ---------------------------------------------------------------------------
@@ -309,7 +330,7 @@ def judge(summary: Summary) -> Verdict:
 
     Returns:
         Verdict: The five rules, the answer, the failing sources split by whether the sender is
-            recognized, and the notes.
+            recognized, the notes, and what was left out of the numbers.
     """
     period = summary.period
     days = period.days_spanned if period else 0
@@ -343,4 +364,9 @@ def judge(summary: Summary) -> Verdict:
         recognized_failing=recognized_failing,
         unrecognized_failing=unrecognized_failing,
         notes=_notes(summary, enforcing),
+        left_out=LeftOut(
+            skipped=len(summary.skipped),
+            duplicates=summary.duplicates,
+            other_domain=summary.other_domain,
+        ),
     )

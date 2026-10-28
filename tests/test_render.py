@@ -23,6 +23,7 @@ from mailvigil.render import (
     format_share,
     no_reports_message,
     render_summary,
+    share_tenths,
 )
 from mailvigil.reports import IngestionResult, PolicyPublished, Reason, SkippedFile
 from mailvigil.senders import Outcome
@@ -199,6 +200,30 @@ def skipped(name: str, reason: Reason = Reason.NOT_A_REPORT) -> SkippedFile:
 )
 def test_format_share(part: int, whole: int, expected: str) -> None:
     assert format_share(part, whole) == expected
+
+
+@pytest.mark.parametrize(
+    ("part", "whole", "expected"),
+    [
+        (0, 10, 0),
+        (5, 0, 0),
+        (-1, 10, 0),
+        (4, 10000, 0),
+        (5, 10000, 1),
+        (1, 2, 500),
+        (150, 30000, 5),
+        (151, 30000, 5),
+        (160, 30000, 5),
+        (170, 30000, 6),
+        (2399, 3000, 800),
+        (10000, 10000, 1000),
+    ],
+)
+def test_share_tenths_is_the_tenths_of_a_percent_rounded_half_up(
+    part: int, whole: int, expected: int
+) -> None:
+    """The integer under ``format_share``, public so the verdict can compare it to a limit."""
+    assert share_tenths(part, whole) == expected
 
 
 def test_a_share_does_not_depend_on_a_float() -> None:
