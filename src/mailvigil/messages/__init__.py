@@ -1,8 +1,8 @@
 """
 The catalog of everything MailVigil says, one ``Messages`` per language (spec 006).
 
-The renderers take a ``Messages`` and read every sentence from it; English is the default. Nothing
-here imports a renderer.
+The renderers take a ``Messages`` and read every sentence from it; English is the default and
+Brazilian Portuguese is the other language. Nothing here imports a renderer.
 """
 
 from __future__ import annotations
@@ -19,10 +19,12 @@ from mailvigil.messages.model import (
     SummaryMessages,
     VerdictMessages,
 )
+from mailvigil.messages.pt_br import PORTUGUESE
 
 __all__ = [
     "ENGLISH",
     "LANGUAGES",
+    "PORTUGUESE",
     "CommonMessages",
     "Messages",
     "Plural",
@@ -33,7 +35,7 @@ __all__ = [
 ]
 
 # The accepted codes, in lower case: the lookup folds the case of what the user typed.
-LANGUAGES: Mapping[str, Messages] = MappingProxyType({"en": ENGLISH})
+LANGUAGES: Mapping[str, Messages] = MappingProxyType({"en": ENGLISH, "pt-br": PORTUGUESE})
 
 
 def language_by_code(code: str) -> Messages:

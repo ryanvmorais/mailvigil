@@ -2,12 +2,13 @@
 Command-line entry point of MailVigil.
 
 The ``summary`` command wires three calls: ``ingest`` reads the reports, ``summarize`` adds them up
-and ``render_summary`` writes the text, or ``summary_document`` and ``dumps`` write the JSON with
-``--json``. The ``verdict`` command shares everything up to the ``Summary`` and then calls ``judge``
-and ``render_verdict`` (or ``verdict_document``). This module counts nothing, judges nothing and
-lays nothing out; it decides where the domain and the configuration come from (RF-08) and turns
-every refusal, and every answer, into an exit code. The exit codes are a contract (spec 006 RF-04):
-the code is decided before the format, so ``--json`` cannot change it.
+and ``render_summary`` writes the text, in the language of ``--lang``, or ``summary_document`` and
+``dumps`` write the JSON with ``--json``, which has no language. The ``verdict`` command shares
+everything up to the ``Summary`` and then calls ``judge`` and ``render_verdict`` (or
+``verdict_document``). This module counts nothing, judges nothing and lays nothing out; it
+decides where the domain and the configuration come from (RF-08) and turns every refusal, and
+every answer, into an exit code. The exit codes are a contract (spec 006 RF-04): the code is
+decided before the format and the language, so neither ``--json`` nor ``--lang`` can change it.
 """
 
 from __future__ import annotations
@@ -21,7 +22,7 @@ from typing import TextIO
 
 from mailvigil import __version__
 from mailvigil.config import Config, ConfigError, check_domain, load_config
-from mailvigil.messages import ENGLISH, Messages
+from mailvigil.messages import ENGLISH, Messages, language_by_code
 from mailvigil.render import no_reports_message, render_summary
 from mailvigil.render_json import dumps, summary_document, verdict_document
 from mailvigil.render_verdict import render_verdict
@@ -50,6 +51,9 @@ _VERDICT_EXIT = {
     Answer.TOO_EARLY: EXIT_TOO_EARLY,
     Answer.NOT_READY: EXIT_NOT_READY,
 }
+
+# The codes ``--lang`` accepts, as the help writes them; the lookup folds the case (RF-06).
+_LANGUAGE_CODES = ("en", "pt-BR")
 
 # Longest path or domain echoed in a refusal line; it comes from the command line, not a report.
 _MAX_ECHO = 200
@@ -204,6 +208,29 @@ def _write(stream: TextIO, text: str) -> None:
 # ---------------------------------------------------------------------------
 
 
+def _language(code: str) -> Messages:
+    """
+    Turn the ``--lang`` value into the catalog of that language.
+
+    Args:
+        code (str): The code as the user typed it, in any case.
+
+    Returns:
+        Messages: The catalog.
+
+    Raises:
+        argparse.ArgumentTypeError: For a code that is not one of ``_LANGUAGE_CODES``, so argparse
+            ends the run with its usage error and code ``EXIT_USAGE``.
+    """
+    try:
+        return language_by_code(code)
+    except ValueError:
+        choices = ", ".join(_LANGUAGE_CODES)
+        raise argparse.ArgumentTypeError(
+            f"invalid language {_echo(code)!r} (choose from {choices})"
+        ) from None
+
+
 def build_parser() -> argparse.ArgumentParser:
     """
     Build the argument parser of the ``mailvigil`` command.
@@ -243,6 +270,13 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="print one JSON document instead of the text (see docs/json-schema.md)",
     )
+    shared.add_argument(
+        "--lang",
+        type=_language,
+        default=ENGLISH,
+        metavar="{" + ",".join(_LANGUAGE_CODES) + "}",
+        help="language of the text and of the refusal lines (default: en); the JSON has none",
+    )
 
     commands = parser.add_subparsers(dest="command", metavar="COMMAND")
     commands.add_parser(
@@ -269,8 +303,8 @@ def _load(
     Resolve the configuration and read the reports, the part both commands share.
 
     Args:
-        args (argparse.Namespace): The parsed arguments: ``paths``, ``config``, ``domain`` and
-            ``json``.
+        args (argparse.Namespace): The parsed arguments: ``paths``, ``config``, ``domain``,
+            ``json`` and ``lang``.
         messages (Messages, optional): The language of the refusal lines. Default: English.
 
     Returns:
@@ -296,13 +330,13 @@ def _run_summary(args: argparse.Namespace) -> int:
     Run the ``summary`` command: resolve, ingest, summarize, print.
 
     Args:
-        args (argparse.Namespace): The parsed arguments: ``paths``, ``config``, ``domain`` and
-            ``json``.
+        args (argparse.Namespace): The parsed arguments: ``paths``, ``config``, ``domain``,
+            ``json`` and ``lang``.
 
     Returns:
         int: ``EXIT_OK`` when the summary was printed, ``EXIT_REFUSED`` when it could not be made.
     """
-    loaded = _load(args)
+    loaded = _load(args, args.lang)
     if loaded is None:
         return EXIT_REFUSED
     config, source, result = loaded
@@ -311,7 +345,7 @@ def _run_summary(args: argparse.Namespace) -> int:
     if args.json:
         _write(sys.stdout, dumps(summary_document(summary, source)))
     else:
-        _write(sys.stdout, render_summary(summary, source))
+        _write(sys.stdout, render_summary(summary, source, args.lang))
     return EXIT_OK
 
 
@@ -320,14 +354,14 @@ def _run_verdict(args: argparse.Namespace) -> int:
     Run the ``verdict`` command: resolve, ingest, summarize, judge, print.
 
     Args:
-        args (argparse.Namespace): The parsed arguments: ``paths``, ``config``, ``domain`` and
-            ``json``.
+        args (argparse.Namespace): The parsed arguments: ``paths``, ``config``, ``domain``,
+            ``json`` and ``lang``.
 
     Returns:
         int: ``EXIT_OK`` for ready, ``EXIT_TOO_EARLY`` for too early, ``EXIT_NOT_READY`` for not
             ready and ``EXIT_REFUSED`` when no verdict could be made.
     """
-    loaded = _load(args)
+    loaded = _load(args, args.lang)
     if loaded is None:
         return EXIT_REFUSED
     config, _source, result = loaded
@@ -336,7 +370,7 @@ def _run_verdict(args: argparse.Namespace) -> int:
     if args.json:
         _write(sys.stdout, dumps(verdict_document(verdict)))
     else:
-        _write(sys.stdout, render_verdict(verdict))
+        _write(sys.stdout, render_verdict(verdict, args.lang))
     return _VERDICT_EXIT[verdict.answer]
 
 

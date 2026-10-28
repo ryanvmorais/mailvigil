@@ -239,8 +239,8 @@ def _header(summary: Summary, config_source: str | None, messages: Messages) -> 
         room = _WIDTH - len(indent) - len(suffix)
         lines.append(_field(text.key_config, fit(config_source, room) + suffix, key_width))
     if summary.selectors_configured == 0:
-        lines.append(indent + text.no_selectors)
-        lines.append(indent + text.no_selectors_hint)
+        lines.append(indent + fit(text.no_selectors, _WIDTH - len(indent)))
+        lines.append(indent + fit(text.no_selectors_hint, _WIDTH - len(indent)))
 
     period = summary.period
     if period is None:
@@ -383,7 +383,7 @@ def _senders(summary: Summary, messages: Messages) -> list[str]:
 
     # The label takes what the numbers leave: two columns for the marker, two spaces per number.
     left = _WIDTH - 2 - sum(2 + width for width in widths)
-    labels = [_label(row, _WIDTH) for row in shown]
+    labels = [_label(row, _WIDTH, messages) for row in shown]
     longest = max([len(text.col_sender), *(len(label) for label in labels)])
     label_width = max(_LABEL_MIN, min(_LABEL_MAX, left, longest))
 

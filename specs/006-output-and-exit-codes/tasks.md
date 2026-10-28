@@ -119,31 +119,35 @@ Behavior-neutral: the output is byte-equal to today's. No Portuguese is written 
 
 ## Stage 3 — Portuguese and `--lang` (RF-06, RF-07, ADR-5, ADR-6)
 
-- [ ] `tests/test_messages.py`, written first, for `PORTUGUESE`: it has the same fields and the same
+- [x] `tests/test_messages.py`, written first, for `PORTUGUESE`: it has the same fields and the same
   placeholders per field as `ENGLISH`; every template and every mapping value encodes to ASCII;
   every enum-keyed mapping covers its enum; no template equals its English twin except the ones
   that are the same in both (`p=reject`, `DKIM`, `SPF`), listed in the test. — RF-06
-- [ ] `src/mailvigil/messages/pt_br.py`: `PORTUGUESE`, ASCII only. Plain, short sentences; the same
+- [x] `src/mailvigil/messages/pt_br.py`: `PORTUGUESE`, ASCII only. Plain, short sentences; the same
   structure as the English ones; the words "seguro" and "ataque" are not used (the verdict reads
   reports, it does not certify a domain). Phrases that agree with the count are `Plural` of the
   whole phrase. — RF-06, Resolved decision 4
-- [ ] `tests/test_render_pt.py`, written first, through the renderers with `PORTUGUESE`: the title,
+- [x] `tests/test_render_pt.py`, written first, through the renderers with `PORTUGUESE`: the title,
   the answer word and the section order for each of the three answers and for the enforcing forms;
   the same numbers as the English text on the same input; every line within 80 columns and ASCII on
   the stress inputs the English tests use (long domain, long service name, many sources, extreme
   counts, skipped files of every reason); the closing sentence, the left-out line and the
   no-reports message. — RF-06, RF-07
-- [ ] `tests/test_cli_lang.py`, written first: `--lang pt-BR` and `--lang pt-br` print the
+- [x] `tests/test_cli_lang.py`, written first: `--lang pt-BR` and `--lang pt-br` print the
   Portuguese text for `summary` and `verdict`; `--lang en` equals no `--lang`; `--lang fr` is a
   usage error (`2`); `--lang pt-BR --json` prints the same document as `--json`; every combination
   of `--json` and `--lang` returns the same exit code for the same input; a refusal under
   `--lang pt-BR` is a Portuguese line on standard error with standard output empty, and a
   configuration refusal is the phrase for its reason plus `[key]`, with the detail kept for
   `MALFORMED_TOML` and `UNKNOWN_KEY` only. — RF-04, RF-05, RF-06, ADR-5, ADR-6
-- [ ] `src/mailvigil/cli.py`: `--lang` in the shared parent parser, case-insensitive, with the two
+- [x] `src/mailvigil/cli.py`: `--lang` in the shared parent parser, case-insensitive, with the two
   codes as the only values; the chosen `Messages` goes to the renderers and to the refusal lines.
   `--help` stays in English (Risk 4). — RF-06
-- [ ] Quality gate. — result recorded when run: ___
+  — `--lang` is parsed by a `type=` function that returns the `Messages`, so a bad code is argparse's
+  own usage error (`2`) and `args.lang` is the catalog; `render.py` also cuts the two no-selectors
+  lines to the screen and sizes the sender labels with the chosen language.
+- [x] Quality gate. — ruff, black and mypy clean; `pytest --cov` 1074 passed, 100% coverage (2026-10-28); no test file of specs 002 to 005 was edited (`tests/test_messages.py`, from stage 2, gained the
+  Portuguese checks).
 
 ## Stage 4 — Validation and close (RF-07, RNF-06)
 
