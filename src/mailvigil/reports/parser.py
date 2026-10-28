@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import ipaddress
 import re
-import unicodedata
 from datetime import UTC, datetime
 from xml.etree.ElementTree import Element
 
@@ -31,6 +30,7 @@ from mailvigil.reports.model import (
     SpfResult,
 )
 from mailvigil.reports.xmlsafe import parse_xml
+from mailvigil.text import clean_text
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -38,14 +38,6 @@ from mailvigil.reports.xmlsafe import parse_xml
 
 # The longest text a field may hold once cleaned (RF-05). One constant, so raising it is one edit.
 MAX_TEXT = 255
-
-# Whitespace that XML allows inside text and that would break a line or move a column on a terminal.
-# They become a space, so two words a provider separated with a line break stay two words.
-_SPACING = str.maketrans({"\t": " ", "\r": " ", "\n": " "})
-
-# Unicode categories dropped from every text: control (C0 and C1), format (zero-width and the
-# bidirectional overrides and isolates), and the line and paragraph separators (ADR-6).
-_DROPPED_CATEGORIES = frozenset({"Cc", "Cf", "Zl", "Zp"})
 
 # A whole number written with ASCII digits only. ``int`` alone also takes ``1_000``, ``-5``, ``+5``
 # and digits of other scripts, none of which a report has any reason to hold.
@@ -60,8 +52,8 @@ def _clean(value: str) -> str:
     """
     Make a text from a report safe to print: inert and short.
 
-    Tab, carriage return and line feed become a space; every character in the categories ``Cc``,
-    ``Cf``, ``Zl`` and ``Zp`` is dropped; the result is stripped and cut to ``MAX_TEXT``.
+    The rules live in ``mailvigil.text.clean_text``, shared with the configuration layer (ADR-4 of
+    003): the report text is cut to ``MAX_TEXT``.
 
     Args:
         value (str): The text as the XML parser produced it.
@@ -69,9 +61,7 @@ def _clean(value: str) -> str:
     Returns:
         str: The cleaned text, possibly empty.
     """
-    spaced = value.translate(_SPACING)
-    kept = "".join(char for char in spaced if unicodedata.category(char) not in _DROPPED_CATEGORIES)
-    return kept.strip()[:MAX_TEXT]
+    return clean_text(value, MAX_TEXT)
 
 
 def _raw_text(node: Element, path: str) -> str | None:
