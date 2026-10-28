@@ -1,6 +1,6 @@
 ---
 feature: HTML report — one static file with the summary and the verdict
-status: approved
+status: done
 date: 2026-10-28
 related:
   - 004-summary/requirements.md

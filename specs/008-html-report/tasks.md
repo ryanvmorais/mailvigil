@@ -1,6 +1,6 @@
 ---
 feature: HTML report — one static file with the summary and the verdict
-status: in progress
+status: done
 date: 2026-10-28
 related:
   - 008-html-report/requirements.md
@@ -210,7 +210,11 @@ maintainer, not decided here.
   rows of the numbers table inside the open `details`, which it cannot judge because the scroll box
   clips them (the colours are the pairs the palette test measures). Single-word last lines on a few
   paragraphs at 390 px are cosmetic and left.
-- [ ] Look at the print preview by eye (the print block of the stylesheet is tested, not seen). — RF-07
+- [x] Look at the print preview by eye (the print block of the stylesheet is tested, not seen). — RF-07
+  **Result:** Chrome printed the `not ready` page to a 2-page A4 PDF and poppler (`pdftoppm`, 70 dpi)
+  rendered it to images: the stylesheet's print rules hold, the light palette is used, and no card
+  is cut between the two pages (the page break falls between the stacked bar and the timeline).
+  The page tint prints behind the cards (Chrome's `--print-to-pdf` keeps backgrounds); not changed.
 
 - [x] Quality gate of the stage (same four commands). **Result:** ruff, black, mypy strict clean;
   2231 tests pass, coverage 100%. Decisions the stage took: `answer_phrase` and `left_out_parts`
@@ -222,19 +226,35 @@ maintainer, not decided here.
 
 ## Stage 6 — Close (RF-01 to RF-09, all RNF)
 
-- [ ] End-to-end with the real command: a folder of synthetic reports and an `.eml` through
+- [x] End-to-end with the real command: a folder of synthetic reports and an `.eml` through
   `uv run mailvigil verdict --domain example.com FOLDER --html > report.html` for each of the three
   answers; open each in a browser and read the answer, the rules and the timeline as the person
   deciding would. Check that the text and JSON output of `summary` and `verdict` for the same
   folder is byte-identical to the one of `main` before the spec. Record what was done. — RNF-05
-- [ ] `README.md`: the flag, the redirect, one image of the page if the maintainer approves one (it
+  **Result:** three synthetic folders (30 daily reports, the last one arriving inside an `.eml`):
+  all passing, only 3 days, and a recognized sender failing every day. `verdict --html > file`
+  ended in `0`, `3` and `4`; each file is one document that starts with `<!doctype html>` and ends
+  in a newline (18 to 27 KB). The `not ready` page, seen in Chrome at 1280 px, reads in the order a
+  person decides: the answer and the one next step, five meters with the failing one in red, the
+  four situations, the day-by-day columns, the senders and the failing source with its address.
+  The text and `--json` outputs (and `--lang pt-BR`) of `summary` and `verdict` for the three
+  folders, 36 runs with their exit codes, are byte-identical between the commit before the spec
+  (`d31f51e^`, a worktree) and this branch.
+- [x] `README.md`: the flag, the redirect, one image of the page if the maintainer approves one (it
   is built from synthetic data), the PowerShell 5.1 note; `docs/stack.md`: inline SVG, CSP,
   `NewType` and `html.parser`, each with what to study first; `CLAUDE.md`: the architecture block
   (`htmlkit.py`, `html_style.py`, `html_charts.py`, `render_html.py`, `DayCounts`), the commands and
   the one-line warning that markup is built in `htmlkit.py` only; `specs/README.md`: the roadmap
   row to `done`. `docs/json-schema.md` is checked and unchanged. — RF-08
-- [ ] `status:` of the three files of the spec to `done`, and the maintainer's memory of the
+  **Result:** done. The README image is `docs/images/dmarc-reject-verdict-html-report.png`, a
+  1280 px capture (cropped after the timeline) of a page built from invented reports: three
+  senders, two unrecognized sources, two days with no report; the file name carries the search
+  terms (subject, technology, context) and the README gives it a descriptive `alt`. The link is
+  absolute (`raw.githubusercontent.com`, `main`) so it also renders on PyPI; it resolves once this
+  branch is merged.
+- [x] `status:` of the three files of the spec to `done`, and the maintainer's memory of the
   project updated (the 008 closed, the next is 009), in the same session. — RNF-05
 - [ ] `/atualizar-docs`, then `/fechar-sessao` (commit, push, PR; no merge).
-- [ ] Final quality gate: the same four commands, plus `uv build` and the check that the wheel has
-  no `Requires-Dist` (RNF-01). **Result:** _to fill in when the stage runs._
+- [x] Final quality gate: the same four commands, plus `uv build` and the check that the wheel has
+  no `Requires-Dist` (RNF-01). **Result:** ruff, black, mypy strict clean; 2231 tests pass,
+  coverage 100%; `uv build` makes the sdist and the wheel and the wheel has 0 `Requires-Dist`.

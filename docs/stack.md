@@ -9,8 +9,9 @@ project and the reasoning behind each piece. Entries marked **(planned)** are de
 built yet. The project is pre-0.1: the report-ingestion layer (`mailvigil.reports`), the
 configuration loader, the sender identification, the summary, the verdict and their texts are built
 and tested (it reads `.eml` and `.mbox` too, spec 007), and `mailvigil summary` and `mailvigil
-verdict` run them end to end, in English or Portuguese (`--lang`), as text or as one JSON document (`--json`), with exit codes that are a public
-contract (spec 006).
+verdict` run them end to end, in English or Portuguese (`--lang`), as text or as one JSON document
+(`--json`), with exit codes that are a public contract (spec 006); `verdict --html` writes one
+static HTML page (spec 008).
 
 The project is one small program with no runtime dependency:
 
@@ -35,7 +36,9 @@ report files (.zip, .gz, .xml)        mail files (.eml, .mbox)
         │
         ▼
  verdict (five rules) ──► 80-column text (--lang en|pt-BR) or JSON (--json)
-                         + exit code 0, 3 or 4                          ◄── built
+        │                + exit code 0, 3 or 4                          ◄── built
+        ▼
+ one static HTML page (--html): inline SVG, no script, no network       ◄── built
 ```
 
 ---
@@ -146,6 +149,48 @@ it with a stack is safer than recursion, why a body can be larger than its own s
 **Docs:** [email](https://docs.python.org/3/library/email.html),
 [email.policy](https://docs.python.org/3/library/email.policy.html),
 [email.parser](https://docs.python.org/3/library/email.parser.html)
+
+### `html.escape`, inline SVG and a content security policy
+
+The HTML report (`verdict --html`, spec 008) is one string the program builds itself. Every node
+goes through `mailvigil/htmlkit.py`, the only module that writes markup: `text()` escapes a `str`
+with `html.escape(quote=True)` and returns it as a `Safe`, and `el()` accepts only `Safe` children,
+so a report's organization name, domain or selector can reach the page only as the text of a node.
+The charts (meters, the stacked bar, the day-by-day timeline) are inline `<svg>` drawn from the
+numbers, and the page carries a `Content-Security-Policy` meta that allows no script, no network
+and no external file, so a mistake in the escaping still could not run anything.
+
+**Why this:** against Jinja2 or a charting library, the standard library costs nothing to install
+and the page has nothing to load, which is what lets it open from disk and keeps "zero runtime
+dependencies" true. The text is hostile (it comes from other people's mail), so the rule is built
+into the types instead of left to the discipline of each line: `mypy` rejects a plain `str` where
+markup is expected (ADR-1 and ADR-8 of spec 008). Inline SVG keeps the charts inside the same file
+and lets them follow the colors of the page, light and dark.
+
+**Learn:** the difference between escaping text and escaping an attribute value (`quote=True`), why
+`</style>` and `<!--` in the data are an attack even inside text, what a CSP
+`default-src 'none'` forbids and why a `<meta>` can carry it, `viewBox` and `preserveAspectRatio`
+(a drawing that scales without redrawing), and `aria-label` plus `role="img"` so a chart is read
+aloud as its numbers.
+
+**Docs:** [html.escape](https://docs.python.org/3/library/html.html),
+[SVG basics (MDN)](https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial/Getting_Started),
+[Content Security Policy (MDN)](https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP)
+
+### `typing.NewType`
+
+`Safe = NewType("Safe", str)` marks a string that is already escaped markup. At run time it is the
+`str` itself, so it costs nothing; for `mypy` it is a different type, which is the whole point.
+
+**Why this:** a subclass of `str` would be a real object that code could build by mistake and that
+every `+` turns back into a plain `str`; `NewType` makes the one safe constructor (`text()`) the
+only way to a `Safe` that the type checker allows.
+
+**Learn:** `NewType` against a type alias (an alias is the same type, a `NewType` is a new one for
+the checker), and why `Safe("<b>")` is legal Python, so the rule that only `htmlkit.py` calls it is a
+convention, held by review and by the hostile-input tests.
+
+**Docs:** [typing.NewType](https://docs.python.org/3/library/typing.html#newtype)
 
 ### `xml.parsers.expat` and `xml.etree.ElementTree`
 
@@ -358,6 +403,7 @@ hands anything back.
 | `datetime` | the period of the summary: each report is a range of days with an exclusive end (one ending at midnight does not touch the next day), and overlapping ranges are merged so a day is counted once (ADR-3 of spec 004) |
 | `collections.Counter` | counts the skipped files per reason for the "left out" section |
 | integer arithmetic | `format_share` rounds a percentage to one decimal with `//`, never a float, and prints `<0.1%` so a small failing share is not rounded to zero (ADR-5 of spec 004). `share_tenths` is the integer under it: the verdict asks it whether a failed rule rounds to its own limit and then prints `>0.5%` (or `<80%`) instead of a number that reads as a pass beside `FAIL` (ADR-8 of spec 005) |
+| `html.parser` | tests only: `tests/html_helpers.py` parses the page the renderer built and asserts on its structure (one `h1`, no `script`, no event handler, no link other than `#…`), because a test that compares strings would not notice a broken tag |
 | `NO_COLOR` | convention for turning terminal colors off, honored by the output (**planned**) |
 
 ---
@@ -366,6 +412,7 @@ hands anything back.
 
 - **click, typer, rich** — nice CLIs, but each is a dependency; `argparse` and a few ANSI codes do the job.
 - **defusedxml, lxml** — hardened or faster XML parsers; refusing `DOCTYPE`/`ENTITY` inside `expat` makes the standard parser safe enough for this input.
+- **Jinja2, a charting library (matplotlib, Plotly), a JavaScript chart** — each is a dependency, and a script on the page would break "no script, no network"; the charts are inline SVG built from the numbers.
 - **gettext / Babel** — the CLI text exists in two languages (English and Portuguese), a small dictionary is simpler than a translation toolchain.
 - **Elasticsearch, Splunk, Kibana, a web dashboard served by the tool** — permanent non-goals: that is parsedmarc's territory, and a server breaks "offline, nothing to run" (reasons in `specs/README.md`). `--json` feeds them from outside.
 - **Sending e-mail** — a permanent non-goal: SMTP credentials and deliverability for no unmet need, since exit codes and `--json` compose with `cron`.

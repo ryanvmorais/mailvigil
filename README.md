@@ -34,9 +34,9 @@ out DMARC, and it runs entirely on your machine: your reports are never sent to 
 | Summary | Per sender and per situation (ok, fragile, failing), failures highlighted | v0.1 | Built (`mailvigil summary`) |
 | Verdict | "Ready for `reject`?" with a declared criterion: 28 days covered, reports on 80% of the days, 1000 messages, no failure from a recognized sender, at most 0.5% of the messages failing from unrecognized sources | v0.1 | Built (`mailvigil verdict`) |
 | Output and language | `--json` and stable exit codes for scripts and CI; the text in English or Brazilian Portuguese (`--lang pt-BR`) | v0.1 | Built (`--json` and `--lang` on `summary` and `verdict`) |
+| HTML report | One static page with the verdict, each rule against its limit and the messages day by day: no script, no network, opened from disk | v0.1 | Built (`mailvigil verdict --html`) |
 
-Planned: a static HTML report and an opt-in `fetch` over IMAP (see
-[specs/](specs/README.md#roadmap)). Not planned, on purpose: indexing in Elasticsearch, a web
+Planned: an opt-in `fetch` over IMAP (see [specs/](specs/README.md#roadmap)). Not planned, on purpose: indexing in Elasticsearch, a web
 dashboard served by the tool and sending e-mail, each with its reason in
 [Permanent non-goals](specs/README.md#permanent-non-goals).
 
@@ -106,6 +106,9 @@ uv run mailvigil verdict --config mailvigil.toml reports/ --json
 
 # The text in Brazilian Portuguese (English is the default)
 uv run mailvigil verdict --config mailvigil.toml reports/ --lang pt-BR
+
+# One HTML page to open in a browser (redirect it to a file)
+uv run mailvigil verdict --config mailvigil.toml reports/ --html > report.html
 ```
 
 The commands print their text and nothing else; they only read your files and touch no network.
@@ -190,6 +193,33 @@ command names it.
 
 When files were refused, duplicated or from another domain, the verdict adds one line saying so;
 `mailvigil summary` shows why. They never change the answer.
+
+### HTML report
+
+`mailvigil verdict --html` prints one self-contained HTML page instead of the text, for reading the
+answer on a screen or sending it to someone who will not open a terminal. The page opens with the
+answer, then shows each of the five rules as a meter against its limit, the split of the messages
+in four situations, one column per day of the period, the senders and the failing sources. It
+follows `--lang`, switches to dark with the system, and prints on paper.
+
+![MailVigil HTML report of a DMARC verdict: NOT READY for p=reject, five rules as meters against their limits, the message mix and a day-by-day chart](https://raw.githubusercontent.com/ryanvmorais/mailvigil/main/docs/images/dmarc-reject-verdict-html-report.png)
+
+*The page for an invented domain (`example.com`, documentation addresses): unrecognized sources fail 1.1% of the messages, above the 0.5% limit, so the answer is `NOT READY`.*
+
+```bash
+uv run mailvigil verdict --config mailvigil.toml reports/ --html > report.html
+```
+
+- **It is a file, not a server.** The page has no script, loads nothing from the network and
+  declares a content security policy that forbids both; the text from your reports is escaped
+  before it reaches the markup. Open it from disk.
+- **It carries no path and no file name**, only what the reports say, so it can be shared as it is
+  once you are happy to show the domain and the sending addresses in it.
+- **The exit code is the same** as without `--html` (`0`, `3`, `4`), and `--html` cannot be
+  combined with `--json`. `summary` has no `--html`.
+- **Windows PowerShell 5.1** writes a redirect as UTF-16, which browsers do not read as the page
+  intends; use `uv run mailvigil verdict ... --html | Out-File -Encoding ascii report.html` there. The
+  page is ASCII, so any other shell's `>` is fine.
 
 ### Exit codes
 

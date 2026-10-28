@@ -10,7 +10,8 @@ language, who is sending mail as a domain and whether it is safe to move the pol
 dependencies), offline. It is pre-0.1: the CLI answers `mailvigil --version`, `mailvigil summary`
 and `mailvigil verdict` (report ingestion, configuration, sender identification, the summary, the
 verdict on `p=reject` and their texts are built and wired); `--json`, `--lang en|pt-BR` and the stable
-exit codes (a public contract, `docs/json-schema.md`) are built (spec 006 is done). Everything
+exit codes (a public contract, `docs/json-schema.md`) are built (spec 006 is done), and so is the
+static HTML page of `verdict --html` (spec 008 is done). Everything
 is specified in [specs/](specs/) first. The repository has been public since
 2026-10-27 (the maintainer made it public, not Claude); nothing is announced or published to PyPI
 until the first version is ready.
@@ -30,6 +31,7 @@ uv run mailvigil summary --domain example.com path/to/reports   # or --config FI
 uv run mailvigil verdict --domain example.com path/to/reports   # exit 0 ready, 3 too early, 4 not ready
 uv run mailvigil verdict --config FILE path/to/reports --json   # one JSON document, same exit code
 uv run mailvigil summary --config FILE path/to/reports --lang pt-BR   # the text in Portuguese
+uv run mailvigil verdict --config FILE path/to/reports --html > report.html   # one static page (spec 008)
 
 # Run the tests (one file, then one test)
 uv run pytest
@@ -66,7 +68,8 @@ src/mailvigil/
                      # (resolve_config, ingest → summarize → render, exit 0/1/2) and `verdict` (same
                      # load, then judge → render_verdict; exit 0 ready, 3 too early, 4 not ready);
                      # the exit code is decided before the format; a parent parser shares
-                     # paths/--config/--domain/--json/--lang (`--lang` is parsed to a Messages)
+                     # paths/--config/--domain/--json/--lang (`--lang` is parsed to a Messages);
+                     # `--html` exists on `verdict` only and is refused together with `--json`
   py.typed           # marks the package as typed (PEP 561)
   reports/           # report ingestion (spec 002); public API re-exported by __init__.py
     errors.py        #   Reason (StrEnum) and ReportRefused: every refusal is typed
@@ -83,7 +86,8 @@ src/mailvigil/
                      # the CLI's --domain; ConfigError is typed (spec 003)
   senders.py         # identify_sender(record, config) → Identification; a selector counts only under the domain
   summary.py         # summarize(result, config) → frozen Summary: rows per sender, failing sources, period,
-                     # policy, what was left out (spec 004); never imports render
+                     # policy, what was left out (spec 004), the messages per day (`DayCounts`, spec 008,
+                     # internal: not in `--json`); never imports render
   render.py          # render_summary(summary, config_source, messages) → 80-column ASCII text;
                      # no_reports_message; also the public helpers fit, address, format_share,
                      # share_tenths
@@ -95,6 +99,13 @@ src/mailvigil/
                      # notes, what was left out, next step
   render_json.py     # summary_document / verdict_document → dict, dumps → ASCII JSON, no language
                      # (spec 006); the schema is public contract, see docs/json-schema.md
+  htmlkit.py         # the ONLY module that builds markup (spec 008): `text()` escapes a str into a `Safe`
+                     # (a NewType), `el()` takes only `Safe` children and allowlisted tags
+  html_style.py      # the palette (light and dark dicts, contrast measured by a test), the stylesheet
+                     # and the CSP constant: no `url()`, no `@import`, no `<`
+  html_charts.py     # meter, stacked_bar and timeline as inline SVG, integer geometry, figures in words
+  render_html.py     # render_html(summary, verdict, messages) → one self-contained ASCII page: no script,
+                     # no network, no path or file name
   messages/          # every sentence of the tool, one Messages per language (spec 006): model.py
                      # (Plural and the frozen dataclasses), en.py (ENGLISH), pt_br.py (PORTUGUESE,
                      # ASCII only); language_by_code; imports no renderer
@@ -104,8 +115,10 @@ tests/               # pytest, one test file per module (test_reports_*.py incl.
                      # test_render_verdict.py, test_render_json.py, test_render_pt.py,
                      # test_messages.py, test_json_schema_doc.py, test_cli_summary.py,
                      # test_cli_verdict.py, test_cli_json.py, test_cli_lang.py,
-                     # test_cli_exit_codes.py, test_cli_mail.py); fixtures are synthetic, built in
-                     # conftest.py, cli_helpers.py, mail_helpers.py, schema_examples.py or tmp_path
+                     # test_cli_exit_codes.py, test_cli_mail.py, test_htmlkit.py, test_html_style.py,
+                     # test_html_charts.py, test_render_html.py, test_render_html_hostile.py,
+                     # test_cli_html.py); fixtures are synthetic, built in conftest.py,
+                     # cli_helpers.py, mail_helpers.py, schema_examples.py, html_helpers.py or tmp_path
 specs/               # spec-driven development: requirements → design → tasks per feature
 docs/stack.md        # each technology of the stack, why it was chosen, what to study first
 docs/json-schema.md  # every field of the two --json documents and the compatibility promise
@@ -120,6 +133,11 @@ uv.lock              # never edit by hand (generated; a hook blocks it)
 > declares any `Requires-Dist`. Dev tools go in `[dependency-groups] dev`. Parsing uses the
 > standard library only (`argparse`, `tomllib`, `xml.etree`, `xml.parsers.expat`, `zipfile`,
 > `gzip`, `ipaddress`).
+
+> ⚠️ **Markup is built in `htmlkit.py` only.** Text from a report reaches the HTML page only through
+> `text()`, which escapes it into a `Safe`; never write a tag, an attribute or a `Safe(...)` anywhere
+> else, and keep the page free of script, network and `url()` (`test_render_html_hostile.py` feeds
+> the attacks).
 
 > ⚠️ **Reports are hostile input.** The parser refuses any XML containing `DOCTYPE` or `ENTITY`
 > (entity expansion) inside `reports/xmlsafe.py`, and `reports/reader.py` caps the decompressed
@@ -169,10 +187,11 @@ with a human approval gate between phases; use `/spec`. Flow per task: issue →
 `/fechar-sessao`. Claude opens PRs and never merges. At the end of a session that changed
 architecture, commands or the CLI, run `/atualizar-docs` and then `/fechar-sessao`.
 
-**A feature with an interface** (the HTML report, spec 008) needs a mockup the maintainer approved
-before any code: Claude builds it in the Artifact with `/nova-interface` (390 and 1280 px, two or
-three alternatives, one recommended) and writes no interface file until the "ok". This is a global
-rule (`~/.claude/CLAUDE.md`); the 008 choice so far is recorded in `specs/README.md`.
+**A feature with an interface** (the HTML report, spec 008, was the first) needs a mockup the
+maintainer approved before any code: Claude builds it in the Artifact with `/nova-interface` (390
+and 1280 px, two or three alternatives, one recommended) and writes no interface file until the
+"ok". This is a global rule (`~/.claude/CLAUDE.md`); the 008 choice is recorded in
+`specs/README.md`.
 
 ## Dependencies
 
