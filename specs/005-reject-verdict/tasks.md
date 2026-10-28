@@ -36,39 +36,42 @@ module (RNF-03).
 
 ## Stage 2 — The rules and the answer (RF-01 to RF-05, RF-07, RNF-02, RNF-03, RNF-04, RNF-05)
 
-- [ ] `tests/test_verdict.py`, written first, with a `Summary` builder (period, totals, senders,
+- [x] `tests/test_verdict.py`, written first, with a `Summary` builder (period, totals, senders,
   failing sources, policy, `earlier_p`) whose defaults are a clean, long, busy domain. Rules, each
   at the threshold and at the value beside it: 28 and 27 days spanned; 23 and 22 days with a report
   of 28; 1000 and 999 messages; 0 and 1 failing message under a recognized sender; unrecognized
   failures at exactly 0.5% of the total and just over, built with totals large enough for the
   arithmetic to be exact. — RF-02
-- [ ] Same file, the answers: a clean table with a short window is `TOO_EARLY`; a recognized failure
+- [x] Same file, the answers: a clean table with a short window is `TOO_EARLY`; a recognized failure
   with a short window is `NOT_READY` (not `TOO_EARLY`); every rule passing is `READY`; a failed rule
   of each kind together is `NOT_READY`; `deciding` is the first failed rule of the deciding kind and
   `None` for `READY`. — RF-01, ADR-2
-- [ ] Same file, empty input: a `Summary` with no reports is `TOO_EARLY` with rules 1 to 3 failed,
+- [x] Same file, empty input: a `Summary` with no reports is `TOO_EARLY` with rules 1 to 3 failed,
   rule 5 passing and no division by zero; reports present with zero messages is `TOO_EARLY`;
   `missing` is the days or messages short (rounding up for rule 2) and 0 for a problem rule.
   — RF-01, RF-02, ADR-4
-- [ ] Same file, the sources: `recognized_failing` and `unrecognized_failing` split `summary.failing`
+- [x] Same file, the sources: `recognized_failing` and `unrecognized_failing` split `summary.failing`
   by outcome (`KNOWN` against the other three), keep its order, and are filled whatever the answer;
   a `KNOWN` source whose DKIM signature passed but was not aligned counts as recognized failing; the
   two failing counts add up to `totals.failing`. — RF-03, RF-02
-- [ ] Same file, the notes: fragile traffic gives `FRAGILE` with the numbers, `pct` below 100 gives
+- [x] Same file, the notes: fragile traffic gives `FRAGILE` with the numbers, `pct` below 100 gives
   `PARTIAL_POLICY`, a non-empty `earlier_p` gives `POLICY_CHANGED`, an `sp` or `np` different from
   `p` gives `SUBDOMAIN_POLICY` and `quarantine` gives `CURRENTLY_QUARANTINE`; each alone gives only
   its note, in `NoteKind` order when several apply, and none changes the answer. — RF-04
-- [ ] Same file, the policy: `enforcing` is lower case and trimmed (`" REJECT "` becomes `reject`),
+- [x] Same file, the policy: `enforcing` is lower case and trimmed (`" REJECT "` becomes `reject`),
   `?` and `none` give no note and the same answer as the same traffic under `reject`. — RF-05
-- [ ] Same file, the properties: the same `Summary` judged twice, and a `Summary` built from the same
+- [x] Same file, the properties: the same `Summary` judged twice, and a `Summary` built from the same
   reports in two orders (through `summarize`), give equal verdicts; `Verdict`, `Rule` and `Note`
   raise `FrozenInstanceError` on assignment and expose only tuples; `mailvigil.verdict` imports no
   text module (`render*`). — RNF-02, RNF-03, RNF-04
-- [ ] `src/mailvigil/verdict.py`: `Answer`, `RuleKind`, `RuleId`, `Rule`, `NoteKind`, `Note`,
+- [x] `src/mailvigil/verdict.py`: `Answer`, `RuleKind`, `RuleId`, `Rule`, `NoteKind`, `Note`,
   `Verdict`, the four threshold constants with their units documented, and `judge` as in the design
   (integer arithmetic only). Docstrings with `Args:` / `Returns:`, full annotations. — RF-01 to
   RF-05, ADR-1 to ADR-4
-- [ ] Quality gate. — result recorded when run: ___
+- [x] Quality gate. — result recorded when run: all green on 2026-10-28; 59 new tests in
+  `tests/test_verdict.py`, coverage 100% (Python 3.12). `judge` takes the recognized failing messages
+  from the sum of the `KNOWN` entries of `summary.failing`, not from the `senders` rows: the two are
+  equal by construction (004 RF-04) and this one needs no second table in a test `Summary`
 
 ## Stage 3 — The text (RF-03, RF-04, RF-05, RNF-05)
 
