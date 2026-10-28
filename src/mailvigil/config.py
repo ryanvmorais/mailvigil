@@ -214,9 +214,48 @@ def _check_keys(table: dict[str, Any]) -> None:
         raise ConfigError(ConfigReason.UNKNOWN_KEY, key, detail)
 
 
+def check_domain(value: object, key: str = "domain") -> str:
+    """
+    Validate and normalize a domain: the rules of the file, usable on any value (ADR-7).
+
+    The command applies the same rules to ``--domain``, so the flag and the file can never disagree
+    about what a plausible domain is.
+
+    Args:
+        value (object): The domain as the file or the flag gave it.
+        key (str, optional): What to name in a refusal, such as ``--domain``. Default: ``domain``.
+
+    Returns:
+        str: The normalized domain.
+
+    Raises:
+        ConfigError: ``INVALID_DOMAIN`` or ``NON_ASCII_DOMAIN``, naming ``key``.
+    """
+    if not isinstance(value, str):
+        raise ConfigError(ConfigReason.INVALID_DOMAIN, key, "the domain must be a string")
+    # Checked before lower-casing: the Kelvin sign (U+212A) lower-cases to an ASCII ``k``, which
+    # would let a different name through as if it were plain.
+    if not value.strip().isascii():
+        raise ConfigError(
+            ConfigReason.NON_ASCII_DOMAIN, key, "write the domain in its xn-- (punycode) form"
+        )
+
+    domain = normalize_domain(value)
+    labels = domain.split(".")
+    # The label rule excludes spaces, ``:``, ``/``, ``@``, empty labels and control characters in
+    # one test; a scheme or a path fails it because ``:`` and ``/`` are not letters or digits.
+    if (
+        len(domain) > _MAX_DOMAIN
+        or len(labels) < 2
+        or not all(_LABEL.fullmatch(label) for label in labels)
+    ):
+        raise ConfigError(ConfigReason.INVALID_DOMAIN, key, "not a plausible host name")
+    return domain
+
+
 def _read_domain(table: dict[str, Any]) -> str:
     """
-    Validate and normalize the domain (step 6).
+    Validate and normalize the domain of the file (step 6).
 
     Args:
         table (dict[str, Any]): The parsed file.
@@ -229,27 +268,7 @@ def _read_domain(table: dict[str, Any]) -> str:
     """
     if "domain" not in table:
         raise ConfigError(ConfigReason.MISSING_DOMAIN, "domain", "the file has no domain")
-    value = table["domain"]
-    if not isinstance(value, str):
-        raise ConfigError(ConfigReason.INVALID_DOMAIN, "domain", "the domain must be a string")
-    # Checked before lower-casing: the Kelvin sign (U+212A) lower-cases to an ASCII ``k``, which
-    # would let a different name through as if it were plain.
-    if not value.strip().isascii():
-        raise ConfigError(
-            ConfigReason.NON_ASCII_DOMAIN, "domain", "write the domain in its xn-- (punycode) form"
-        )
-
-    domain = normalize_domain(value)
-    labels = domain.split(".")
-    # The label rule excludes spaces, ``:``, ``/``, ``@``, empty labels and control characters in
-    # one test; a scheme or a path fails it because ``:`` and ``/`` are not letters or digits.
-    if (
-        len(domain) > _MAX_DOMAIN
-        or len(labels) < 2
-        or not all(_LABEL.fullmatch(label) for label in labels)
-    ):
-        raise ConfigError(ConfigReason.INVALID_DOMAIN, "domain", "not a plausible host name")
-    return domain
+    return check_domain(table["domain"])
 
 
 def _read_senders(table: dict[str, Any]) -> dict[str, str]:
