@@ -1,7 +1,6 @@
 # Issue form configuration — consumed by GitHub.
-# No blank issues: the two forms cover bugs and features. Vulnerabilities go private. The link
-# works once Private Vulnerability Reporting is on, which happens when the repository goes public
-# (it is unavailable while it is private on the Free plan).
+# No blank issues: the two forms cover bugs and features. Vulnerabilities go private, through the
+# link below (Private Vulnerability Reporting is on).
 blank_issues_enabled: false
 contact_links:
   - name: "Report a vulnerability in MailVigil"
