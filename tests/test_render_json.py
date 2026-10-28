@@ -11,6 +11,7 @@ RNF-06).
 
 from __future__ import annotations
 
+import dataclasses
 import json
 from datetime import UTC, datetime, timedelta
 from itertools import permutations
@@ -31,7 +32,15 @@ from mailvigil.reports import (
     SkippedFile,
 )
 from mailvigil.senders import Outcome
-from mailvigil.summary import Counts, FailingSource, Period, SenderRow, Summary, summarize
+from mailvigil.summary import (
+    Counts,
+    DayCounts,
+    FailingSource,
+    Period,
+    SenderRow,
+    Summary,
+    summarize,
+)
 from mailvigil.verdict import Answer, Note, NoteKind, RuleId, Verdict, judge
 
 # ---------------------------------------------------------------------------
@@ -564,6 +573,19 @@ def test_two_builds_of_the_same_input_are_byte_equal() -> None:
     assert dumps(verdict_document(make_verdict(failing=failing))) == dumps(
         verdict_document(make_verdict(failing=failing))
     )
+
+
+def test_the_days_of_a_summary_do_not_reach_the_documents() -> None:
+    """Spec 008, RF-08: the per-day counts are internal and the schema of 006 does not change."""
+    plain = make_summary()
+    days = (DayCounts(_FIRST_DAY.date(), 1, Counts(ok=7)),)
+    covered = ((_FIRST_DAY.date(), _FIRST_DAY.date()),)
+    dated = dataclasses.replace(plain, days=days, covered=covered)
+
+    assert dumps(summary_document(dated, "mailvigil.toml")) == dumps(
+        summary_document(plain, "mailvigil.toml")
+    )
+    assert dumps(verdict_document(judge(dated))) == dumps(verdict_document(judge(plain)))
 
 
 def _report(report_id: str, day: int, ip: str, selector: str) -> Report:

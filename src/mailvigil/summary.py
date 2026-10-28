@@ -155,6 +155,22 @@ class Period:
 
 
 @dataclass(frozen=True, slots=True)
+class DayCounts:
+    """
+    The messages of the reports that begin on one UTC day (spec 008, ADR-3).
+
+    Attributes:
+        day (date): The UTC day the periods of these reports begin on.
+        reports (int): How many reports begin that day. Default: 0.
+        counts (Counts): Their messages per situation. Default: all zero.
+    """
+
+    day: date
+    reports: int = 0
+    counts: Counts = Counts()
+
+
+@dataclass(frozen=True, slots=True)
 class Summary:
     """
     Everything the reports of one domain say, added up.
@@ -178,6 +194,12 @@ class Summary:
             most frequent first. Default: none.
         duplicates (int): Reports dropped as already seen. Default: 0.
         other_domain (int): Reports dropped for belonging to another domain. Default: 0.
+        days (tuple[DayCounts, ...]): The messages per UTC day a report begins on, sorted by day,
+            only the days on which a report begins; internal, the ``--json`` documents do not carry
+            it. Default: none.
+        covered (tuple[tuple[date, date], ...]): The merged ``[first, last]`` intervals of the days
+            some report touches, the list ``period.days_with_reports`` is counted from. Default:
+            none.
     """
 
     domain: str
@@ -195,6 +217,8 @@ class Summary:
     skipped_by_reason: tuple[tuple[Reason, int], ...] = ()
     duplicates: int = 0
     other_domain: int = 0
+    days: tuple[DayCounts, ...] = ()
+    covered: tuple[tuple[date, date], ...] = ()
 
 
 # ---------------------------------------------------------------------------
@@ -379,42 +403,59 @@ def _days_touched(report: Report) -> tuple[date, date]:
     return first, (report.end - timedelta(microseconds=1)).date()
 
 
-def _period(reports: tuple[Report, ...]) -> Period | None:
+def _covered(reports: tuple[Report, ...]) -> tuple[tuple[date, date], ...]:
     """
-    Build the period the reports cover.
+    Merge the days the reports touch into ``[first, last]`` intervals.
 
-    The days are counted from merged ``[first, last]`` intervals, never from a set of days: a report
-    may legitimately span centuries (RNF-09).
+    The days are kept as intervals, never as a set of days: a report may legitimately span centuries
+    (RNF-09). Rule 2 of the verdict and the timeline of the HTML report both read this list, so they
+    cannot disagree about which days have a report (spec 008, ADR-3).
 
     Args:
         reports (tuple[Report, ...]): The reports kept.
+
+    Returns:
+        tuple[tuple[date, date], ...]: The intervals, ordered, with at least one day between two of
+            them; empty without reports.
+    """
+    if not reports:
+        return ()
+    intervals = sorted(_days_touched(report) for report in reports)
+    merged: list[tuple[date, date]] = []
+    run_first, run_last = intervals[0]
+    for first, last in intervals[1:]:
+        # why: days that follow each other are one interval, so a gap is exactly a hole in the list
+        if (first - run_last).days > 1:
+            merged.append((run_first, run_last))
+            run_first, run_last = first, last
+        else:
+            run_last = max(run_last, last)
+    merged.append((run_first, run_last))
+    return tuple(merged)
+
+
+def _period(reports: tuple[Report, ...], covered: tuple[tuple[date, date], ...]) -> Period | None:
+    """
+    Build the period the reports cover.
+
+    Args:
+        reports (tuple[Report, ...]): The reports kept.
+        covered (tuple[tuple[date, date], ...]): Their merged intervals, from ``_covered``.
 
     Returns:
         Period | None: The period, or ``None`` without reports.
     """
     if not reports:
         return None
-    intervals = sorted(_days_touched(report) for report in reports)
-    first_day = intervals[0][0]
-    last_day = max(last for _first, last in intervals)
-
-    days_with_reports = 0
-    run_first, run_last = intervals[0]
-    for first, last in intervals[1:]:
-        if first > run_last:
-            days_with_reports += (run_last - run_first).days + 1
-            run_first, run_last = first, last
-        else:
-            run_last = max(run_last, last)
-    days_with_reports += (run_last - run_first).days + 1
-
+    first_day = covered[0][0]
+    last_day = covered[-1][1]
     return Period(
         begin=min(report.begin for report in reports),
         end=max(report.end for report in reports),
         first_day=first_day,
         last_day=last_day,
         days_spanned=(last_day - first_day).days + 1,
-        days_with_reports=days_with_reports,
+        days_with_reports=sum((last - first).days + 1 for first, last in covered),
     )
 
 
@@ -467,8 +508,14 @@ def summarize(result: IngestionResult, config: Config) -> Summary:
     sources: dict[tuple[Outcome, str, str, str], _Source] = {}
     totals = _Tally()
     recognized = 0
+    day_reports: Counter[date] = Counter()
+    day_tallies: dict[date, _Tally] = {}
 
     for report in result.reports:
+        # 0. The messages of a report go to the day its period begins (spec 008, ADR-3).
+        begin_day = report.begin.date()
+        day_reports[begin_day] += 1
+        day_tally = day_tallies.setdefault(begin_day, _Tally())
         for record in report.records:
             if record.count <= 0:
                 continue
@@ -485,6 +532,7 @@ def summarize(result: IngestionResult, config: Config) -> Summary:
                 row = rows[key] = _Row(identification.outcome, service, row_ip)
             row.tally.add(dkim_ok, spf_ok, record.count)
             totals.add(dkim_ok, spf_ok, record.count)
+            day_tally.add(dkim_ok, spf_ok, record.count)
             if known:
                 recognized += record.count
             elif identification.selector:
@@ -547,13 +595,14 @@ def summarize(result: IngestionResult, config: Config) -> Summary:
 
     policy, earlier_p = _policy(result.reports)
     reasons = Counter(file.reason for file in result.skipped)
+    covered = _covered(result.reports)
 
     return Summary(
         domain=config.domain,
         selectors_configured=len(config.senders),
         reports=len(result.reports),
         reporters=len({report.reporter for report in result.reports}),
-        period=_period(result.reports),
+        period=_period(result.reports, covered),
         policy=policy,
         earlier_p=earlier_p,
         totals=totals.freeze(),
@@ -566,4 +615,9 @@ def summarize(result: IngestionResult, config: Config) -> Summary:
         ),
         duplicates=result.duplicates,
         other_domain=result.other_domain,
+        days=tuple(
+            DayCounts(day, day_reports[day], day_tallies[day].freeze())
+            for day in sorted(day_tallies)
+        ),
+        covered=covered,
     )
