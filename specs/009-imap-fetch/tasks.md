@@ -93,7 +93,7 @@ signature changed (the parent parser split); if any other one fails, the code is
 
 ## Stage 4 — The adapter to `imaplib` (RF-01 to RF-05, RF-10, RNF-01, RNF-02, ADR-2 to ADR-5)
 
-- [ ] `tests/test_fetch_imap.py`, pure functions, written first: the modified UTF-7 encoder
+- [x] `tests/test_fetch_imap.py`, pure functions, written first: the modified UTF-7 encoder
   against the RFC's examples (`Entwürfe` → `Entw&APw-rfe`, a lone `&` → `&-`, a run of accents,
   an emoji, `/` inside a run) and a folder with a control character refused; the quoted string with
   `\` and `"` escaped; the `SINCE` date in a locale other than English (`locale.setlocale` where
@@ -102,7 +102,7 @@ signature changed (the parent parser split); if any other one fails, the code is
   a decimal point; the size parser on lines with reordered attributes, with only one of the two
   numbers, with garbage and with a number of 10,000 digits; the validity parser. — RF-04, RF-05,
   RF-10, ADR-4
-- [ ] Same file, the connection: the context that reaches `IMAP4_SSL` has `verify_mode ==
+- [x] Same file, the connection: the context that reaches `IMAP4_SSL` has `verify_mode ==
   CERT_REQUIRED`, `check_hostname` and `minimum_version >= TLSv1_2`, and no path builds another one;
   the port only changes where to connect; `ssl.SSLCertVerificationError` is
   `certificate_invalid` and nothing was sent after the handshake; other `ssl.SSLError` is
@@ -110,27 +110,27 @@ signature changed (the parent parser split); if any other one fails, the code is
   `TimeoutError` is `timeout`; a rejected login is `login_failed` with an empty `detail`; a
   password with a line break, empty or non-ASCII is `password_unusable` before the connection
   opens. — RF-01, RF-02, ADR-2, ADR-5
-- [ ] Same file, the bounds, over a `socket.socketpair()` with a scripted peer and the `_Bounds`
+- [x] Same file, the bounds, over a `socket.socketpair()` with a scripted peer and the `_Bounds`
   mixin composed over plain `IMAP4`: a literal announced over the limit is refused before one byte
   of it is read; a literal that never ends and a silent peer end in `timeout`; an endless line and
   a `SEARCH` line over the limit are `protocol_error` and `too_many_matches`; a clock past the
   deadline between chunks ends the transfer; the limit is `LITERAL_OTHER` outside `message()` and
   `limit + 1` inside it; after an `abort` no `LOGOUT` is sent. — RF-05, RF-10, ADR-3
-- [ ] Same file, what goes on the wire, recorded by the scripted peer: only `CAPABILITY`, `LOGIN`,
+- [x] Same file, what goes on the wire, recorded by the scripted peer: only `CAPABILITY`, `LOGIN`,
   `EXAMINE`, `UID SEARCH`, `UID FETCH` and `LOGOUT` ever appear, with `BODY.PEEK[]<0.N>` and never
   `BODY[]`; the folder arrives quoted and encoded; a `NO` on `EXAMINE` is `folder_not_found`; the
   search carries `SUBJECT "Report Domain:"` with and without `SINCE`; sizes are asked in batches of
   `SIZE_BATCH`; `close` sends `LOGOUT` and ignores its failure. — RF-03, RF-04, ADR-3
-- [ ] Same file, secrets: with a canary password, no `detail`, no exception text and no recorded
+- [x] Same file, secrets: with a canary password, no `detail`, no exception text and no recorded
   line sent after the login contains it, including when the server echoes it back in an error; a
   server error line with control characters and a bidirectional override comes out cleaned and at
   most 200 characters. — RNF-02, RF-10
-- [ ] `src/mailvigil/fetch/imap.py`: the pure helpers, `_Bounds`, `ImapMailbox`, `connect`, the
+- [x] `src/mailvigil/fetch/imap.py`: the pure helpers, `_Bounds`, `ImapMailbox`, `connect`, the
   error mapping and the secret scrubbing, as in the design. The only module of the product that
   imports `imaplib` and `ssl`. Docstrings with `Args:` / `Returns:` / `Raises:`. — RF-01 to RF-05,
   RNF-01, RNF-02, ADR-2 to ADR-5
-- [ ] Quality gate of the stage: the same four commands, on Python 3.12 and on the newest release
-  (the mixin depends on two method names of the library; ADR-3). **Result:** _pending_.
+- [x] Quality gate of the stage: the same four commands, on Python 3.12 and on the newest release
+  (the mixin depends on two method names of the library; ADR-3). **Result:** ruff, black and mypy clean on 3.12 and 3.15; 2553 tests passed on both, coverage 100%.
 
 ## Stage 5 — The command (RF-02, RF-08, RF-09, ADR-7)
 

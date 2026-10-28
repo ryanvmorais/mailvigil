@@ -122,7 +122,7 @@ saves is always one `007` would accept.
   `sizes(uids) -> dict[int, int]` (announced sizes) ·
   `message(uid, limit) -> bytes | None` (at most `limit + 1` bytes; `None` when the server gives
   no body) · `close() -> None`.
-- **`connect(host, port, user, password, clock) -> ImapMailbox`**: builds
+- **`connect(host, port, user, password, clock, deadline) -> ImapMailbox`**: builds
   `ssl.create_default_context()` (certificate chain and host name verified, TLS 1.2 or newer) and
   passes it to the connection; the library's own default does **not** verify (ADR-2). Opens with
   `timeout=SOCKET_TIMEOUT`, logs in (ADR-5) and returns the wrapper. `ssl.SSLCertVerificationError`
@@ -134,12 +134,14 @@ saves is always one `007` would accept.
   plain `IMAP4` and a local socket pair) overrides two methods the library documents as replaceable
   (`read`, `readline`):
   - `read(size)`: `size > self.max_literal` raises `imaplib.IMAP4.abort` before one byte is read
-    (a server that announces a huge literal is refused, not obeyed), then reads in 64 KiB chunks
-    with `read1`, checking the deadline between chunks and setting the socket timeout to the time
-    left. `max_literal` is `LITERAL_OTHER` by default and `limit + 1` only while `message()` runs.
+    (a server that announces a huge literal is refused, not obeyed), then reads in 64 KiB slices
+    through the library's own `read`, checking the deadline between slices and setting the socket
+    timeout to the time left. (Not `read1` on `self.file`: Python 3.15 reads from the socket
+    itself and has no `self.file`.) `max_literal` is `LITERAL_OTHER` by default and `limit + 1` only while `message()` runs.
   - `readline()`: sets the socket timeout to `min(SOCKET_TIMEOUT, time left)`, then the library's
     own bounded line read (1,000,000 bytes). An `abort` or an oversized line is `protocol_error`
-    (`too_many_matches` when it happens during the SEARCH).
+    (`too_many_matches` when it happens during the SEARCH). `imaplib` re-wraps every `abort`, so the
+    connection keeps an `overlong` flag the mailbox reads.
   After an `abort` the connection is shut down at the socket and no `LOGOUT` is attempted; in every
   other end `close()` sends `LOGOUT` and ignores its failure (RF-03).
 - **`select(folder)`**: rejects a folder with a control character (< 0x20, 0x7f) before it is sent
