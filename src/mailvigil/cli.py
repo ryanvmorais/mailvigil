@@ -10,21 +10,36 @@ counts nothing, judges nothing and lays nothing out; it
 decides where the domain and the configuration come from (RF-08) and turns every refusal, and
 every answer, into an exit code. The exit codes are a contract (spec 006 RF-04): the code is
 decided before the format and the language, so neither ``--json`` nor ``--lang`` can change it.
+
+The ``fetch`` command (spec 009) is the one that uses the network. It resolves the password (a
+prompt or ``--password-file``, never an argument), opens the mailbox, runs the loop of
+``mailvigil.fetch`` and writes the outcome or the one line of a refusal. The adapter that imports
+``imaplib`` and ``ssl`` is loaded inside ``_run_fetch`` only, so ``summary`` and ``verdict`` never
+load it (RF-09).
 """
 
 from __future__ import annotations
 
 import argparse
+import getpass
+import os
 import sys
+import time
 from collections.abc import Sequence
+from datetime import date
 from pathlib import Path
 from types import MappingProxyType
 from typing import TextIO
 
 from mailvigil import __version__
 from mailvigil.config import Config, ConfigError, check_domain, load_config
+from mailvigil.fetch.errors import FetchReason, FetchRefused
+from mailvigil.fetch.model import DEADLINE_SECONDS, DEFAULT_LIMIT, MAX_LIMIT
+from mailvigil.fetch.run import fetch_reports
+from mailvigil.fetch.store import Store, tag_of
 from mailvigil.messages import ENGLISH, Messages, language_by_code
 from mailvigil.render import no_reports_message, render_summary
+from mailvigil.render_fetch import refusal_line, render_fetch
 from mailvigil.render_html import render_html
 from mailvigil.render_json import dumps, summary_document, verdict_document
 from mailvigil.render_verdict import render_verdict
@@ -59,6 +74,12 @@ _LANGUAGE_CODES = ("en", "pt-BR")
 
 # Longest path or domain echoed in a refusal line; it comes from the command line, not a report.
 _MAX_ECHO = 200
+
+# The most a password file is read for: the first line of a file longer than this is not a password.
+_PASSWORD_FILE_MAX = 4096
+
+# The port of IMAP over implicit TLS (RFC 8314).
+_DEFAULT_PORT = 993
 
 # ---------------------------------------------------------------------------
 # Refusals
@@ -233,17 +254,114 @@ def _language(code: str) -> Messages:
         ) from None
 
 
+def _integer_in(text: str, low: int, high: int) -> int:
+    """
+    Turn an option value into an integer inside a range.
+
+    Args:
+        text (str): The value as the user typed it.
+        low (int): The smallest accepted value.
+        high (int): The largest accepted value.
+
+    Returns:
+        int: The number.
+
+    Raises:
+        argparse.ArgumentTypeError: For text that is not a whole number, or outside the range.
+    """
+    try:
+        number = int(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"invalid number {_echo(text)!r}") from None
+    if not low <= number <= high:
+        raise argparse.ArgumentTypeError(f"{number} is not between {low} and {high}")
+    return number
+
+
+def _port(text: str) -> int:
+    """
+    Turn the ``--port`` value into a port number.
+
+    Args:
+        text (str): The value as the user typed it.
+
+    Returns:
+        int: A port in 1..65535.
+
+    Raises:
+        argparse.ArgumentTypeError: For anything else.
+    """
+    return _integer_in(text, 1, 65535)
+
+
+def _limit(text: str) -> int:
+    """
+    Turn the ``--limit`` value into a count of messages.
+
+    Args:
+        text (str): The value as the user typed it.
+
+    Returns:
+        int: A number in 1..``MAX_LIMIT``.
+
+    Raises:
+        argparse.ArgumentTypeError: For anything else.
+    """
+    return _integer_in(text, 1, MAX_LIMIT)
+
+
+def _day(text: str) -> date:
+    """
+    Turn the ``--since`` value into a day.
+
+    Args:
+        text (str): The value as the user typed it.
+
+    Returns:
+        date: The day.
+
+    Raises:
+        argparse.ArgumentTypeError: For text that is not a ``YYYY-MM-DD`` date.
+    """
+    try:
+        return date.fromisoformat(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"invalid date {_echo(text)!r} (use YYYY-MM-DD)") from None
+
+
+def _folder(text: str) -> str:
+    """
+    Check the ``--folder`` value.
+
+    A control character is refused because a line break would end the command line that is sent to
+    the server and start another one.
+
+    Args:
+        text (str): The value as the user typed it.
+
+    Returns:
+        str: The same text.
+
+    Raises:
+        argparse.ArgumentTypeError: For an empty name or one with a control character.
+    """
+    if not text or any(ord(char) < 0x20 or ord(char) == 0x7F for char in text):
+        raise argparse.ArgumentTypeError("the folder name is empty or has a control character")
+    return text
+
+
 def build_parser() -> argparse.ArgumentParser:
     """
     Build the argument parser of the ``mailvigil`` command.
 
     The subcommand is optional at the parser level, so that ``main`` decides what a missing one
-    means. ``summary`` and ``verdict`` take the same three arguments, defined once in a parent
-    parser.
+    means. ``summary`` and ``verdict`` take what they read and the language from two parent parsers,
+    in that order; ``fetch`` takes the language only, so it shares no option with the reading
+    commands (spec 009, ADR-7).
 
     Returns:
-        argparse.ArgumentParser: The parser, with ``--version`` and the ``summary`` and ``verdict``
-            subcommands.
+        argparse.ArgumentParser: The parser, with ``--version`` and the ``summary``, ``verdict``
+            and ``fetch`` subcommands.
     """
     parser = argparse.ArgumentParser(
         prog="mailvigil",
@@ -251,32 +369,33 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
 
-    shared = argparse.ArgumentParser(add_help=False)
-    shared.add_argument(
+    reading = argparse.ArgumentParser(add_help=False)
+    reading.add_argument(
         "paths",
         nargs="+",
         type=Path,
         metavar="PATH",
         help="report files (.xml .gz .zip), mail files (.eml .mbox) or folders of them",
     )
-    shared.add_argument(
+    reading.add_argument(
         "--config",
         type=Path,
         metavar="FILE",
         help="TOML file with the domain and the selector map "
         f"(default: {DEFAULT_CONFIG} in the current folder, if there is one)",
     )
-    shared.add_argument(
+    reading.add_argument(
         "--domain",
         metavar="DOMAIN",
         help="the domain the reports are about (required when there is no configuration file)",
     )
-    shared.add_argument(
+    reading.add_argument(
         "--json",
         action="store_true",
         help="print one JSON document instead of the text (see docs/json-schema.md)",
     )
-    shared.add_argument(
+    language = argparse.ArgumentParser(add_help=False)
+    language.add_argument(
         "--lang",
         type=_language,
         default=ENGLISH,
@@ -287,13 +406,13 @@ def build_parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(dest="command", metavar="COMMAND")
     commands.add_parser(
         "summary",
-        parents=[shared],
+        parents=[reading, language],
         help="say who sends mail as the domain, from DMARC aggregate reports",
         description="Sum up DMARC aggregate reports per sender and per situation.",
     )
     verdict_parser = commands.add_parser(
         "verdict",
-        parents=[shared],
+        parents=[reading, language],
         help="say if the domain is ready for p=reject, and why",
         description="Say if the domain is ready for p=reject, from DMARC aggregate reports. "
         f"The exit code is {EXIT_OK} for ready, {EXIT_TOO_EARLY} for too early and "
@@ -305,6 +424,64 @@ def build_parser() -> argparse.ArgumentParser:
         help="print one self-contained HTML page instead of the text; redirect it to a file "
         "(mailvigil verdict ... --html > report.html; in Windows PowerShell 5.1 pipe it to "
         "Out-File -Encoding ascii); not with --json",
+    )
+    fetch_parser = commands.add_parser(
+        "fetch",
+        parents=[language],
+        # ``--password`` must not be read as a short form of ``--password-file``.
+        allow_abbrev=False,
+        help="download the report messages of a mailbox over IMAP; "
+        "the one command that uses the network",
+        description="Download the DMARC report messages of a mailbox into a folder, for summary "
+        "and verdict to read. This is the one command that connects to a server: always over TLS, "
+        "and the certificate is always checked. It only reads: it never changes, moves or deletes "
+        "mail and does not mark it as read. The password is asked for on the terminal or read from "
+        "--password-file; it is never an argument or an environment variable, and nothing stores "
+        f"it. Exit code {EXIT_OK} when the run finished, even with nothing new, {EXIT_REFUSED} "
+        "when it was refused.",
+    )
+    fetch_parser.add_argument("--host", required=True, metavar="HOST", help="the IMAP server")
+    fetch_parser.add_argument("--user", required=True, metavar="NAME", help="the login name")
+    fetch_parser.add_argument(
+        "--to",
+        required=True,
+        type=Path,
+        metavar="DIR",
+        help="the folder the messages are saved in (created if missing)",
+    )
+    fetch_parser.add_argument(
+        "--port",
+        type=_port,
+        default=_DEFAULT_PORT,
+        metavar="N",
+        help=f"where to connect (default: {_DEFAULT_PORT}); the connection is always TLS",
+    )
+    fetch_parser.add_argument(
+        "--folder",
+        type=_folder,
+        default="INBOX",
+        metavar="NAME",
+        help="the mailbox folder to read (default: INBOX)",
+    )
+    fetch_parser.add_argument(
+        "--since",
+        type=_day,
+        metavar="YYYY-MM-DD",
+        help="only messages received on or after this day (default: all)",
+    )
+    fetch_parser.add_argument(
+        "--limit",
+        type=_limit,
+        default=DEFAULT_LIMIT,
+        metavar="N",
+        help="the most new messages to download in one run, newest first "
+        f"(default: {DEFAULT_LIMIT}, at most {MAX_LIMIT})",
+    )
+    fetch_parser.add_argument(
+        "--password-file",
+        type=Path,
+        metavar="FILE",
+        help="read the password from the first line of this file instead of asking for it",
     )
     return parser
 
@@ -391,6 +568,116 @@ def _run_verdict(args: argparse.Namespace) -> int:
     return _VERDICT_EXIT[verdict.answer]
 
 
+# ---------------------------------------------------------------------------
+# Fetch (spec 009)
+# ---------------------------------------------------------------------------
+
+
+def _password_from_file(path: Path, messages: Messages) -> str:
+    """
+    Read the password from the first line of a file.
+
+    At most ``_PASSWORD_FILE_MAX`` bytes are read; the line end (LF or CRLF) is not part of the
+    password and later lines are ignored. On POSIX a file that group or others can read adds one
+    warning line on standard error and the run goes on.
+
+    Args:
+        path (Path): The ``--password-file`` value.
+        messages (Messages): The language of the warning.
+
+    Returns:
+        str: The password.
+
+    Raises:
+        FetchRefused: ``password_file`` when the file cannot be read, is empty or has a first line
+            that long; ``password_unusable`` when the line is not UTF-8.
+    """
+    try:
+        mode = path.stat().st_mode
+        with path.open("rb") as stream:
+            data = stream.read(_PASSWORD_FILE_MAX + 1)
+    except OSError:
+        raise FetchRefused(FetchReason.PASSWORD_FILE) from None
+    line = data.split(b"\n", 1)[0].removesuffix(b"\r")
+    if not line or len(line) > _PASSWORD_FILE_MAX:
+        raise FetchRefused(FetchReason.PASSWORD_FILE)
+    try:
+        password = line.decode("utf-8")
+    except UnicodeDecodeError:
+        raise FetchRefused(FetchReason.PASSWORD_UNUSABLE) from None
+    # The mode bits mean nothing on Windows, where access is decided by ACLs.
+    if os.name == "posix" and mode & 0o077:
+        warning = messages.fetch.password_file_exposed.format(path=_echo(path))
+        _write(sys.stderr, f"mailvigil: {warning}")
+    return password
+
+
+def _password(args: argparse.Namespace, parser: argparse.ArgumentParser) -> str:
+    """
+    Decide where the password comes from and read it: the file, else the terminal.
+
+    Never an argument and never an environment variable (spec 009, RF-02).
+
+    Args:
+        args (argparse.Namespace): The parsed arguments: ``password_file`` and ``lang``.
+        parser (argparse.ArgumentParser): Used to end the run with a usage error.
+
+    Returns:
+        str: The password.
+
+    Raises:
+        FetchRefused: When the file or the answer at the prompt cannot be a password.
+    """
+    if args.password_file is not None:
+        return _password_from_file(args.password_file, args.lang)
+    if not sys.stdin.isatty():
+        parser.error("no terminal: give the password in a file with --password-file")
+    password = getpass.getpass()
+    if not password:
+        raise FetchRefused(FetchReason.PASSWORD_UNUSABLE)
+    return password
+
+
+def _run_fetch(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
+    """
+    Run the ``fetch`` command: the password, the connection, the loop, the outcome.
+
+    Args:
+        args (argparse.Namespace): The parsed arguments: ``host``, ``port``, ``user``, ``to``,
+            ``folder``, ``since``, ``limit``, ``password_file`` and ``lang``.
+        parser (argparse.ArgumentParser): Used to end the run with a usage error.
+
+    Returns:
+        int: ``EXIT_OK`` when the run finished, even with nothing new; ``EXIT_REFUSED`` when it
+            was refused, after one line on standard error.
+    """
+    # Imported here and nowhere else: it is the one module that loads ``imaplib`` and ``ssl``, and
+    # ``summary`` and ``verdict`` must never load them (spec 009, ADR-7, RF-09).
+    from mailvigil.fetch import imap
+
+    try:
+        password = _password(args, parser)
+        clock = time.monotonic
+        deadline = clock() + DEADLINE_SECONDS
+        try:
+            # Looked up on the module at call time, so a test can replace it.
+            mailbox = imap.connect(args.host, args.port, args.user, password, clock, deadline)
+        except ValueError as error:
+            parser.error(f"argument --user: {error}")
+        try:
+            store = Store(args.to, tag_of(args.host, args.user, args.folder))
+            outcome = fetch_reports(
+                mailbox, args.folder, args.since, store, args.limit, clock, deadline
+            )
+        finally:
+            mailbox.close()
+    except FetchRefused as refusal:
+        _write(sys.stderr, refusal_line(refusal, args.lang))
+        return EXIT_REFUSED
+    _write(sys.stdout, render_fetch(outcome, str(args.to), args.lang))
+    return EXIT_OK
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """
     Run the ``mailvigil`` command.
@@ -413,5 +700,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _run_summary(args)
     if args.command == "verdict":
         return _run_verdict(args)
+    if args.command == "fetch":
+        return _run_fetch(args, parser)
     parser.print_help(sys.stderr)
     return EXIT_USAGE

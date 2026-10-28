@@ -69,7 +69,9 @@ src/mailvigil/
                      # load, then judge → render_verdict; exit 0 ready, 3 too early, 4 not ready);
                      # the exit code is decided before the format; a parent parser shares
                      # paths/--config/--domain/--json/--lang (`--lang` is parsed to a Messages);
-                     # `--html` exists on `verdict` only and is refused together with `--json`
+                     # `--html` exists on `verdict` only and is refused together with `--json`;
+                     # `fetch` (spec 009) takes only `--lang` from the parents and loads
+                     # `fetch.imap` (imaplib, ssl) inside `_run_fetch`, never at import
   py.typed           # marks the package as typed (PEP 561)
   reports/           # report ingestion (spec 002); public API re-exported by __init__.py
     errors.py        #   Reason (StrEnum) and ReportRefused: every refusal is typed

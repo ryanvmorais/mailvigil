@@ -134,7 +134,7 @@ signature changed (the parent parser split); if any other one fails, the code is
 
 ## Stage 5 — The command (RF-02, RF-08, RF-09, ADR-7)
 
-- [ ] `tests/test_cli_fetch.py`, written first, through `main(argv)` and `capsys` with
+- [x] `tests/test_cli_fetch.py`, written first, through `main(argv)` and `capsys` with
   `mailvigil.fetch.imap.connect` replaced by a function returning a `FakeMailbox`: success with
   new messages (exit `0`, the six numbers, the files in `--to`); nothing new (exit `0`); each
   `FetchReason` as a refusal (exit `1`, one line on standard error, the saved count line when some
@@ -146,20 +146,20 @@ signature changed (the parent parser split); if any other one fails, the code is
   ASCII; the mailbox is closed on success and on every
   refusal; a canary password absent from standard output and error in every case above. — RF-02,
   RF-08
-- [ ] `tests/test_cli.py` (the existing file) first: `summary --help` and `verdict --help` are
+- [x] `tests/test_cli_fetch.py` (there is no `tests/test_cli.py`; the help tests live here) and `tests/help_golden.py` (the recorded text), first: `summary --help` and `verdict --help` are
   byte-identical to the ones before the parent parser split (compare with a recorded text), and
   `fetch --help` states that it connects, that it only reads, what happens to the password and that
   the certificate is always checked. `mailvigil --help` describes `fetch` as the one command that
   uses the network. — RF-08, RF-09, ADR-7
-- [ ] `tests/test_offline_isolation.py`: a fresh `python -I` subprocess imports `mailvigil.cli`,
+- [x] `tests/test_offline_isolation.py`: a fresh `python -I` subprocess imports `mailvigil.cli`,
   runs `summary` and `verdict` over a synthetic report and asserts that neither `imaplib` nor
-  `mailvigil.fetch.imap` is in `sys.modules`; a second case runs `fetch` against the replaced
-  `connect` and asserts they are loaded only then. — RF-09, ADR-7
-- [ ] `src/mailvigil/cli.py`: split the shared parent parser into `reading` and `language`
+  `mailvigil.fetch.imap` is in `sys.modules`; a second case runs `fetch` up to the user-name check (the real `connect` refuses it before any socket)
+  and asserts they are loaded only then. — RF-09, ADR-7
+- [x] `src/mailvigil/cli.py` (and `messages/`, one new sentence, `password_file_exposed`): split the shared parent parser into `reading` and `language`
   (`summary` and `verdict` take both, in the old order); the `fetch` subparser; `_run_fetch` with the
-  lazy import and its one comment saying why; the password source; `try` / `finally` around the
+  lazy import of `fetch.imap` only (the other `fetch` modules load no network code) and its one comment saying why; the password source; `try` / `finally` around the
   mailbox. Update the module docstring and the architecture line. — RF-02, RF-08, RF-09, ADR-7
-- [ ] Quality gate of the stage: the same four commands. **Result:** _pending_.
+- [x] Quality gate of the stage: the same four commands. **Result:** ruff, black and mypy clean on 3.12 and 3.15; 2629 tests passed (1 POSIX-only skip on Windows) and coverage 100% on both.
 
 ## Stage 6 — Close the spec (RF-08, RF-09, RNF-01, RNF-07)
 
