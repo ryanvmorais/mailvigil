@@ -136,9 +136,7 @@ def test_a_long_clean_busy_set_is_ready_and_returns_zero(
 
     captured = capsys.readouterr()
     assert code == 0
-    assert "example.com" in captured.out
-    assert "READY" in captured.out.upper()
-    assert "NOT READY" not in captured.out.upper()
+    assert captured.out.startswith("MailVigil verdict for example.com: READY")
     assert captured.err == ""
 
 
