@@ -296,6 +296,83 @@ class RefusalMessages:
     no_file_hint: str
 
 
+@dataclass(frozen=True, slots=True)
+class HtmlMessages:
+    """
+    What only the HTML report says (spec 008). Every sentence the text format already has (rule
+    names, answers, reasons, notes, left-out) is read from the other areas, never repeated here.
+
+    Attributes:
+        page_title (str): The title of the page; ``{domain}``.
+        eyebrow (str): The small line above the answer.
+        policy_label (str): The accessible name of the published-policy box.
+        rules_title (str): The title of the rules section.
+        group_data (str): The title of the group of data rules.
+        group_problem (str): The title of the group of problem rules.
+        meter_legend (str): What the dark mark on a meter is.
+        at_least (str): The limit of an "at least" rule; ``{value}``.
+        at_most (str): The limit of an "at most" rule; ``{value}``.
+        none_allowed (str): The limit of a rule that allows nothing.
+        meter_label (str): The accessible name of a meter; ``{name}``, ``{measured}`` and
+            ``{needed}``.
+        of_messages (Plural): ``of {n} messages``, after a share.
+        mix_title (Plural): The title of the mix of messages; ``{n}`` is all of them.
+        situation_ok (str): The messages where DKIM and SPF both pass.
+        situation_dkim (str): The messages where only DKIM passes.
+        situation_spf (str): The messages where only SPF passes.
+        situation_failing (str): The messages where neither passes.
+        situation_label (str): One situation in an accessible name; ``{name}``, ``{count}`` and
+            ``{share}``.
+        days_title (str): The title of the timeline.
+        column_note (Plural): What a column is and on which day a report counts; ``{n}`` is the
+            days in a column.
+        legend_failing_day (str): The key of the mark above a column with failing messages.
+        legend_no_report (str): The key of a day with no report.
+        legend_covered (str): The key of a day a report covers but does not count on.
+        scale_note (str): How to read the height of a column; ``{tallest}``.
+        timeline_label (Plural): The accessible name of the timeline; ``{n}`` is the columns,
+            ``{first}``, ``{last}`` and ``{failing}`` (the columns with failing messages).
+        show_numbers (str): The summary of the table behind the timeline.
+        numbers_region (str): The accessible name of that table.
+        senders_region (str): The accessible name of the senders table.
+        col_day (str): The header of the day column.
+        range_label (str): A column of several days; ``{first}`` and ``{last}``.
+        footer (str): The last line; ``{version}``.
+    """
+
+    page_title: str
+    eyebrow: str
+    policy_label: str
+    rules_title: str
+    group_data: str
+    group_problem: str
+    meter_legend: str
+    at_least: str
+    at_most: str
+    none_allowed: str
+    meter_label: str
+    of_messages: Plural
+    mix_title: Plural
+    situation_ok: str
+    situation_dkim: str
+    situation_spf: str
+    situation_failing: str
+    situation_label: str
+    days_title: str
+    column_note: Plural
+    legend_failing_day: str
+    legend_no_report: str
+    legend_covered: str
+    scale_note: str
+    timeline_label: Plural
+    show_numbers: str
+    numbers_region: str
+    senders_region: str
+    col_day: str
+    range_label: str
+    footer: str
+
+
 # ---------------------------------------------------------------------------
 # Messages
 # ---------------------------------------------------------------------------
@@ -311,9 +388,11 @@ class Messages:
         summary (SummaryMessages): What ``summary`` says.
         verdict (VerdictMessages): What ``verdict`` says.
         refusals (RefusalMessages): The refusal lines and the no-reports explanation.
+        html (HtmlMessages): What only the HTML report says.
     """
 
     common: CommonMessages
     summary: SummaryMessages
     verdict: VerdictMessages
     refusals: RefusalMessages
+    html: HtmlMessages

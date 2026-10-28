@@ -13,6 +13,7 @@ from types import MappingProxyType
 from mailvigil.messages.en import ENGLISH
 from mailvigil.messages.model import (
     CommonMessages,
+    HtmlMessages,
     Messages,
     Plural,
     RefusalMessages,
@@ -26,6 +27,7 @@ __all__ = [
     "LANGUAGES",
     "PORTUGUESE",
     "CommonMessages",
+    "HtmlMessages",
     "Messages",
     "Plural",
     "RefusalMessages",
