@@ -34,6 +34,7 @@ from mailvigil.reports import (
 from mailvigil.senders import Outcome
 from mailvigil.summary import (
     Counts,
+    DayCounts,
     FailingSource,
     Period,
     SenderRow,
@@ -183,10 +184,11 @@ def test_counts_derive_fragile_and_total() -> None:
         Counts(),
         SenderRow(Outcome.UNKNOWN),
         FailingSource(Outcome.UNKNOWN, "192.0.2.1", 1),
+        DayCounts(_BEGIN.date()),
         Period(_BEGIN, _END, _BEGIN.date(), _END.date(), 1, 1),
         Summary("example.com"),
     ],
-    ids=["Counts", "SenderRow", "FailingSource", "Period", "Summary"],
+    ids=["Counts", "SenderRow", "FailingSource", "DayCounts", "Period", "Summary"],
 )
 def test_every_part_of_the_model_is_frozen(instance: object) -> None:
     """Assigning to a field of the model raises, so a summary cannot change under a reader."""
@@ -217,6 +219,8 @@ def test_summary_has_the_fields_of_the_design_and_no_display_text() -> None:
         "skipped_by_reason",
         "duplicates",
         "other_domain",
+        "days",
+        "covered",
     }
     assert [name for name, kind in fields.items() if kind == "str"] == ["domain"]
 
@@ -225,7 +229,15 @@ def test_every_collection_of_a_summary_is_a_tuple() -> None:
     """No list and no dict is exposed (RNF-04)."""
     summary = summary_of(record(dkim_evaluated="fail", spf_evaluated="fail"))
 
-    for name in ("earlier_p", "senders", "failing", "skipped", "skipped_by_reason"):
+    for name in (
+        "earlier_p",
+        "senders",
+        "failing",
+        "skipped",
+        "skipped_by_reason",
+        "days",
+        "covered",
+    ):
         assert isinstance(getattr(summary, name), tuple)
     assert isinstance(summary.senders[0].selectors, tuple)
     assert isinstance(summary.failing[0].dkim, tuple)
@@ -700,6 +712,198 @@ def test_a_period_of_five_hundred_years_is_summarized_at_once() -> None:
     assert period is not None
     assert period.days_spanned == (end - begin).days
     assert period.days_with_reports == period.days_spanned
+
+
+# ---------------------------------------------------------------------------
+# Days (spec 008, RF-04, ADR-3)
+# ---------------------------------------------------------------------------
+
+
+def with_messages(
+    begin: datetime, end: datetime, report_id: str, *counts: tuple[str, str, int]
+) -> Report:
+    """
+    Build a report of ``example.com`` for a period with one record per ``(dkim, spf, count)``.
+
+    Args:
+        begin (datetime): Start of the period.
+        end (datetime): End of the period.
+        report_id (str): The id the reporter gave it.
+        *counts (tuple[str, str, int]): The evaluated DKIM and SPF results and the messages of each
+            record.
+
+    Returns:
+        Report: The report.
+    """
+    records = tuple(record(dkim_evaluated=d, spf_evaluated=s, count=n) for d, s, n in counts)
+    return dataclasses.replace(dated(begin, end, report_id), records=records)
+
+
+def add_up(days: tuple[DayCounts, ...]) -> Counts:
+    """
+    Add the counts of every day.
+
+    Args:
+        days (tuple[DayCounts, ...]): The days of a summary.
+
+    Returns:
+        Counts: The four counts added across the days.
+    """
+    return Counts(
+        ok=sum(day.counts.ok for day in days),
+        dkim_only=sum(day.counts.dkim_only for day in days),
+        spf_only=sum(day.counts.spf_only for day in days),
+        failing=sum(day.counts.failing for day in days),
+    )
+
+
+def test_a_month_of_daily_reports_gives_one_entry_per_day_that_adds_up_to_the_totals() -> None:
+    """The invariant of the design: the days are the totals and the reports, cut by day."""
+    reports = tuple(
+        with_messages(
+            at(day),
+            at(day + 1),
+            str(day),
+            ("pass", "pass", 10 + day),
+            ("pass", "fail", 2),
+            ("fail", "pass", 1),
+            ("fail", "fail", day % 3),
+        )
+        for day in range(1, 31)
+    )
+
+    summary = summary_of_reports(*reports)
+
+    assert [day.day for day in summary.days] == [date(2026, 10, day) for day in range(1, 31)]
+    assert add_up(summary.days) == summary.totals
+    assert sum(day.reports for day in summary.days) == summary.reports == 30
+    assert summary.days[0] == DayCounts(
+        date(2026, 10, 1), 1, Counts(ok=11, dkim_only=2, spf_only=1, failing=1)
+    )
+
+
+def test_the_days_do_not_depend_on_the_order_of_the_reports() -> None:
+    """Sorted by day, like every other collection of the summary (RNF-05)."""
+    reports = (
+        with_messages(at(3), at(4), "3", ("pass", "pass", 3)),
+        with_messages(at(1), at(2), "1", ("pass", "pass", 1)),
+        with_messages(at(2), at(3), "2", ("fail", "fail", 2)),
+    )
+
+    results = {summary_of_reports(*order).days for order in itertools.permutations(reports)}
+
+    assert len(results) == 1
+    (days,) = results
+    assert [day.day.day for day in days] == [1, 2, 3]
+
+
+@pytest.mark.parametrize("end", [at(2), at(1, 23, 59, 59)], ids=["next midnight", "23:59:59"])
+def test_a_report_from_midnight_to_midnight_is_one_day(end: datetime) -> None:
+    """The end is exclusive: the next midnight does not make a second entry."""
+    summary = summary_of_reports(with_messages(at(1), end, "1", ("pass", "pass", 5)))
+
+    assert summary.days == (DayCounts(date(2026, 10, 1), 1, Counts(ok=5)),)
+    assert summary.covered == ((date(2026, 10, 1), date(2026, 10, 1)),)
+
+
+def test_a_report_that_crosses_midnight_counts_all_its_messages_on_the_first_day() -> None:
+    """ADR-3: the day a period begins; the second day is only covered."""
+    summary = summary_of_reports(
+        with_messages(at(1, 12), at(2, 12), "1", ("pass", "pass", 5), ("fail", "fail", 2))
+    )
+
+    assert summary.days == (DayCounts(date(2026, 10, 1), 1, Counts(ok=5, failing=2)),)
+    assert summary.covered == ((date(2026, 10, 1), date(2026, 10, 2)),)
+
+
+def test_a_report_of_zero_length_counts_on_the_day_it_begins() -> None:
+    """The same choice the period makes."""
+    summary = summary_of_reports(with_messages(at(7, 8), at(7, 8), "1", ("fail", "fail", 4)))
+
+    assert summary.days == (DayCounts(date(2026, 10, 7), 1, Counts(failing=4)),)
+    assert summary.covered == ((date(2026, 10, 7), date(2026, 10, 7)),)
+
+
+def test_two_reports_that_begin_on_one_day_are_one_entry() -> None:
+    """Two reporters on the same day: two reports, their messages added."""
+    summary = summary_of_reports(
+        with_messages(at(4), at(5), "1", ("pass", "pass", 6)),
+        with_messages(at(4), at(5), "2", ("pass", "fail", 3), ("pass", "pass", 1)),
+    )
+
+    assert summary.days == (DayCounts(date(2026, 10, 4), 2, Counts(ok=7, dkim_only=3)),)
+
+
+def test_a_report_of_three_days_is_one_entry_and_one_interval_of_three_days() -> None:
+    """The other two days are in ``covered`` and carry no counts."""
+    summary = summary_of_reports(with_messages(at(1), at(4), "1", ("pass", "pass", 9)))
+
+    assert len(summary.days) == 1
+    assert summary.days[0].day == date(2026, 10, 1)
+    assert summary.covered == ((date(2026, 10, 1), date(2026, 10, 3)),)
+
+
+def test_covered_merges_overlaps_and_keeps_the_gaps() -> None:
+    """Overlapping or consecutive intervals are one; a missing day splits them."""
+    summary = summary_of_reports(
+        dated(at(1), at(3), "1"),
+        dated(at(2), at(4), "2"),
+        dated(at(4), at(5), "3"),
+        dated(at(8), at(9), "4"),
+        dated(at(10), at(12), "5"),
+    )
+
+    assert summary.covered == (
+        (date(2026, 10, 1), date(2026, 10, 4)),
+        (date(2026, 10, 8), date(2026, 10, 8)),
+        (date(2026, 10, 10), date(2026, 10, 11)),
+    )
+
+
+def test_the_length_of_covered_is_the_days_with_reports_of_the_period() -> None:
+    """Rule 2 and the timeline read the same list, so they cannot disagree (ADR-3)."""
+    summary = summary_of_reports(
+        dated(at(1), at(3), "1"), dated(at(2), at(4), "2"), dated(at(8), at(9), "3")
+    )
+
+    assert summary.period is not None
+    assert sum((last - first).days + 1 for first, last in summary.covered) == (
+        summary.period.days_with_reports
+    )
+
+
+def test_a_period_of_centuries_is_one_entry_and_one_interval() -> None:
+    """The size follows the reports, never the period (004 RNF-09)."""
+    begin = at(1)
+    summary = summary_of_reports(
+        with_messages(begin, begin.replace(year=2526), "1", ("pass", "pass", 1))
+    )
+
+    assert len(summary.days) == 1
+    assert len(summary.covered) == 1
+
+
+def test_without_reports_the_days_and_the_covered_intervals_are_empty() -> None:
+    """Nothing to draw."""
+    summary = summarize(IngestionResult(), config())
+
+    assert summary.days == ()
+    assert summary.covered == ()
+
+
+def test_a_summary_built_the_old_way_has_no_days() -> None:
+    """Both fields are defaulted, so no existing caller has to change."""
+    summary = Summary("example.com")
+
+    assert summary.days == ()
+    assert summary.covered == ()
+
+
+def test_a_report_with_no_messages_still_counts_on_its_day() -> None:
+    """A report with nothing in it was received on that day."""
+    summary = summary_of_reports(with_messages(at(2), at(3), "1", ("pass", "pass", 0)))
+
+    assert summary.days == (DayCounts(date(2026, 10, 2), 1, Counts()),)
 
 
 # ---------------------------------------------------------------------------

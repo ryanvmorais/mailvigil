@@ -56,7 +56,7 @@ maintainer, not decided here.
 
 ## Stage 2 — The `Summary` learns the days (RF-04, RF-08, ADR-3)
 
-- [ ] `tests/test_summary.py`, written first: `Summary.days` has one entry per UTC day on which a
+- [x] `tests/test_summary.py`, written first: `Summary.days` has one entry per UTC day on which a
   report begins, sorted, each with the reports that begin that day and their messages per
   situation; `sum(day.counts) == totals` and `sum(day.reports) == reports` for a month of daily
   reports, for a report from midnight to midnight, for one that crosses midnight (all its messages
@@ -66,15 +66,16 @@ maintainer, not decided here.
   spans centuries gives one entry and one interval (the size follows the reports, never the
   period); no reports gives empty tuples; a `Summary` built the old way has `days == ()` and
   `covered == ()`. — RF-04, ADR-3
-- [ ] `tests/test_render_json.py`, first: `summary_document` of a summary with days equals the one
+- [x] `tests/test_render_json.py`, first: `summary_document` of a summary with days equals the one
   of the same summary without them, byte for byte after `dumps`; the verdict document is
   unchanged. — RF-08, RNF-05
-- [ ] `src/mailvigil/summary.py`: `DayCounts`; `Summary.days` and `Summary.covered`, defaulted;
+- [x] `src/mailvigil/summary.py`: `DayCounts`; `Summary.days` and `Summary.covered`, defaulted;
   the merge of intervals that `_period` does becomes one helper both use, so rule 2 and the
   timeline read the same list; the tally by begin day in the existing loop over reports (no second
   pass over the records). Docstrings. — RF-04, ADR-3
-- [ ] Quality gate of the stage (same four commands). **Result:** _to fill in when the stage
-  runs._
+- [x] Quality gate of the stage (same four commands). **Result:** ruff, black, mypy strict clean;
+  1236 tests pass, coverage 100%. `covered` also merges consecutive days (a gap is exactly a hole
+  in the list); `days_with_reports` is unchanged.
 
 ## Stage 3 — The one module that builds markup, and the palette (RF-06, RF-07, ADR-1, ADR-7, ADR-8, ADR-10, RNF-01, RNF-02)
 
