@@ -166,6 +166,11 @@ with a human approval gate between phases; use `/spec`. Flow per task: issue →
 `/fechar-sessao`. Claude opens PRs and never merges. At the end of a session that changed
 architecture, commands or the CLI, run `/atualizar-docs` and then `/fechar-sessao`.
 
+**A feature with an interface** (the HTML report, spec 008) needs a mockup the maintainer approved
+before any code: Claude builds it in the Artifact with `/nova-interface` (390 and 1280 px, two or
+three alternatives, one recommended) and writes no interface file until the "ok". This is a global
+rule (`~/.claude/CLAUDE.md`); the 008 choice so far is recorded in `specs/README.md`.
+
 ## Dependencies
 
 `uv` manages everything: `pyproject.toml` holds the floors (`>=`) and `uv.lock` the exact
