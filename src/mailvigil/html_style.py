@@ -137,6 +137,7 @@ _RULES: Final = """
 *{box-sizing:border-box}
 body{margin:0;background:var(--page);color:var(--fg);font:15px/1.5 system-ui,"Segoe UI",Roboto,sans-serif}
 .page{max-width:1040px;margin:0 auto;padding:24px 16px 56px;display:flex;flex-direction:column;gap:16px}
+main{display:flex;flex-direction:column;gap:16px}
 .top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 24px}
 .brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:17px}
 .meta{margin:0;color:var(--muted);font-size:14px}
@@ -152,15 +153,16 @@ h2{font-size:17px;margin-bottom:12px}
 .ready .vmark{background:var(--ok)}
 .early .vmark{background:var(--warn)}
 .vbody{flex:1 1 320px;min-width:0;display:flex;flex-direction:column;gap:6px}
-.eyebrow{font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.eyebrow{font-size:13px;font-weight:700;color:var(--muted)}
 .verdict h1{font-size:34px;line-height:1.15;color:var(--bad)}
 .ready h1{color:var(--ok)}
 .early h1{color:var(--warn)}
 .why{font-size:16px}
+.why::first-letter{text-transform:uppercase}
 .next{font-size:15px;color:var(--muted)}
 .policy{flex:none;margin:0;display:flex;gap:16px;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 14px}
 .policy div{display:flex;flex-direction:column}
-.policy dt{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.policy dt{font-size:12px;color:var(--muted)}
 .policy dd{margin:0;font-weight:700;font-variant-numeric:tabular-nums}
 .grp{font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:20px 0 8px}
 .grp:first-of-type{margin-top:0}

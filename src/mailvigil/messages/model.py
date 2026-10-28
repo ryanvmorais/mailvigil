@@ -303,6 +303,7 @@ class HtmlMessages:
     names, answers, reasons, notes, left-out) is read from the other areas, never repeated here.
 
     Attributes:
+        lang (str): The language code of the ``lang`` attribute of the page.
         page_title (str): The title of the page; ``{domain}``.
         eyebrow (str): The small line above the answer.
         policy_label (str): The accessible name of the published-policy box.
@@ -335,11 +336,13 @@ class HtmlMessages:
         show_numbers (str): The summary of the table behind the timeline.
         numbers_region (str): The accessible name of that table.
         senders_region (str): The accessible name of the senders table.
+        failing_heading (str): The title of the failing-sources block.
         col_day (str): The header of the day column.
         range_label (str): A column of several days; ``{first}`` and ``{last}``.
         footer (str): The last line; ``{version}``.
     """
 
+    lang: str
     page_title: str
     eyebrow: str
     policy_label: str
@@ -368,6 +371,7 @@ class HtmlMessages:
     show_numbers: str
     numbers_region: str
     senders_region: str
+    failing_heading: str
     col_day: str
     range_label: str
     footer: str

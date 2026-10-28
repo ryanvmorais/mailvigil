@@ -5,7 +5,8 @@ The ``summary`` command wires three calls: ``ingest`` reads the reports, ``summa
 and ``render_summary`` writes the text, in the language of ``--lang``, or ``summary_document`` and
 ``dumps`` write the JSON with ``--json``, which has no language. The ``verdict`` command shares
 everything up to the ``Summary`` and then calls ``judge`` and ``render_verdict`` (or
-``verdict_document``). This module counts nothing, judges nothing and lays nothing out; it
+``verdict_document``, or ``render_html`` with ``--html``, the page of spec 008). This module
+counts nothing, judges nothing and lays nothing out; it
 decides where the domain and the configuration come from (RF-08) and turns every refusal, and
 every answer, into an exit code. The exit codes are a contract (spec 006 RF-04): the code is
 decided before the format and the language, so neither ``--json`` nor ``--lang`` can change it.
@@ -24,6 +25,7 @@ from mailvigil import __version__
 from mailvigil.config import Config, ConfigError, check_domain, load_config
 from mailvigil.messages import ENGLISH, Messages, language_by_code
 from mailvigil.render import no_reports_message, render_summary
+from mailvigil.render_html import render_html
 from mailvigil.render_json import dumps, summary_document, verdict_document
 from mailvigil.render_verdict import render_verdict
 from mailvigil.reports import IngestionResult, ingest
@@ -289,13 +291,20 @@ def build_parser() -> argparse.ArgumentParser:
         help="say who sends mail as the domain, from DMARC aggregate reports",
         description="Sum up DMARC aggregate reports per sender and per situation.",
     )
-    commands.add_parser(
+    verdict_parser = commands.add_parser(
         "verdict",
         parents=[shared],
         help="say if the domain is ready for p=reject, and why",
         description="Say if the domain is ready for p=reject, from DMARC aggregate reports. "
         f"The exit code is {EXIT_OK} for ready, {EXIT_TOO_EARLY} for too early and "
         f"{EXIT_NOT_READY} for not ready.",
+    )
+    verdict_parser.add_argument(
+        "--html",
+        action="store_true",
+        help="print one self-contained HTML page instead of the text; redirect it to a file "
+        "(mailvigil verdict ... --html > report.html; in Windows PowerShell 5.1 pipe it to "
+        "Out-File -Encoding ascii); not with --json",
     )
     return parser
 
@@ -359,7 +368,7 @@ def _run_verdict(args: argparse.Namespace) -> int:
 
     Args:
         args (argparse.Namespace): The parsed arguments: ``paths``, ``config``, ``domain``,
-            ``json`` and ``lang``.
+            ``json``, ``html`` and ``lang``.
 
     Returns:
         int: ``EXIT_OK`` for ready, ``EXIT_TOO_EARLY`` for too early, ``EXIT_NOT_READY`` for not
@@ -370,9 +379,13 @@ def _run_verdict(args: argparse.Namespace) -> int:
         return EXIT_REFUSED
     config, _source, result = loaded
 
-    verdict = judge(summarize(result, config))
+    summary = summarize(result, config)
+    verdict = judge(summary)
     if args.json:
         _write(sys.stdout, dumps(verdict_document(verdict)))
+    elif args.html:
+        # ``render_html`` ends in a newline already; ``_write`` adds one, so the last is cut.
+        _write(sys.stdout, render_html(summary, verdict, args.lang).rstrip("\n"))
     else:
         _write(sys.stdout, render_verdict(verdict, args.lang))
     return _VERDICT_EXIT[verdict.answer]
@@ -392,6 +405,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     """
     parser = build_parser()
     args = parser.parse_args(argv)
+    # A run has one format; argparse cannot make a group across a parent parser and a subparser's
+    # own argument, so the pair is refused here, before any work (ADR-6).
+    if args.command == "verdict" and args.json and args.html:
+        parser.error("argument --html: not allowed with argument --json")
     if args.command == "summary":
         return _run_summary(args)
     if args.command == "verdict":
