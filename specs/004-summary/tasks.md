@@ -100,25 +100,25 @@ command, then the close. The computation (`summary.py`) never imports `render` (
 
 ## Stage 4 — The text (RF-04, RF-05, RF-06, RF-09, RF-10, RNF-08)
 
-- [ ] `tests/test_render.py`, shares first: `format_share` gives `95.4%` for 11900 of 12480; `0%`
+- [x] `tests/test_render.py`, shares first: `format_share` gives `95.4%` for 11900 of 12480; `0%`
   for no part; `<0.1%` for 4 of 10000; `99.9%` for 9997 of 10000; `100%` only for the whole; `0%`
   when the whole is zero; the result does not depend on a float. — RF-06, ADR-5
-- [ ] `src/mailvigil/render.py`, part 1: `format_share`. — RF-06, ADR-5
-- [ ] Tests for the helpers, written first: `_fit` cuts to the width with `...` and leaves a short
+- [x] `src/mailvigil/render.py`, part 1: `format_share`. — RF-06, ADR-5
+- [x] Tests for the helpers, written first: `_fit` cuts to the width with `...` and leaves a short
   text alone; it removes an escape sequence, a line break and U+202E before cutting; a phrase exists
   for every `Reason` (the test iterates the enum); the label of a row is the service name or
   `IP (kind)` with the three kinds; an empty address reads as no address. — RF-05, RF-09, RNF-08
-- [ ] `render.py`, part 2: `_fit`, the reason phrases and the row labels. — RF-09, RNF-08
-- [ ] Tests for the header, the situations and the senders table, written first, on a built
+- [x] `render.py`, part 2: `_fit`, the reason phrases and the row labels. — RF-09, RNF-08
+- [x] Tests for the header, the situations and the senders table, written first, on a built
   `Summary`: the sections come in order; the header shows config, period, reports, policy (with `sp`
   and `np` when present, and the earlier values when it changed) and messages with the recognized
   share; an empty map adds the note; a row with failing messages starts with `!`; every `KNOWN` row
   is shown and 12 unrecognized rows print 10 and one remainder line with its sources, messages and
   failing count; the numbers print as exact integers beside each percentage; plural and singular
   (`1 of 1 day`, `1 reporter`). — RF-03, RF-06, RF-09, Resolved decision 12
-- [ ] `render.py`, part 3: the header, the situations and the senders table, with the column widths
+- [x] `render.py`, part 3: the header, the situations and the senders table, with the column widths
   taken from the data. — RF-03, RF-09, ADR-6
-- [ ] Tests for the failures and the left-out sections, written first: the title carries the failing
+- [x] Tests for the failures and the left-out sections, written first: the title carries the failing
   messages and the number of sources; recognized sources come before unrecognized ones and an empty
   group is not printed; each source takes two lines with the IP, the messages, `dkim: …, spf: …` and
   the override types, several reasons joined with `/`; a foreign or failing-signature source names
@@ -126,15 +126,16 @@ command, then the close. The computation (`summary.py`) never imports `render` (
   prints `No failing messages.`; skipped files list 10 and a remainder, with counts per reason, and a
   name carrying an escape sequence is shown cleaned; duplicates and other domains print even at
   zero. — RF-04, RF-05, RNF-08
-- [ ] `render.py`, part 4: the failures and the left-out sections, and `render_summary`. — RF-04,
+- [x] `render.py`, part 4: the failures and the left-out sections, and `render_summary`. — RF-04,
   RF-05, RF-09
-- [ ] Tests for the layout limits, written first: no line is over 80 columns with a 100-character
+- [x] Tests for the layout limits, written first: no line is over 80 columns with a 100-character
   service name, an IPv6 address, a count of `10**12` and 40 override types; the output is ASCII
   apart from names; the same `Summary` rendered twice is equal text. — RF-09, RNF-05, ADR-6
-- [ ] Tests for the empty-result message, written first: `no_reports_message` names the domain, the
+- [x] Tests for the empty-result message, written first: `no_reports_message` names the domain, the
   counts of skipped files per reason, the duplicates and the reports of other domains. — RF-10
-- [ ] `render.py`, part 5: `no_reports_message`. — RF-10
-- [ ] Quality gate. — result recorded when run
+- [x] `render.py`, part 5: `no_reports_message`. — RF-10
+- [x] Quality gate. — result recorded when run: all green on 2026-10-27; 478 passed (401 before,
+  77 new), coverage 100% (Python 3.12)
 
 ## Stage 5 — The command (RF-07, RF-08, RF-10, RNF-02, RNF-08)
 
