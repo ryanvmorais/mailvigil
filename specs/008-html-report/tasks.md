@@ -152,18 +152,18 @@ maintainer, not decided here.
 
 ## Stage 5 — The renderer and the flag (RF-01, RF-02, RF-05, RF-06, RF-07, RF-08, RF-09, RNF-03, RNF-04, ADR-6, ADR-8)
 
-- [ ] `tests/test_render_html.py`, written first, the structure through `html.parser`: one `h1`
+- [x] `tests/test_render_html.py`, written first, the structure through `html.parser`: one `h1`
   (the answer), headings in order, `lang` equal to the language, tables with `th scope`, SVGs with
   a label, the sections in the order of the design for each answer; `READY` has no deciding rule
   and no failing-sources content; "Left out" appears only when a count is above zero; the policy
   box shows `np` only when present; the notes of the verdict are all there; the page has no path
   and no file name. — RF-02, RF-05, RF-07
-- [ ] `tests/test_render_html.py`, parity and contract: for the same run, the answer, the five
+- [x] `tests/test_render_html.py`, parity and contract: for the same run, the answer, the five
   figures, the senders, the failing sources and the notes of the page equal those of
   `render_verdict` and `render_summary`; `pt-BR` gives `lang="pt-BR"` and ASCII only; two calls
   give the same string; a year of daily reports from a dozen senders stays under the size ceiling
   (about 200 KB); the output is ASCII and ends in a newline. — RF-02, RF-08, RNF-03, RNF-04
-- [ ] `tests/test_render_html_hostile.py`, first: the attack strings of RF-06 (`<script>`, `"`,
+- [x] `tests/test_render_html_hostile.py`, first: the attack strings of RF-06 (`<script>`, `"`,
   `'`, `&`, `</style>`, `<!--`, `-->`, `javascript:`, a long run, control characters, a
   bidirectional override) in every field that reaches the page (the domain, service names,
   selectors, addresses, override reasons, the `p`, `sp`, `np` and earlier `p` values); the parsed
@@ -172,28 +172,53 @@ maintainer, not decided here.
   appears only as the text of a node; extreme inputs (a period of many years, one day with a huge
   count, zero messages in a situation, all rules passing, all failing) give a valid document and
   never an exception. — RF-06, RF-09, ADR-8
-- [ ] `tests/test_cli_html.py`, first, through `main(argv)` and `capsys`: `verdict --html` ends in
+- [x] `tests/test_cli_html.py`, first, through `main(argv)` and `capsys`: `verdict --html` ends in
   `0`, `3` and `4` for ready, too early and not ready and prints one document that starts with
   `<!doctype html>`; with `--lang pt-BR`; `--html` with `--json` is a usage error and exit `2`;
   `summary --html` is exit `2`; a refusal before an answer (no reports, bad domain) writes nothing
   to standard output and ends in `1`; `--help` names the format and says to redirect it; every
   existing CLI test passes untouched. — RF-01, RF-08, ADR-6
-- [ ] `src/mailvigil/render_html.py`: `render_html(summary, verdict, messages)` with the sections of
+- [x] `src/mailvigil/render_html.py`: `render_html(summary, verdict, messages)` with the sections of
   the design, in order, from the catalog and the helpers of stage 1; nothing but `htmlkit` builds
   markup. — RF-02, RF-05, RF-06
-- [ ] `src/mailvigil/cli.py`: `--html` on the `verdict` subparser, the refusal of the pair with
+- [x] `src/mailvigil/cli.py`: `--html` on the `verdict` subparser, the refusal of the pair with
   `--json` through `parser.error` before any work, the branch in `_run_verdict` (the exit code line
   untouched). The `--help` text mentions the redirect and, for Windows PowerShell 5.1, `|
   Out-File -Encoding ascii`. — RF-01, ADR-6, ADR-7
-- [ ] Look at the real page in a browser, with the maintainer's mockup beside it: generate a page
+- [x] Look at the real page in a browser, with the maintainer's mockup beside it: generate a page
   from synthetic reports with failures, with none and with a gap; capture 390 and 1280 px, light
   and dark, and the print preview; compare with boards B, C and T1 and list the three largest
   deviations; fix and capture again, at most three rounds. Run `auditar_proporcoes.py` and
   `auditar_navegador.py` (axe) from the `/auditoria-interface` skill on the file, and tab through
   the page: the senders table, the numbers table and the `details` take focus with a visible
   outline. Record what was found. — RF-03, RF-04, RF-07
-- [ ] Quality gate of the stage (same four commands). **Result:** _to fill in when the stage
-  runs._
+  **Result (partial):** captured with Chrome headless at 1280 px, at 390 px (inside a 390 px frame)
+  and in dark (the palette forced by replacing the media query), for the three answers and a run
+  with a gap. No horizontal scroll of the page; the senders table scrolls in its own box. Deviations
+  from the mockup, fixed: the `Next:` label printed two colons (the catalog label already has one),
+  the eyebrow and the policy keys were upper-cased by CSS (`P=REJECT`), the reason started in lower
+  case, and the failing source line had a double space. Left as it is, to show the maintainer: the
+  notes block is titled `Notes` (the catalog's word) where the mockup said "Worth knowing"; the
+  failing sources have no count at the right of the name (the line below already says it).
+  **Audits** (`auditar_navegador.py` with axe-core 4.14.0, MPL-2.0, sha256 `20c09fe1...6e878`, light
+  and dark, 390 and 1280 px, five pages: three answers, a gap, `pt-BR`; and `auditar_proporcoes.py`):
+  no horizontal scroll, one `h1`, no skipped heading level, no small text, no clipped text, 3 Tab
+  stops (senders box, numbers box, `details`) all with a visible indicator, proportions 0 findings.
+  axe found one serious fault, `dlitem`: the `role="group"` on the policy `dl` took its terms out of
+  a list. Fixed by moving the role and the name to a `div` around the `dl`, with a test; axe then
+  reports no violation. axe still lists `color-contrast` as "review" (13 to 127 nodes): they are the
+  rows of the numbers table inside the open `details`, which it cannot judge because the scroll box
+  clips them (the colours are the pairs the palette test measures). Single-word last lines on a few
+  paragraphs at 390 px are cosmetic and left.
+- [ ] Look at the print preview by eye (the print block of the stylesheet is tested, not seen). — RF-07
+
+- [x] Quality gate of the stage (same four commands). **Result:** ruff, black, mypy strict clean;
+  2231 tests pass, coverage 100%. Decisions the stage took: `answer_phrase` and `left_out_parts`
+  became public in `render_verdict.py` (the text output is byte-identical, the golden test
+  passes); `HtmlMessages` gained `lang` and `failing_heading`; the failing sources come from the
+  `Verdict` (as the text does) and a ready page with a source still failing lists it under the
+  `still_failing` sentence; the senders table lists every row (RF-05) and the failing groups keep
+  the limit of 10; `main` got the one rule `main{display:flex}` in the stylesheet.
 
 ## Stage 6 — Close (RF-01 to RF-09, all RNF)
 
