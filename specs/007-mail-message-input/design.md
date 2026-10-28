@@ -1,6 +1,6 @@
 ---
 feature: Mail message input — read report attachments straight from `.eml` and `.mbox` files
-status: approved
+status: done
 date: 2026-10-28
 related:
   - 007-mail-message-input/requirements.md

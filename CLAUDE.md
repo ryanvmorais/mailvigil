@@ -5,8 +5,8 @@ This file guides Claude Code (claude.ai/code) when working in this repository.
 ## Project overview
 
 MailVigil is an open-source command-line tool that reads DMARC aggregate reports (RUA, usually
-`.zip`, `.gz` or `.xml`) and says, in plain language, who is sending mail as a domain and whether
-it is safe to move the policy to `p=reject`. Python `>=3.12`, standard library only (zero runtime
+`.zip`, `.gz` or `.xml`, or still attached to the mail in an `.eml` or `.mbox`) and says, in plain
+language, who is sending mail as a domain and whether it is safe to move the policy to `p=reject`. Python `>=3.12`, standard library only (zero runtime
 dependencies), offline. It is pre-0.1: the CLI answers `mailvigil --version`, `mailvigil summary`
 and `mailvigil verdict` (report ingestion, configuration, sender identification, the summary, the
 verdict on `p=reject` and their texts are built and wired); `--json`, `--lang en|pt-BR` and the stable
@@ -73,8 +73,10 @@ src/mailvigil/
     model.py         #   frozen dataclasses: Report, Record, PolicyPublished, IngestionResult…
     xmlsafe.py       #   the only XML parser: expat handlers refuse DOCTYPE and ENTITY
     reader.py        #   .xml/.gz/.zip to bytes, capped at MAX_BYTES (5 MiB) as it decompresses
+    mail.py          #   .eml/.mbox (spec 007): report attachments out of messages, bounded in size,
+                     #   lines, parts and depth before and while the `email` parser works
     parser.py        #   XML tree to Report: sanitized text, strict numbers, IPs normalized
-    discovery.py     #   paths (files and folders) to an ordered, deduplicated list of files
+    discovery.py     #   paths (files and folders) to an ordered list of `Source`s, deduplicated
     ingest.py        #   ingest(paths, domain): the entry point; refusals go to `skipped`
   text.py            # text and domain rules shared by reports and config (clean_text, normalize_domain…)
   config.py          # load_config(path) → frozen Config (domain + selector map); check_domain is shared with
@@ -96,13 +98,14 @@ src/mailvigil/
   messages/          # every sentence of the tool, one Messages per language (spec 006): model.py
                      # (Plural and the frozen dataclasses), en.py (ENGLISH), pt_br.py (PORTUGUESE,
                      # ASCII only); language_by_code; imports no renderer
-tests/               # pytest, one test file per module (test_reports_*.py, test_text.py, test_config.py,
+tests/               # pytest, one test file per module (test_reports_*.py incl.
+                     # test_reports_mail.py, test_text.py, test_config.py,
                      # test_senders.py, test_summary.py, test_render.py, test_verdict.py,
                      # test_render_verdict.py, test_render_json.py, test_render_pt.py,
                      # test_messages.py, test_json_schema_doc.py, test_cli_summary.py,
                      # test_cli_verdict.py, test_cli_json.py, test_cli_lang.py,
-                     # test_cli_exit_codes.py); fixtures are synthetic, built in conftest.py,
-                     # cli_helpers.py, schema_examples.py or tmp_path
+                     # test_cli_exit_codes.py, test_cli_mail.py); fixtures are synthetic, built in
+                     # conftest.py, cli_helpers.py, mail_helpers.py, schema_examples.py or tmp_path
 specs/               # spec-driven development: requirements → design → tasks per feature
 docs/stack.md        # each technology of the stack, why it was chosen, what to study first
 docs/json-schema.md  # every field of the two --json documents and the compatibility promise
