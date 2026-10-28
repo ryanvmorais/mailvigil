@@ -1,0 +1,329 @@
+"""
+Turns the bytes of one aggregate report into an immutable ``Report``.
+
+The XML is parsed by ``xmlsafe.parse_xml``, so a document that declares a ``DOCTYPE`` or an
+``ENTITY`` never gets here. This module reads the tree by local name with ``find`` / ``findall``, so
+the order of elements does not matter, unknown elements and extensions in a foreign namespace are
+ignored, and a report in the RFC 7489 form and one in the RFC 9990 namespace give the same model
+(ADR-5).
+
+Only what the verdict cannot do without is strict: the period, ``pct`` and every ``count`` refuse
+the whole report when they cannot be trusted. Every other optional element takes the default of the
+model. Every text that reaches the model went through ``_clean``, so any caller may print it
+(RF-05, ADR-6).
+"""
+
+from __future__ import annotations
+
+import ipaddress
+import re
+import unicodedata
+from datetime import UTC, datetime
+from xml.etree.ElementTree import Element
+
+from mailvigil.reports.errors import Reason, ReportRefused
+from mailvigil.reports.model import (
+    DkimResult,
+    OverrideReason,
+    PolicyPublished,
+    Record,
+    Report,
+    SpfResult,
+)
+from mailvigil.reports.xmlsafe import parse_xml
+
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+
+# The longest text a field may hold once cleaned (RF-05). One constant, so raising it is one edit.
+MAX_TEXT = 255
+
+# Whitespace that XML allows inside text and that would break a line or move a column on a terminal.
+# They become a space, so two words a provider separated with a line break stay two words.
+_SPACING = str.maketrans({"\t": " ", "\r": " ", "\n": " "})
+
+# Unicode categories dropped from every text: control (C0 and C1), format (zero-width and the
+# bidirectional overrides and isolates), and the line and paragraph separators (ADR-6).
+_DROPPED_CATEGORIES = frozenset({"Cc", "Cf", "Zl", "Zp"})
+
+# A whole number written with ASCII digits only. ``int`` alone also takes ``1_000``, ``-5``, ``+5``
+# and digits of other scripts, none of which a report has any reason to hold.
+_DIGITS = re.compile(r"[0-9]+")
+
+# ---------------------------------------------------------------------------
+# Text
+# ---------------------------------------------------------------------------
+
+
+def _clean(value: str) -> str:
+    """
+    Make a text from a report safe to print: inert and short.
+
+    Tab, carriage return and line feed become a space; every character in the categories ``Cc``,
+    ``Cf``, ``Zl`` and ``Zp`` is dropped; the result is stripped and cut to ``MAX_TEXT``.
+
+    Args:
+        value (str): The text as the XML parser produced it.
+
+    Returns:
+        str: The cleaned text, possibly empty.
+    """
+    spaced = value.translate(_SPACING)
+    kept = "".join(char for char in spaced if unicodedata.category(char) not in _DROPPED_CATEGORIES)
+    return kept.strip()[:MAX_TEXT]
+
+
+def _raw_text(node: Element, path: str) -> str | None:
+    """
+    Read the stripped text of a sub-element, uncut and uncleaned.
+
+    Only numbers use this: they must match ``_DIGITS`` whole, so nothing in them needs cleaning,
+    and cutting them at ``MAX_TEXT`` would turn a long number into a different, valid one.
+
+    Args:
+        node (Element): The element to search from.
+        path (str): A path of local names, such as ``row/count``.
+
+    Returns:
+        str | None: The stripped text (empty when the element holds none), or ``None`` when the
+            element is absent.
+    """
+    found = node.find(path)
+    return None if found is None else (found.text or "").strip()
+
+
+def _find_text(node: Element, path: str) -> str | None:
+    """
+    Read the cleaned text of a sub-element, telling "absent" from "empty".
+
+    Args:
+        node (Element): The element to search from.
+        path (str): A path of local names, such as ``policy_evaluated/dkim``.
+
+    Returns:
+        str | None: The cleaned text (empty when the element holds none), or ``None`` when the
+            element is absent.
+    """
+    raw = _raw_text(node, path)
+    return None if raw is None else _clean(raw)
+
+
+def _text(node: Element, path: str, default: str = "", *, lower: bool = False) -> str:
+    """
+    Read the cleaned text of a sub-element, with a default for absent and empty.
+
+    Args:
+        node (Element): The element to search from.
+        path (str): A path of local names, such as ``policy_evaluated/dkim``.
+        default (str, optional): Returned when the element is absent or holds no text.
+        lower (bool, optional): Lower-case the result, for domains. The default is not changed.
+
+    Returns:
+        str: The cleaned text, or the default.
+    """
+    value = _find_text(node, path)
+    if not value:
+        return default
+    return value.lower() if lower else value
+
+
+# ---------------------------------------------------------------------------
+# Numbers
+# ---------------------------------------------------------------------------
+
+
+def _integer(value: str | None, field: str) -> int:
+    """
+    Read a whole number a report must get right.
+
+    Args:
+        value (str | None): The raw text, or ``None`` when the element is absent.
+        field (str): The path of the field, named in the refusal.
+
+    Returns:
+        int: The number, zero or more.
+
+    Raises:
+        ReportRefused: ``INVALID_FIELD`` when the value is absent, empty or not ASCII digits, or is
+            so long that ``int`` refuses it. The detail names the field, never the value.
+    """
+    if value is None or _DIGITS.fullmatch(value) is None:
+        raise ReportRefused(Reason.INVALID_FIELD, f"invalid value in {field}")
+    try:
+        return int(value)
+    except ValueError:  # more digits than the interpreter converts
+        raise ReportRefused(Reason.INVALID_FIELD, f"invalid value in {field}") from None
+
+
+def _timestamp(value: str | None, field: str) -> datetime:
+    """
+    Read a Unix timestamp as an aware UTC datetime.
+
+    Args:
+        value (str | None): The raw text, or ``None`` when the element is absent.
+        field (str): The path of the field, named in the refusal.
+
+    Returns:
+        datetime: The moment, timezone-aware, UTC.
+
+    Raises:
+        ReportRefused: ``INVALID_FIELD`` when the value is not a whole number or is outside what
+            the platform can represent as a date.
+    """
+    seconds = _integer(value, field)
+    try:
+        return datetime.fromtimestamp(seconds, UTC)
+    except (ValueError, OverflowError, OSError):
+        raise ReportRefused(Reason.INVALID_FIELD, f"invalid value in {field}") from None
+
+
+# ---------------------------------------------------------------------------
+# Parts of the report
+# ---------------------------------------------------------------------------
+
+
+def _parse_policy(node: Element) -> PolicyPublished:
+    """
+    Read ``policy_published``.
+
+    Args:
+        node (Element): The ``policy_published`` element.
+
+    Returns:
+        PolicyPublished: The policy, with the defaults of the model for what is absent.
+
+    Raises:
+        ReportRefused: ``INVALID_FIELD`` for a missing domain or a ``pct`` outside 0 to 100.
+    """
+    domain = _text(node, "domain", lower=True)
+    if not domain:
+        raise ReportRefused(Reason.INVALID_FIELD, "missing value in policy_published/domain")
+
+    pct_text = _raw_text(node, "pct")
+    pct = 100 if pct_text is None else _integer(pct_text, "policy_published/pct")
+    if pct > 100:
+        raise ReportRefused(Reason.INVALID_FIELD, "invalid value in policy_published/pct")
+
+    return PolicyPublished(
+        domain=domain,
+        p=_text(node, "p", "?"),
+        sp=_text(node, "sp"),
+        np=_text(node, "np"),
+        adkim=_text(node, "adkim"),
+        aspf=_text(node, "aspf"),
+        testing=_text(node, "testing"),
+        discovery_method=_text(node, "discovery_method"),
+        pct=pct,
+    )
+
+
+def _source_ip(node: Element) -> str:
+    """
+    Read ``row/source_ip``, normalized when it is an address.
+
+    Args:
+        node (Element): The ``record`` element.
+
+    Returns:
+        str: ``str(address)`` when ``ipaddress`` accepts the text, so two spellings of one IPv6
+            address are equal; otherwise the cleaned text, because a source the report named but
+            that cannot be reasoned about is still worth showing.
+    """
+    text = _text(node, "row/source_ip")
+    try:
+        return str(ipaddress.ip_address(text))
+    except ValueError:
+        return text
+
+
+def _parse_record(node: Element) -> Record:
+    """
+    Read one ``record``.
+
+    Args:
+        node (Element): The ``record`` element.
+
+    Returns:
+        Record: The row, every DKIM and SPF block, and the override reasons, in document order.
+
+    Raises:
+        ReportRefused: ``INVALID_FIELD`` when ``row/count`` is absent or not a whole number.
+    """
+    evaluated = "row/policy_evaluated"
+    return Record(
+        source_ip=_source_ip(node),
+        count=_integer(_raw_text(node, "row/count"), "row/count"),
+        disposition=_text(node, f"{evaluated}/disposition", "none"),
+        dkim_evaluated=_text(node, f"{evaluated}/dkim"),
+        spf_evaluated=_text(node, f"{evaluated}/spf"),
+        override_reasons=tuple(
+            OverrideReason(type=_text(reason, "type"), comment=_text(reason, "comment"))
+            for reason in node.findall(f"{evaluated}/reason")
+        ),
+        header_from=_text(node, "identifiers/header_from", lower=True),
+        dkim=tuple(
+            DkimResult(
+                domain=_text(block, "domain", lower=True),
+                selector=_text(block, "selector"),
+                result=_text(block, "result"),
+            )
+            for block in node.findall("auth_results/dkim")
+        ),
+        spf=tuple(
+            SpfResult(domain=_text(block, "domain", lower=True), result=_text(block, "result"))
+            for block in node.findall("auth_results/spf")
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Public entry point
+# ---------------------------------------------------------------------------
+
+
+def parse_report(xml: bytes, *, source: str = "") -> Report:
+    """
+    Turn the XML of an aggregate report into a ``Report``.
+
+    Args:
+        xml (bytes): The document, in any encoding XML allows.
+        source (str, optional): The file name the XML came from, kept for display. It is cleaned
+            like any other text.
+
+    Returns:
+        Report: The immutable report.
+
+    Raises:
+        ReportRefused: ``FORBIDDEN_DECLARATION`` or ``MALFORMED_XML`` from the XML parser;
+            ``NOT_A_REPORT`` for a wrong root or a missing ``report_metadata`` or
+            ``policy_published``; ``UNSUPPORTED_VERSION`` for a ``version`` other than ``1.0``;
+            ``INVALID_FIELD`` for a period, a ``pct`` or a ``count`` that cannot be trusted.
+    """
+    root = parse_xml(xml)
+    if root.tag != "feedback":
+        raise ReportRefused(Reason.NOT_A_REPORT, "the root element is not feedback")
+
+    version = _find_text(root, "version")
+    if version is not None and version != "1.0":
+        raise ReportRefused(Reason.UNSUPPORTED_VERSION, "version is not 1.0")
+
+    metadata = root.find("report_metadata")
+    policy = root.find("policy_published")
+    if metadata is None or policy is None:
+        raise ReportRefused(Reason.NOT_A_REPORT, "report_metadata or policy_published is missing")
+
+    begin = _timestamp(_raw_text(metadata, "date_range/begin"), "date_range/begin")
+    end = _timestamp(_raw_text(metadata, "date_range/end"), "date_range/end")
+    if end < begin:
+        raise ReportRefused(Reason.INVALID_FIELD, "invalid value in date_range/end")
+
+    return Report(
+        reporter=_text(metadata, "org_name", "?"),
+        report_id=_text(metadata, "report_id"),
+        begin=begin,
+        end=end,
+        policy=_parse_policy(policy),
+        records=tuple(_parse_record(record) for record in root.findall("record")),
+        source_file=_clean(source),
+    )

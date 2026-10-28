@@ -26,7 +26,7 @@ class DkimResult:
     One ``auth_results/dkim`` block.
 
     Attributes:
-        domain (str): The ``d=`` domain of the signature.
+        domain (str): The ``d=`` domain of the signature, lower case.
         selector (str): The ``s=`` selector, the main clue to which service signed.
         result (str): The DKIM verdict as the receiver reported it (``pass``, ``fail``, …).
     """
@@ -42,7 +42,7 @@ class SpfResult:
     One ``auth_results/spf`` block.
 
     Attributes:
-        domain (str): The domain SPF was checked against.
+        domain (str): The domain SPF was checked against, lower case.
         result (str): The SPF verdict as the receiver reported it.
     """
 
