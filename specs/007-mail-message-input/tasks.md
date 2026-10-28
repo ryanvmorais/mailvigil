@@ -111,13 +111,13 @@ fails, the code is wrong.
 
 ## Stage 3 — Wiring: discovery, ingestion, CLI (RF-01, RF-02, RF-06, RF-07, RF-08, RNF-04, ADR-5, ADR-6)
 
-- [ ] `tests/test_reports_discovery.py`, written first (the file is edited because `discover`
+- [x] `tests/test_reports_discovery.py`, written first (the file is edited because `discover`
   changes its return type): the existing cases pass with `Source` in place of `Path`; `.eml` and
   `.mbox` in a folder are found in name order with the attachments, whatever their names and
   letter case; `explicit` is `True` for a named file and `False` for a listed one; a file named
   twice keeps the first spelling and its flag; a subfolder is not entered; a `.txt` in the folder is
   not listed. — RF-06, ADR-5
-- [ ] `tests/test_reports_ingest.py`, first: the same report as a loose `.zip` and inside an `.eml`
+- [x] `tests/test_reports_ingest.py`, first: the same report as a loose `.zip` and inside an `.eml`
   is kept once with `duplicates == 1`; an `.mbox` with three messages gives the reports in file
   order; the non-report messages of a mailbox are not in `skipped`; an explicit `.eml` with no
   attachment is `no_report_attachment` and the same file found in a folder is silent; an `.eml` with
@@ -126,18 +126,24 @@ fails, the code is wrong.
   `<file>: <part>`; an oversized message among good ones costs one `skipped` entry; nothing the
   attachment's name holds survives uncleaned; the result is identical on two runs. — RF-01, RF-02,
   RF-07, RF-08, RNF-04, ADR-6
-- [ ] `src/mailvigil/reports/discovery.py` and `ingest.py`: `Source`, the folder listing of
+- [x] `src/mailvigil/reports/discovery.py` and `ingest.py`: `Source`, the folder listing of
   `.eml`/`.mbox`, `Document`, `_documents` (loose file, `.eml`, `.mbox`), the part and source
   strings built in one place; the loop of `ingest` unchanged apart from what it iterates.
   — RF-01, RF-02, RF-06, RF-07, ADR-5, ADR-6
-- [ ] `tests/test_cli_summary.py`, `tests/test_cli_verdict.py`, `tests/test_cli_json.py` (a new
+- [x] `tests/test_cli_summary.py`, `tests/test_cli_verdict.py`, `tests/test_cli_json.py` (a new
   `tests/test_cli_mail.py` if a file grows too much), first, through `main(argv)` and `capsys`: an
   `.eml` and an `.mbox` through `summary` and `verdict` give the same text and the same exit code as
   the same reports as loose files; `--json` has `skipped[].part`; `--lang pt-BR` shows the new
   reasons in Portuguese; `--help` mentions `.eml` and `.mbox`. — RF-08
-- [ ] `src/mailvigil/cli.py`: the help of `PATH`. — RF-08
-- [ ] Quality gate of the stage: `uv run ruff check .` → `uv run black --check .` → `uv run mypy` →
+- [x] `src/mailvigil/cli.py`: the help of `PATH`. — RF-08
+- [x] Quality gate of the stage: `uv run ruff check .` → `uv run black --check .` → `uv run mypy` →
   `uv run pytest --cov`. Record the result here.
+  **Result (2026-10-28):** `ruff` clean, `black` unchanged, `mypy` strict clean on 23 source files,
+  `pytest --cov` 1,188 tests passed on 3.12 with coverage 100% (1,668 statements, 380 branches).
+  Moves outside the list: the message and mailbox builders of the tests live in
+  `tests/mail_helpers.py` (shared by the ingestion and the CLI tests); `Source` is also re-exported
+  by `mailvigil.reports`; an `.mbox` that is not a regular file is `unreadable` without being opened
+  (a pipe would block the run), the same rule `read_message_file` applies to an `.eml`.
 
 ## Stage 4 — Close (RF-01 to RF-09, all RNF)
 
