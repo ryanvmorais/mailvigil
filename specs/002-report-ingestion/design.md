@@ -389,8 +389,8 @@ that message possible. (RF-01, RF-06, RF-07)
 3. **5 MiB may be too small for a very busy domain.** The source script never hit it. A refusal is
    visible as `DECOMPRESSED_TOO_LARGE`, and `MAX_BYTES` is one constant; raising it is a decision
    for a spec, not a silent edit.
-4. **Typing the expat handlers.** The handler attributes of `XMLParserType` may need explicit
-   annotations or a narrow `cast` to satisfy mypy strict. Mitigation: confined to `xmlsafe.py`.
+4. **Typing the expat handlers.** *Settled on 2026-10-27 (Stage 2):* the stubs type the handler
+   attributes loosely, so plain lambdas satisfy mypy strict with no annotation and no `cast`.
 5. **Cross-platform ordering.** Sorting by the file name string is the same on Windows and Linux;
    the discovery test asserts it with names that differ in case only.
 
