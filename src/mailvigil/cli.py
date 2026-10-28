@@ -251,7 +251,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     shared = argparse.ArgumentParser(add_help=False)
     shared.add_argument(
-        "paths", nargs="+", type=Path, metavar="PATH", help="report files or folders of reports"
+        "paths",
+        nargs="+",
+        type=Path,
+        metavar="PATH",
+        help="report files (.xml .gz .zip), mail files (.eml .mbox) or folders of them",
     )
     shared.add_argument(
         "--config",
