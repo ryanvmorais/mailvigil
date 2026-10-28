@@ -75,28 +75,34 @@ module (RNF-03).
 
 ## Stage 3 — The text (RF-03, RF-04, RF-05, RNF-05)
 
-- [ ] `tests/test_render_verdict.py`, written first, from built `Verdict` values. The title for each
+- [x] `tests/test_render_verdict.py`, written first, from built `Verdict` values. The title for each
   answer, and the reject wording under `p=reject` (`NO PROBLEM SEEN`, `BLOCKING REAL MAIL`); the
   words "safe" and "attack" never appear in any output of the module. — RF-03, RF-05
-- [ ] Same file, the reason: rule 4 names each recognized source with its failing messages, its IP
+- [x] Same file, the reason: rule 4 names each recognized source with its failing messages, its IP
   and the override types, and more than 10 print 10 and a remainder line; rule 5 prints the share
   and the first 5 unrecognized sources, with `foreign domain (selector s)` and `failing signature
   (selector s)` labels, and a remainder line with the failing count of the others; `TOO_EARLY`
   names each failed data rule with what is missing (`need 1 more day`, `need 120 more messages`)
   and, with no reports, says that none was kept; `READY` prints `every rule passes`, and lists the
   first 5 unrecognized failing sources under the limit when there are any. — RF-03, ADR-3
-- [ ] Same file, the table and the rest: the five rules with id, name, measured, needed and result
+- [x] Same file, the table and the rest: the five rules with id, name, measured, needed and result
   (`pass`, `FAIL`, `fail (too early)`); a share printed with `format_share` and beside its count
   (`27 of 28`); the notes only when present; the next step by `deciding` and absent for `READY`;
   the closing sentence always. — RF-03, RF-04
-- [ ] Same file, the layout: no line over 80 columns, also with a 100-character service name, an
+- [x] Same file, the layout: no line over 80 columns, also with a 100-character service name, an
   IPv6 address and a count of `10**12`; ASCII apart from names; a name wider than its column is
   cut with `...`; the output has no color and no control code. — 004 RF-09 applied here
-- [ ] Same file, the criterion cannot drift: monkeypatching each of the four constants changes the
+- [x] Same file, the criterion cannot drift: monkeypatching each of the four constants changes the
   "needed" column and the explanation. — RNF-05
-- [ ] `src/mailvigil/render_verdict.py`: `render_verdict(verdict)` and its English text, using
+- [x] `src/mailvigil/render_verdict.py`: `render_verdict(verdict)` and its English text, using
   `fit`, `address`, `count_noun` and `format_share` from `render.py`. — RF-03 to RF-05, ADR-5
-- [ ] Quality gate. — result recorded when run: ___
+- [x] Quality gate. — result recorded when run: all green on 2026-10-28; 79 new tests in
+  `tests/test_render_verdict.py` (645 in all), coverage 100% (Python 3.12). The "needed" column and
+  the limit in the explanation are read from the `Rule` fields that `judge` builds from the four
+  constants, not from the constants directly, so a hand-built `Verdict` renders what it says; the
+  test moves each constant, judges again and reads the text. The measured column of rules 2 and 5
+  carries the count and the share (`27 of 28 (96.4%)`, `12 (0.3%)`); a title too wide for one line
+  puts the answer on a second line
 
 ## Stage 4 — The command (RF-06)
 
