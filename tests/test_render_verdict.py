@@ -13,13 +13,24 @@ from __future__ import annotations
 
 import dataclasses
 import re
+from collections.abc import Callable
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 import pytest
+from tests.render_verdict_golden import GOLDEN
 
 from mailvigil import verdict as verdict_module
-from mailvigil.render_verdict import render_verdict
+from mailvigil.messages import ENGLISH, PORTUGUESE, Messages
+from mailvigil.render_verdict import (
+    measured_text,
+    missing_text,
+    needed_text,
+    next_sentence,
+    note_sentence,
+    reason_sentence,
+    render_verdict,
+)
 from mailvigil.reports import PolicyPublished
 from mailvigil.senders import Outcome
 from mailvigil.summary import Counts, FailingSource, Period, Summary
@@ -905,3 +916,144 @@ def test_the_line_fits_80_columns_with_huge_counts() -> None:
     assert all(len(line) <= 80 for line in lines_of(verdict))
     assert all(ord(ch) < 128 for ch in render_verdict(verdict))
     assert str(huge) in _left_out_text(verdict)
+
+
+# ---------------------------------------------------------------------------
+# The text is pinned, whole, in both languages (008 RNF-05, ADR-2)
+# ---------------------------------------------------------------------------
+
+
+def _all_notes() -> Verdict:
+    """Judge a clean verdict and attach one note of every kind."""
+    notes = (
+        Note(NoteKind.FRAGILE, numbers=(120, 80, 2000)),
+        Note(NoteKind.PARTIAL_POLICY, numbers=(50,)),
+        Note(NoteKind.POLICY_CHANGED, texts=("none", "quarantine")),
+        Note(NoteKind.SUBDOMAIN_POLICY, texts=("none", "reject")),
+        Note(NoteKind.CURRENTLY_QUARANTINE),
+    )
+    return dataclasses.replace(make_verdict(p="quarantine"), notes=notes)
+
+
+def _many_recognized() -> Verdict:
+    """Twelve failing sources of recognized senders: two more than the text prints."""
+    sources = tuple(
+        known(40 - number, service=f"Example Mailer {number}", ip=f"192.0.2.{number}")
+        for number in range(1, 13)
+    )
+    return make_verdict(sources=sources)
+
+
+# The verdicts whose whole text is recorded below. The refactor of 008 stage 1 must leave every
+# one byte for byte as it was, in English and in Brazilian Portuguese.
+PINNED_CASES: dict[str, Callable[[], Verdict]] = {
+    "ready": make_verdict,
+    "ready_still_failing": lambda: make_verdict(sources=(other(5, selectors=("s1",)),)),
+    "ready_enforcing": lambda: make_verdict(p="reject"),
+    "too_early_no_report": lambda: make_verdict(days=0),
+    "too_early_missing": lambda: make_verdict(days=10, with_reports=8, ok=50),
+    "recognized_one": lambda: make_verdict(sources=(known(30),)),
+    "recognized_overrides": lambda: make_verdict(
+        sources=(known(30, override_reasons=("forwarded", "mailing_list")),)
+    ),
+    "recognized_several": lambda: make_verdict(
+        sources=(known(30), known(20, service="Example Mail Two", ip="192.0.2.11"))
+    ),
+    "recognized_over_limit": _many_recognized,
+    "unrecognized_at_limit": lambda: make_verdict(ok=29840, sources=(other(160),)),
+    "unrecognized_over_limit": lambda: make_verdict(
+        ok=2000,
+        sources=tuple(other(20 - number, number) for number in range(1, 8)),
+    ),
+    "all_notes": _all_notes,
+    "left_out": lambda: _with_left_out(LeftOut(skipped=2, duplicates=1, other_domain=3)),
+}
+
+
+@pytest.mark.parametrize("case", sorted(PINNED_CASES))
+@pytest.mark.parametrize(("code", "messages"), [("en", ENGLISH), ("pt-BR", PORTUGUESE)])
+def test_the_text_of_a_fixed_verdict_is_recorded_whole(
+    case: str, code: str, messages: Messages
+) -> None:
+    """The guard of the 008 refactor: words and layout stay what they were, byte for byte."""
+    text = render_verdict(PINNED_CASES[case](), messages)
+
+    assert tuple(text.split("\n")) == GOLDEN[case][code]
+
+
+# ---------------------------------------------------------------------------
+# The sentences the HTML report shares with the text (008 RF-02, ADR-2)
+# ---------------------------------------------------------------------------
+
+
+def test_the_reason_sentence_for_each_of_the_five_cases() -> None:
+    """The sentence comes without its label, so the page can place it where it wants."""
+    cases = [
+        (make_verdict(), "every rule passes."),
+        (make_verdict(days=10, with_reports=8, ok=50), "not enough reports to tell yet."),
+        (make_verdict(days=0), "not enough reports to tell yet."),
+        (make_verdict(sources=(known(30),)), "a recognized sender fails DMARC."),
+        (
+            make_verdict(ok=29840, sources=(other(160),)),
+            "failures from unrecognized sources are >0.5% of the messages (160 of 30000); "
+            "the limit is 0.5%.",
+        ),
+    ]
+
+    for verdict, sentence in cases:
+        assert reason_sentence(verdict, ENGLISH) == sentence
+
+
+def test_the_reason_sentence_is_what_the_text_prints_after_the_label() -> None:
+    """Both renderers read the same sentence, so they cannot drift."""
+    for build in PINNED_CASES.values():
+        verdict = build()
+        for messages in (ENGLISH, PORTUGUESE):
+            label = messages.verdict.why_label
+            first = flat(render_verdict(verdict, messages).split("\n\n")[1])
+            assert first.startswith(f"{label} {flat(reason_sentence(verdict, messages))}")
+
+
+def test_the_next_sentence_is_empty_when_ready_and_one_sentence_otherwise() -> None:
+    """Nothing is left to do for a ready verdict; every other answer has one thing to do."""
+    assert next_sentence(make_verdict(), ENGLISH) == ""
+    for verdict in (
+        make_verdict(days=0),
+        make_verdict(sources=(known(30),)),
+        make_verdict(ok=29840, sources=(other(160),)),
+    ):
+        sentence = next_sentence(verdict, ENGLISH)
+        assert sentence
+        assert not sentence.startswith("Next")
+        assert "\n" not in sentence
+
+
+def test_measured_needed_and_missing_text_for_each_rule() -> None:
+    """The figures of the rules table, one rule at a time, are public."""
+    verdict = make_verdict(days=10, with_reports=8, ok=50, sources=(other(1),))
+    by_id = {rule.id: rule for rule in verdict.rules}
+
+    assert measured_text(by_id[RuleId.PERIOD], ENGLISH) == "10 days"
+    assert measured_text(by_id[RuleId.COVERAGE], ENGLISH) == "8 of 10 (80.0%)"
+    assert measured_text(by_id[RuleId.VOLUME], ENGLISH) == "51"
+    assert measured_text(by_id[RuleId.RECOGNIZED_FAILURES], ENGLISH) == "0"
+    assert measured_text(by_id[RuleId.UNRECOGNIZED_FAILURES], ENGLISH) == "1 (2.0%)"
+    assert needed_text(by_id[RuleId.PERIOD]) == f">= {MIN_DAYS_SPANNED}"
+    assert needed_text(by_id[RuleId.COVERAGE]) == f">= {MIN_COVERAGE_PERCENT}%"
+    assert needed_text(by_id[RuleId.VOLUME]) == f">= {MIN_MESSAGES}"
+    assert needed_text(by_id[RuleId.RECOGNIZED_FAILURES]) == "<= 0"
+    assert needed_text(by_id[RuleId.UNRECOGNIZED_FAILURES]) == "<= 0.5%"
+    assert missing_text(by_id[RuleId.PERIOD], ENGLISH) == "need 18 more days"
+    assert missing_text(by_id[RuleId.VOLUME], ENGLISH) == "need 949 more messages"
+
+
+@pytest.mark.parametrize("messages", [ENGLISH, PORTUGUESE])
+def test_the_sentence_of_every_kind_of_note_is_filled(messages: Messages) -> None:
+    """The test iterates ``NoteKind``: a kind added later cannot reach the page as a bare key."""
+    for kind in NoteKind:
+        note = Note(kind, numbers=(1, 2, 3), texts=("a", "b"))
+        sentence = note_sentence(note, messages)
+
+        assert sentence
+        assert "{" not in sentence
+        assert str(kind) not in sentence
