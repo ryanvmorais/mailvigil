@@ -4,8 +4,8 @@
 #
 # Runs the canonical sequence in CHECK mode (it never edits files: formatting
 # already happens while editing, through the Claude hook or the editor) and
-# aborts the commit if any step fails. The private repository has no branch
-# protection on the Free plan, so this hook and a green CI are the real gate.
+# aborts the commit if any step fails. The `proteger-main` ruleset requires a green CI on the pull
+# request; this hook fails a bad commit earlier, before it leaves the machine.
 #
 # Activate once per clone:
 #   git config core.hooksPath .githooks
