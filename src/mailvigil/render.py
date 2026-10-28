@@ -100,7 +100,7 @@ def format_share(part: int, whole: int) -> str:
     return f"{tenths // 10}.{tenths % 10}%"
 
 
-def _fit(text: str, width: int) -> str:
+def fit(text: str, width: int) -> str:
     """
     Make a text safe to print and no wider than a column.
 
@@ -123,7 +123,7 @@ def _fit(text: str, width: int) -> str:
     return cleaned[: width - 3] + "..."
 
 
-def _count(number: int, singular: str, plural: str = "") -> str:
+def count_noun(number: int, singular: str, plural: str = "") -> str:
     """
     Write a count with its noun.
 
@@ -138,7 +138,7 @@ def _count(number: int, singular: str, plural: str = "") -> str:
     return f"{number} {singular if number == 1 else plural or singular + 's'}"
 
 
-def _address(source_ip: str) -> str:
+def address(source_ip: str) -> str:
     """
     Name a source address, which a report may leave empty.
 
@@ -164,13 +164,13 @@ def _label(row: SenderRow, width: int) -> str:
             wide it is the address that is cut, so the kind stays visible.
     """
     if row.outcome is Outcome.KNOWN:
-        return _fit(row.service, width)
-    address = _address(row.source_ip)
+        return fit(row.service, width)
+    text = address(row.source_ip)
     suffix = f" ({_KIND_NOTES[row.outcome]})"
     room = width - len(suffix)
     if room < 4:
-        return _fit(address + suffix, width)
-    return _fit(address, room) + suffix
+        return fit(text + suffix, width)
+    return fit(text, room) + suffix
 
 
 def _field(key: str, value: str, key_width: int = _HEADER_KEY) -> str:
@@ -186,7 +186,7 @@ def _field(key: str, value: str, key_width: int = _HEADER_KEY) -> str:
         str: The line, with the value cut to what is left of the width.
     """
     prefix = f"  {key:<{key_width}}"
-    return prefix + _fit(value, _WIDTH - len(prefix))
+    return prefix + fit(value, _WIDTH - len(prefix))
 
 
 # ---------------------------------------------------------------------------
@@ -208,14 +208,14 @@ def _header(summary: Summary, config_source: str | None) -> list[str]:
             note on its own line below the field it explains.
     """
     indent = " " * (2 + _HEADER_KEY)
-    lines = [f"MailVigil summary for {_fit(summary.domain, _WIDTH - 22)}"]
+    lines = [f"MailVigil summary for {fit(summary.domain, _WIDTH - 22)}"]
 
     if config_source is None:
         lines.append(_field("config", "none"))
     else:
-        suffix = f" ({_count(summary.selectors_configured, 'selector')})"
+        suffix = f" ({count_noun(summary.selectors_configured, 'selector')})"
         room = _WIDTH - len(indent) - len(suffix)
-        lines.append(_field("config", _fit(config_source, room) + suffix))
+        lines.append(_field("config", fit(config_source, room) + suffix))
     if summary.selectors_configured == 0:
         lines.append(indent + "no selectors are configured, so every sender is unrecognized")
         lines.append(indent + "(see the Configuration section of the README)")
@@ -225,7 +225,7 @@ def _header(summary: Summary, config_source: str | None) -> list[str]:
         lines.append(_field("period", "no reports"))
     else:
         verb = "has" if period.days_with_reports == 1 else "have"
-        days = _count(period.days_spanned, "day")
+        days = count_noun(period.days_spanned, "day")
         lines.append(
             _field(
                 "period",
@@ -235,7 +235,7 @@ def _header(summary: Summary, config_source: str | None) -> list[str]:
         )
 
     lines.append(
-        _field("reports", f"{summary.reports} from {_count(summary.reporters, 'reporter')}")
+        _field("reports", f"{summary.reports} from {count_noun(summary.reporters, 'reporter')}")
     )
 
     policy = summary.policy
@@ -252,7 +252,7 @@ def _header(summary: Summary, config_source: str | None) -> list[str]:
         if summary.earlier_p:
             earlier = ", ".join(summary.earlier_p)
             lines.append(
-                indent + _fit(f"changed during the period, earlier p: {earlier}", _WIDTH - 12)
+                indent + fit(f"changed during the period, earlier p: {earlier}", _WIDTH - 12)
             )
 
     total = summary.totals.total
@@ -365,8 +365,8 @@ def _senders(summary: Summary) -> list[str]:
         messages = sum(row.counts.total for row in hidden)
         failing = sum(row.counts.failing for row in hidden)
         lines.append(
-            f"  ... and {_count(len(hidden), 'other source')}: "
-            f"{_count(messages, 'message')}, {failing} failing"
+            f"  ... and {count_noun(len(hidden), 'other source')}: "
+            f"{count_noun(messages, 'message')}, {failing} failing"
         )
     return lines
 
@@ -407,15 +407,15 @@ def _source_lines(source: FailingSource) -> list[str]:
     """
     dkim = "/".join(source.dkim) or "none"
     spf = "/".join(source.spf) or "none"
-    detail = f"{_count(source.messages, 'message')}  dkim: {dkim}, spf: {spf}"
+    detail = f"{count_noun(source.messages, 'message')}  dkim: {dkim}, spf: {spf}"
     if source.override_reasons:
         detail += "; " + ", ".join(source.override_reasons)
     if source.outcome is Outcome.UNKNOWN:
-        who = _address(source.source_ip)
+        who = address(source.source_ip)
     else:
         who = _who(source)
-        detail = f"{_address(source.source_ip)}  {detail}"
-    return ["  ! " + _fit(who, _WIDTH - 4), "      " + _fit(detail, _WIDTH - 6)]
+        detail = f"{address(source.source_ip)}  {detail}"
+    return ["  ! " + fit(who, _WIDTH - 4), "      " + fit(detail, _WIDTH - 6)]
 
 
 def _failures(summary: Summary) -> list[str]:
@@ -433,9 +433,8 @@ def _failures(summary: Summary) -> list[str]:
     if not summary.failing:
         return ["No failing messages."]
     messages = sum(source.messages for source in summary.failing)
-    lines = [
-        f"! FAILING: {_count(messages, 'message')} in {_count(len(summary.failing), 'source')}"
-    ]
+    source_count = count_noun(len(summary.failing), "source")
+    lines = [f"! FAILING: {count_noun(messages, 'message')} in {source_count}"]
     recognized = [source for source in summary.failing if source.outcome is Outcome.KNOWN]
     unrecognized = [source for source in summary.failing if source.outcome is not Outcome.KNOWN]
     for title, sources in (
@@ -451,8 +450,8 @@ def _failures(summary: Summary) -> list[str]:
         if rest:
             hidden = sum(source.messages for source in rest)
             lines.append(
-                f"  ... and {_count(len(rest), 'other source')}: "
-                f"{_count(hidden, 'failing message')}"
+                f"  ... and {count_noun(len(rest), 'other source')}: "
+                f"{count_noun(hidden, 'failing message')}"
             )
     return lines
 
@@ -483,7 +482,7 @@ def _left_out(
     for file in skipped[:_LIMIT]:
         phrase = _REASON_PHRASES[file.reason]
         # The phrase is the part that must survive, so it is the name that is cut.
-        name = _fit(file.path.name or str(file.path), _WIDTH - 4 - len(phrase) - 2)
+        name = fit(file.path.name or str(file.path), _WIDTH - 4 - len(phrase) - 2)
         lines.append(f"    {name}: {phrase}")
     if len(skipped) > _LIMIT:
         lines.append(f"    ... and {len(skipped) - _LIMIT} more")
@@ -541,7 +540,7 @@ def no_reports_message(result: IngestionResult, domain: str) -> str:
             other domains, without a trailing newline.
     """
     summary = summarize(result, Config(domain, MappingProxyType({})))
-    lines = [f"No DMARC report for {_fit(domain, _WIDTH - 30)} was kept."]
+    lines = [f"No DMARC report for {fit(domain, _WIDTH - 30)} was kept."]
     if not (summary.skipped or summary.duplicates or summary.other_domain):
         # A folder yields only the providers' attachment names, so a renamed file is not "missing
         # from the paths": say how to read it anyway.
