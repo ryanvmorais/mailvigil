@@ -118,7 +118,8 @@ tests/               # pytest, one test file per module (test_reports_*.py incl.
                      # test_cli_exit_codes.py, test_cli_mail.py, test_htmlkit.py, test_html_style.py,
                      # test_html_charts.py, test_render_html.py, test_render_html_hostile.py,
                      # test_cli_html.py); fixtures are synthetic, built in conftest.py,
-                     # cli_helpers.py, mail_helpers.py, schema_examples.py, html_helpers.py or tmp_path
+                     # cli_helpers.py, mail_helpers.py, schema_examples.py, html_helpers.py,
+                     # render_verdict_golden.py or tmp_path
 specs/               # spec-driven development: requirements → design → tasks per feature
 docs/stack.md        # each technology of the stack, why it was chosen, what to study first
 docs/json-schema.md  # every field of the two --json documents and the compatibility promise
