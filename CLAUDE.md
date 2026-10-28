@@ -7,8 +7,9 @@ This file guides Claude Code (claude.ai/code) when working in this repository.
 MailVigil is an open-source command-line tool that reads DMARC aggregate reports (RUA, usually
 `.zip`, `.gz` or `.xml`) and says, in plain language, who is sending mail as a domain and whether
 it is safe to move the policy to `p=reject`. Python `>=3.12`, standard library only (zero runtime
-dependencies), offline. It is pre-0.1: only the package skeleton and `mailvigil --version` exist;
-everything else is specified in [specs/](specs/) first. The repository has been public since
+dependencies), offline. It is pre-0.1: the CLI only answers `mailvigil --version`, and the report
+ingestion layer (`mailvigil.reports`) is built and tested but not wired to the CLI yet; everything
+else is specified in [specs/](specs/) first. The repository has been public since
 2026-10-27 (the maintainer made it public, not Claude); nothing is announced or published to PyPI
 until the first version is ready.
 
@@ -57,7 +58,15 @@ src/mailvigil/
   __init__.py        # __version__ read from package metadata
   cli.py             # argparse entry point (`mailvigil = mailvigil.cli:main`)
   py.typed           # marks the package as typed (PEP 561)
-tests/               # pytest; reports used as fixtures are synthetic
+  reports/           # report ingestion (spec 002); public API re-exported by __init__.py
+    errors.py        #   Reason (StrEnum) and ReportRefused: every refusal is typed
+    model.py         #   frozen dataclasses: Report, Record, PolicyPublished, IngestionResult…
+    xmlsafe.py       #   the only XML parser: expat handlers refuse DOCTYPE and ENTITY
+    reader.py        #   .xml/.gz/.zip to bytes, capped at MAX_BYTES (5 MiB) as it decompresses
+    parser.py        #   XML tree to Report: sanitized text, strict numbers, IPs normalized
+    discovery.py     #   paths (files and folders) to an ordered, deduplicated list of files
+    ingest.py        #   ingest(paths, domain): the entry point; refusals go to `skipped`
+tests/               # pytest, one test_reports_*.py per module; fixtures are synthetic, built in conftest.py
 specs/               # spec-driven development: requirements → design → tasks per feature
 docs/stack.md        # each technology of the stack, why it was chosen, what to study first
 .githooks/           # versioned pre-commit hook (core.hooksPath)
@@ -69,12 +78,15 @@ uv.lock              # never edit by hand (generated; a hook blocks it)
 > ⚠️ **Zero runtime dependencies is the product promise** (offline, nothing to install but the
 > tool). `dependencies = []` in `pyproject.toml`, and the CI `package` job fails if the wheel
 > declares any `Requires-Dist`. Dev tools go in `[dependency-groups] dev`. Parsing uses the
-> standard library only (`argparse`, `tomllib`, `xml.etree`, `zipfile`, `gzip`).
+> standard library only (`argparse`, `tomllib`, `xml.etree`, `xml.parsers.expat`, `zipfile`,
+> `gzip`, `ipaddress`).
 
-> ⚠️ **Reports are hostile input.** The parser must refuse any XML containing `DOCTYPE` or
-> `ENTITY` (entity expansion) and cap decompressed size (5 MiB per member, against zip bombs),
-> and both defenses need tests. The starting point is the script in the maintainer's site
-> repository (`site-ryan-morais/scripts/relatorios_dmarc.py`).
+> ⚠️ **Reports are hostile input.** The parser refuses any XML containing `DOCTYPE` or `ENTITY`
+> (entity expansion) inside `reports/xmlsafe.py`, and `reports/reader.py` caps the decompressed
+> size at `MAX_BYTES` (5 MiB, against zip bombs) by counting the bytes actually read, never a
+> declared size. Both defenses have tests that feed the attack; keep it so when touching them, and
+> keep `xmlsafe.py` the only module that creates an XML parser. The starting point was the script in
+> the maintainer's site repository (`site-ryan-morais/scripts/relatorios_dmarc.py`).
 
 > ⚠️ **Never use a real DMARC report** in tests, docs, issues or PRs: it carries IP addresses and
 > domains. Fixtures are synthetic. `*.xml.gz`, `*.xml.zip` and `reports/` are git-ignored except

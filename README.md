@@ -27,8 +27,8 @@ out DMARC, and it runs entirely on your machine: your reports are never sent to 
 
 | Area | What | Version | Status |
 |---|---|---|---|
-| Input | Read a folder or files (`.zip`, `.gz`, `.xml`), filter by domain | v0.1 | Planned |
-| Hostile input | Cap decompressed size (zip bombs) and refuse XML with `DOCTYPE` or `ENTITY` (entity expansion) | v0.1 | Planned |
+| Input | Read a folder or files (`.zip`, `.gz`, `.xml`), filter by domain | v0.1 | Library built, not wired to the CLI yet |
+| Hostile input | Cap decompressed size (zip bombs) and refuse XML with `DOCTYPE` or `ENTITY` (entity expansion) | v0.1 | Library built, not wired to the CLI yet |
 | Configuration | A TOML file with your domain and a map from DKIM selector to service name | v0.1 | Planned |
 | Summary | Per sender and per situation (ok, fragile, failing), failures highlighted | v0.1 | Planned |
 | Verdict | "Ready for `reject`?" with a declared criterion (minimum window, minimum volume, no legitimate failures) | v0.1 | Planned |
