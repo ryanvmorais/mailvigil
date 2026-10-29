@@ -288,7 +288,8 @@ abre uma conexão de rede, e o `summary` e o `verdict` nunca carregam o código 
 mailvigil fetch --host imap.example.com --user me@example.com --to reports/
 
 # Só e-mail recente, no máximo 200 mensagens, a senha lida de um arquivo (para o cron)
-mailvigil fetch --host imap.example.com --user me@example.com --to reports/ --since 2026-10-01 --limit 200 --password-file ~/.mailvigil-password
+mailvigil fetch --host imap.example.com --user me@example.com --to reports/ \
+  --since 2026-10-01 --limit 200 --password-file ~/.mailvigil-password
 ```
 
 O que ele faz:
@@ -385,10 +386,16 @@ roda antes de cada commit por um hook versionado:
 # Ative o hook de pre-commit uma vez por clone
 git config core.hooksPath .githooks
 
-# A mesma sequência que o hook e o CI rodam
+# Lint (o hook e o CI rodam estes mesmos quatro passos, nesta ordem)
 uv run ruff check .
+
+# Confira a formatação
 uv run black --check .
+
+# Confira os tipos (strict)
 uv run mypy
+
+# Rode os testes com cobertura
 uv run pytest --cov
 ```
 
