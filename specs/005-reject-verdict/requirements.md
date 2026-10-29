@@ -272,12 +272,19 @@ could be printed while reports had been refused (unsafe XML, too large once deco
   **When** `[project].dependencies` is read
   **Then** it is still empty.
 
+- **Given** the caller passes the moment of the run and the latest report ended more than 14 days
+  before it
+  **When** the verdict is built
+  **Then** a note says how many days ago it ended: the figures may not describe the mail sent
+  today. It never changes the answer, and without a moment there is no such note.
+
 ### RNF-02 — Pure and deterministic
 
 - **Given** a `Summary`
   **When** it is judged twice
   **Then** the verdicts are equal: nothing depends on the clock, the locale, the file system or the
-  order of the reports. `judge` does no I/O.
+  order of the reports. `judge` does no I/O and reads no clock: the moment of the run, when there is
+  one, is its parameter.
 
 ### RNF-03 — Rules apart from text
 

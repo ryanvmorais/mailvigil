@@ -168,8 +168,8 @@ adds the reading layer; it does not add a command (Resolved decision 5).
   **Then** `1.0` and its absence are accepted; any other value is refused with a reason saying the
   version is unsupported.
 - **Given** a record whose `count` is not an integer, is negative or is above one trillion
-  (10^12, a figure no real report reaches), or a period that is not a valid timestamp, or a `pct`
-  outside 0 to 100
+  (10^12, a figure no real report reaches), or a period that is not a valid timestamp or is longer
+  than seven days, or a `pct` outside 0 to 100
   **When** it is parsed
   **Then** the whole report is refused: a number the verdict cannot trust is worse than a missing
   report.
@@ -182,6 +182,14 @@ adds the reading layer; it does not add a command (Resolved decision 5).
   **When** it is parsed
   **Then** it is read correctly. The exact list of quirks is closed in the design, from synthetic
   fixtures that imitate them.
+
+### RF-04b — A report cannot date itself ahead of the run
+
+- **Given** the caller passes the moment of the run
+  **When** a report ends more than one day after it
+  **Then** the report is refused like any other whose period cannot be trusted (`INVALID_FIELD`),
+  so a report cannot present itself as the latest one by its date alone. Without a moment, the
+  check is not made, and `ingest` still reads no clock.
 
 ### RF-05 — Text fields are inert
 

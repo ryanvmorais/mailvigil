@@ -84,7 +84,7 @@ src/mailvigil/
                      #   lines, parts and depth before and while the `email` parser works
     parser.py        #   XML tree to Report: sanitized text, strict numbers, IPs normalized
     discovery.py     #   paths (files and folders) to an ordered list of `Source`s, deduplicated
-    ingest.py        #   ingest(paths, domain): the entry point; refusals go to `skipped`
+    ingest.py        #   ingest(paths, domain, now=None): the entry point; refusals go to `skipped`
   text.py            # text and domain rules shared by reports and config (clean_text, normalize_domain…)
   config.py          # load_config(path) → frozen Config (domain + selector map); check_domain is shared with
                      # the CLI's --domain; ConfigError is typed (spec 003)

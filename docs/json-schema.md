@@ -199,8 +199,8 @@ A share is `measured` over `whole`, compared with integers: rule 2 passes when
 
 | Key | Type | Meaning |
 |---|---|---|
-| `kind` | string | `fragile`, `partial_policy`, `policy_changed`, `subdomain_policy` or `currently_quarantine` |
-| `numbers` | list of integers | The figures of the note: `fragile` has fragile messages, those that pass by SPF only and all messages; `partial_policy` has `pct` |
+| `kind` | string | `fragile`, `partial_policy`, `policy_changed`, `subdomain_policy`, `currently_quarantine` or `stale` |
+| `numbers` | list of integers | The figures of the note: `fragile` has fragile messages, those that pass by SPF only and all messages; `partial_policy` has `pct`; `stale` has the whole days since the latest report ended |
 | `texts` | list of strings or nulls | The words of the note: `policy_changed` has the earlier `p` values, oldest first; `subdomain_policy` has `sp` and `np`, with null for the one that is absent |
 
 ### `left_out`

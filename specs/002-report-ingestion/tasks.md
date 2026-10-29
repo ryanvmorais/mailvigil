@@ -173,3 +173,12 @@ public entry point.
   the four outputs. — RF-04
 - [x] Quality gate. — result recorded when run: ruff, black and mypy clean; pytest passed with
   coverage 100% (Python 3.12, 2026-10-28); the new `main(argv)` test fails without the ceiling.
+
+## Stage 8 — Bound the period and the recency of a report
+
+- [x] `parser.py`: `MAX_PERIOD` (7 days); a longer period refuses the report with `INVALID_FIELD`.
+  `ingest.py`: the optional `now` and `FUTURE_TOLERANCE` (one day); a report that ends later is
+  skipped with `INVALID_FIELD`. Tests at the boundary of both and one run through `main(argv)`. —
+  RF-04, RF-04b
+- [x] Quality gate. — result recorded when run: ruff, black and mypy clean; pytest passed with
+  coverage 100% (Python 3.12, 2026-10-29).
