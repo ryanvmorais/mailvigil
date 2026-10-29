@@ -198,6 +198,10 @@ _VERDICT = VerdictMessages(
             NoteKind.CURRENTLY_QUARANTINE: (
                 "The policy is p=quarantine now; this verdict is about moving to p=reject."
             ),
+            NoteKind.SILENT_REPORTER: (
+                "{name} sent {share} of the messages but nothing in the last {days} days; the "
+                "days it missed may look covered by other reporters."
+            ),
             NoteKind.STALE: (
                 "The latest report ended {days} days ago, so the figures may not describe the "
                 "mail you send today."

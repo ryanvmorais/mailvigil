@@ -218,3 +218,13 @@ command, then the close. The computation (`summary.py`) never imports `render` (
 - [x] Quality gate and CI. — result recorded when run: local gate all green on 2026-10-28; 507
   passed (505 before, 2 new), coverage 100% (Python 3.12), `uv lock --check` ok; the CI runs on
   the pull request
+
+## Stage 3 — Coverage by time, and what each reporter sent
+
+- [x] `summary.py`: `MIN_COVERED_SECONDS`; `_covered` merges the periods in time and counts a day
+  when half of it is covered; `_period` takes its span from the reports; `ReporterActivity` and
+  `Summary.reporter_activity`. Tests: a missing report that does not start at midnight leaves a
+  hole, two short periods on one day add up, a long period is one range, zero length covers
+  nothing. — RF-03
+- [x] Quality gate. — result recorded when run: ruff, black and mypy clean; pytest passed with
+  coverage 100% (Python 3.12, 2026-10-29).

@@ -165,8 +165,12 @@ After the loop, the accumulators become tuples and are sorted (RNF-05):
 **Period (ADR-3).** For each report, `first = begin.date()` and `last = (end - 1 µs).date()` when
 `end > begin`, else `begin.date()`: the end of a period is exclusive, so a report that runs from
 midnight to the next midnight touches one day, as one that ends at 23:59:59 does. Both datetimes are
-already UTC and timezone-aware (002). The intervals are sorted and merged, and `days_with_reports`
-is the sum of the merged lengths; `days_spanned` is `(max last - min first).days + 1`.
+already UTC and timezone-aware (002). `days_spanned` is `(max last - min first).days + 1`, from the
+day the earliest report begins. A day is covered when the periods of the reports, merged in time,
+cover at least `MIN_COVERED_SECONDS` (twelve hours) of it; only the first and the last day of a
+merged period can be partial, so the days between are one range. `covered` holds the merged
+intervals of those days and `days_with_reports` is the sum of their lengths. `reporter_activity`
+holds, per organization, the sum of its messages and its latest `end`, most messages first.
 
 **Policy.** Reports are ordered by `(end, begin, reporter, report_id)`; the last one's
 `PolicyPublished` is `policy`; `earlier_p` is the distinct `p` values of the others that differ from
@@ -317,16 +321,18 @@ requirements. One source may show several reasons for one mechanism (`fail/none`
 
 ### ADR-3 — The period is counted from merged day intervals, with an exclusive end
 
-**Decision.** `days_with_reports` is the size of the union of `[first, last]` day intervals, one per
-report, where `last` is the day of `end` minus one microsecond.
+**Decision.** `days_with_reports` is the size of the union of the days the merged periods cover for
+at least twelve hours; a day is not covered just because a report touches it (amended by the
+coverage change below).
 **Alternatives.** Build a `set` of every day each report touches; use `end.date()` as the last day.
 **Why.** Reporters differ: some end a period at 23:59:59, others at the next midnight, and the
 second would otherwise claim an extra day and make a gap look covered. A set is wrong for another
 reason: a hostile report with a period of centuries is valid under 002 and would allocate a day per
 entry, while interval merging is `O(n log n)` in the number of reports and uses constant memory per
 interval (RNF-09). The span is then truthful, and the long period is shown as the odd fact it is.
-**Trade-off.** A report that ends exactly at `begin` (zero length) counts for the day of `begin`,
-a choice, not a measurement. (RF-03)
+**Trade-off.** A report that ends exactly at `begin` (zero length) names its day in the span but
+covers no time. A report that starts at 14:00 leaves its first day with ten hours, which is not
+covered; the 80% of rule 2 absorbs the edge days. (RF-03)
 
 ### ADR-4 — Make the text writable by encoding it, not by reconfiguring the stream
 

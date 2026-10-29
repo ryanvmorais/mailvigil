@@ -176,6 +176,17 @@ named constants in one module (Resolved decisions 1 and 2).
 - **Given** a `sp` or `np` different from `p`
   **When** the verdict is built
   **Then** a note shows it: moving `p` does not change what they already say.
+- **Given** the caller passes the moment of the run and the latest report ended more than 14 days
+  before it
+  **When** the verdict is built
+  **Then** a note says how many days ago it ended: the figures may not describe the mail sent
+  today. It never changes the answer, and without a moment there is no such note.
+- **Given** a reporter with at least a tenth of the messages whose latest report ended more than
+  seven days before the latest report of all
+  **When** the verdict is built
+  **Then** a note names the one with the most messages and says for how many days it has been
+  silent: the rule about days with a report counts the union of the reporters, so the days it
+  missed may look covered. It never changes the answer, and it needs no clock.
 
 ### RF-05 — A policy that already enforces
 
@@ -271,12 +282,6 @@ could be printed while reports had been refused (unsafe XML, too large once deco
 - **Given** the project at any commit
   **When** `[project].dependencies` is read
   **Then** it is still empty.
-
-- **Given** the caller passes the moment of the run and the latest report ended more than 14 days
-  before it
-  **When** the verdict is built
-  **Then** a note says how many days ago it ended: the figures may not describe the mail sent
-  today. It never changes the answer, and without a moment there is no such note.
 
 ### RNF-02 — Pure and deterministic
 

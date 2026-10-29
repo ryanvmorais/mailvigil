@@ -98,6 +98,7 @@ class NoteKind(StrEnum):
     POLICY_CHANGED = "policy_changed"      # texts: the earlier p values, oldest first
     SUBDOMAIN_POLICY = "subdomain_policy"  # texts: sp, np ("" when absent)
     CURRENTLY_QUARANTINE = "currently_quarantine"
+    SILENT_REPORTER = "silent_reporter"
     STALE = "stale"
 
 class Note:
@@ -176,6 +177,9 @@ retyped numbers, and a test fails if the rendered column and the constants disag
    - `POLICY_CHANGED` when `summary.earlier_p` is not empty.
    - `SUBDOMAIN_POLICY` when `sp` or `np` is present and differs from `p`.
    - `CURRENTLY_QUARANTINE` when the latest `p` is `quarantine`.
+   - `SILENT_REPORTER` when a `reporter_activity` entry has `SILENT_MIN_PERCENT` (10) of the
+     messages and its latest `end` is more than `SILENT_AFTER` (7 days) before the period's `end`;
+     the first such entry (the largest) is named; `numbers` holds the days, its messages and all.
    - `STALE` when `judge(summary, now)` got a `now` and the latest `end` is more than `STALE_AFTER`
      (14 days) before it; `numbers` holds the whole days.
 6. **Left out (RF-09).** `left_out = LeftOut(len(summary.skipped), summary.duplicates,

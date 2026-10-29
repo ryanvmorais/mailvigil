@@ -221,6 +221,7 @@ def test_summary_has_the_fields_of_the_design_and_no_display_text() -> None:
         "other_domain",
         "days",
         "covered",
+        "reporter_activity",
     }
     assert [name for name, kind in fields.items() if kind == "str"] == ["domain"]
 
@@ -237,6 +238,7 @@ def test_every_collection_of_a_summary_is_a_tuple() -> None:
         "skipped_by_reason",
         "days",
         "covered",
+        "reporter_activity",
     ):
         assert isinstance(getattr(summary, name), tuple)
     assert isinstance(summary.senders[0].selectors, tuple)
@@ -693,13 +695,57 @@ def test_the_last_day_is_the_last_one_touched_not_the_day_of_a_midnight_end() ->
     assert period.last_day == date(2026, 10, 3)
 
 
-def test_a_zero_length_period_counts_the_day_of_begin() -> None:
-    """A choice, not a measurement (ADR-3)."""
+def test_a_zero_length_period_spans_its_day_but_covers_nothing() -> None:
+    """The day is named, since the report exists, but no time of it is covered."""
     period = summary_of_reports(dated(at(7, 8), at(7, 8))).period
 
     assert period is not None
     assert (period.first_day, period.last_day) == (date(2026, 10, 7), date(2026, 10, 7))
-    assert (period.days_spanned, period.days_with_reports) == (1, 1)
+    assert (period.days_spanned, period.days_with_reports) == (1, 0)
+
+
+def test_a_missing_report_leaves_its_day_uncovered_when_reports_do_not_start_at_midnight() -> None:
+    """Reports from 14:00 to 14:00 with the middle one missing: the day it covered is a hole."""
+    period = summary_of_reports(
+        dated(at(1, 14), at(2, 14), "1"), dated(at(3, 14), at(4, 14), "2")
+    ).period
+
+    assert period is not None
+    assert period.days_spanned == 4
+    # 1st: 10 h, 2nd: 14 h, 3rd: 10 h, 4th: 14 h; only the 2nd and the 4th reach twelve hours
+    assert period.days_with_reports == 2
+
+
+def test_two_short_periods_on_one_day_add_up_to_cover_it() -> None:
+    """Six hours twice is half a day, whichever reports they came from."""
+    summary = summary_of_reports(
+        dated(at(5, 0), at(5, 6), "1"), dated(at(5, 12), at(5, 18), "2", "other.example.org")
+    )
+
+    assert summary.covered == ((date(2026, 10, 5), date(2026, 10, 5)),)
+
+
+def test_the_days_between_the_ends_of_a_long_period_are_covered_whole() -> None:
+    """A period of five days from 18:00: the first day has 6 h and is out, the next four are in."""
+    summary = summary_of_reports(dated(at(1, 18), at(6, 18)))
+
+    assert summary.covered == ((date(2026, 10, 2), date(2026, 10, 6)),)
+    assert summary.period is not None
+    assert (summary.period.days_spanned, summary.period.days_with_reports) == (6, 5)
+
+
+def test_reporter_activity_sums_messages_and_keeps_the_last_end() -> None:
+    """The reporter with most messages comes first; ties are broken by name."""
+    summary = summary_of_reports(
+        with_messages(at(1), at(2), "1", ("pass", "pass", 3)),
+        with_messages(at(9), at(10), "2", ("pass", "pass", 4)),
+        dated(at(5), at(6), "3", "b.example.org"),
+    )
+
+    assert [(a.name, a.messages, a.last_end) for a in summary.reporter_activity] == [
+        ("reporter.example.net", 7, at(10)),
+        ("b.example.org", 0, at(6)),
+    ]
 
 
 def test_a_period_of_five_hundred_years_is_summarized_at_once() -> None:
@@ -816,12 +862,12 @@ def test_a_report_that_crosses_midnight_counts_all_its_messages_on_the_first_day
     assert summary.covered == ((date(2026, 10, 1), date(2026, 10, 2)),)
 
 
-def test_a_report_of_zero_length_counts_on_the_day_it_begins() -> None:
-    """The same choice the period makes."""
+def test_a_report_of_zero_length_counts_its_messages_on_the_day_it_begins() -> None:
+    """Its messages are kept; it covers no time."""
     summary = summary_of_reports(with_messages(at(7, 8), at(7, 8), "1", ("fail", "fail", 4)))
 
     assert summary.days == (DayCounts(date(2026, 10, 7), 1, Counts(failing=4)),)
-    assert summary.covered == ((date(2026, 10, 7), date(2026, 10, 7)),)
+    assert summary.covered == ()
 
 
 def test_two_reports_that_begin_on_one_day_are_one_entry() -> None:

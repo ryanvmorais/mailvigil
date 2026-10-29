@@ -91,7 +91,8 @@ src/mailvigil/
   senders.py         # identify_sender(record, config) → Identification; a selector counts only under the domain
   summary.py         # summarize(result, config) → frozen Summary: rows per sender, failing sources, period,
                      # policy, what was left out (spec 004), the messages per day (`DayCounts`, spec 008,
-                     # internal: not in `--json`); never imports render
+                     # internal: not in `--json`), what each reporter sent (`ReporterActivity`, internal);
+                     # a day is covered when the merged report periods cover 12 h of it; never imports render
   render.py          # render_summary(summary, config_source, messages) → 80-column ASCII text;
                      # no_reports_message; also the public helpers fit, address, format_share,
                      # share_tenths

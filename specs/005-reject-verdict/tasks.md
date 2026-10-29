@@ -198,3 +198,10 @@ other stages; the rules, the thresholds and the exit codes do not change.
   (`cli._now`) and the tests pin it. — RF-04
 - [x] Quality gate. — result recorded when run: ruff, black and mypy clean; pytest passed with
   coverage 100% (Python 3.12, 2026-10-29).
+
+## Stage 10 — A note for a reporter that went quiet
+
+- [x] `verdict.py`: `SILENT_MIN_PERCENT`, `SILENT_AFTER` and `NoteKind.SILENT_REPORTER`; texts in
+  both languages, `render_verdict.py`, `docs/json-schema.md`. Tests at both limits. — RF-04
+- [x] Quality gate. — result recorded when run: ruff, black and mypy clean; pytest passed with
+  coverage 100% (Python 3.12, 2026-10-29).
