@@ -118,6 +118,7 @@ _ATTRS: Final = frozenset(
         "points",
         "transform",
         "fill",
+        "fill-rule",
         "stroke",
         "stroke-width",
         "stroke-linecap",
