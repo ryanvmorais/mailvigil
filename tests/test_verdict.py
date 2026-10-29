@@ -37,6 +37,7 @@ from mailvigil.verdict import (
     MIN_COVERAGE_PERCENT,
     MIN_DAYS_SPANNED,
     MIN_MESSAGES,
+    STALE_AFTER,
     Answer,
     LeftOut,
     Note,
@@ -490,7 +491,32 @@ def test_several_notes_come_in_the_order_of_note_kind() -> None:
             spf_only=100,
         )
     )
-    assert note_kinds(verdict) == list(NoteKind)
+    assert note_kinds(verdict) == [kind for kind in NoteKind if kind is not NoteKind.STALE]
+
+
+def test_a_report_older_than_two_weeks_adds_the_stale_note() -> None:
+    """The latest report ended 20 days before the run: the note says 20, the answer is unchanged."""
+    summary = make_summary()
+    assert summary.period is not None
+    now = summary.period.end + timedelta(days=20)
+
+    verdict = judge(summary, now)
+
+    assert verdict.notes == (Note(NoteKind.STALE, numbers=(20,)),)
+    assert verdict.answer is judge(summary).answer
+
+
+def test_the_stale_note_needs_more_than_the_limit_and_a_clock() -> None:
+    """Exactly fourteen days is not stale, and without a clock there is nothing to compare."""
+    summary = make_summary()
+    assert summary.period is not None
+
+    assert not judge(summary, summary.period.end + STALE_AFTER).notes
+    assert NoteKind.STALE in note_kinds(
+        judge(summary, summary.period.end + STALE_AFTER + timedelta(seconds=1))
+    )
+    assert not judge(summary).notes
+    assert not judge(make_summary(days=0), summary.period.end + timedelta(days=99)).notes
 
 
 def test_no_note_changes_the_answer() -> None:
@@ -640,6 +666,7 @@ def test_the_answer_and_kind_words_are_the_stable_strings() -> None:
         "policy_changed",
         "subdomain_policy",
         "currently_quarantine",
+        "stale",
     ]
 
 

@@ -57,6 +57,7 @@ _PLACEHOLDERS: dict[str, frozenset[str]] = {
     "verdict.notes[PARTIAL_POLICY]": frozenset({"pct"}),
     "verdict.notes[POLICY_CHANGED]": frozenset({"earlier"}),
     "verdict.notes[SUBDOMAIN_POLICY]": frozenset({"shown"}),
+    "verdict.notes[STALE]": frozenset({"days"}),
     "verdict.next_recognized": frozenset({"who"}),
     "verdict.next_data": frozenset({"marker"}),
     "verdict.left_out": frozenset({"parts"}),

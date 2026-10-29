@@ -298,7 +298,8 @@ def test_the_connection_gets_the_arguments_the_user_gave(
     clock = call["clock"]
     assert callable(clock)
     assert isinstance(call["deadline"], float)
-    assert 0 < call["deadline"] - clock() <= DEADLINE_SECONDS
+    # A tolerance for float rounding: with a coarse clock, (x + 1800) - x is a few ulps over 1800.
+    assert 0 < call["deadline"] - clock() <= DEADLINE_SECONDS + 1e-6
 
 
 def test_the_options_reach_the_mailbox(

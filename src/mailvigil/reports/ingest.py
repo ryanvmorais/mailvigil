@@ -15,6 +15,7 @@ from __future__ import annotations
 import stat
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from mailvigil.reports.discovery import Source, discover
@@ -24,6 +25,10 @@ from mailvigil.reports.model import IngestionResult, Report, SkippedFile
 from mailvigil.reports.parser import parse_report
 from mailvigil.reports.reader import read_xml, read_xml_bytes
 from mailvigil.text import normalize_domain
+
+#: How far past the clock a report may end before it is refused. A day absorbs a skewed clock or a
+#: reporter in a distant time zone.
+FUTURE_TOLERANCE = timedelta(days=1)
 
 # ---------------------------------------------------------------------------
 # Documents
@@ -160,7 +165,7 @@ def _documents(source: Source) -> Iterator[_Document | SkippedFile]:
 # ---------------------------------------------------------------------------
 
 
-def ingest(paths: Sequence[Path], domain: str) -> IngestionResult:
+def ingest(paths: Sequence[Path], domain: str, now: datetime | None = None) -> IngestionResult:
     """
     Read every report under the given paths that belongs to a domain.
 
@@ -169,6 +174,10 @@ def ingest(paths: Sequence[Path], domain: str) -> IngestionResult:
         domain (str): The domain whose reports are wanted. Compared exactly and without regard to
             case, so ``mail.example.com`` is not ``example.com``; surrounding spaces and a trailing
             dot are ignored.
+        now (datetime | None, optional): The moment the run happens, timezone-aware. A report that
+            ends more than ``FUTURE_TOLERANCE`` after it is refused (``INVALID_FIELD``), so a
+            report cannot claim to be the latest policy by dating itself ahead. ``None`` skips the
+            check, which keeps the function free of a clock. Default: ``None``.
 
     Returns:
         IngestionResult: The reports kept in discovery order, the files refused with their reasons,
@@ -198,6 +207,17 @@ def ingest(paths: Sequence[Path], domain: str) -> IngestionResult:
                 report = parse_report(item.xml, source=item.source)
             except ReportRefused as refused:
                 skipped.append(SkippedFile(source.path, refused.reason, refused.detail, item.part))
+                continue
+
+            if now is not None and report.end > now + FUTURE_TOLERANCE:
+                skipped.append(
+                    SkippedFile(
+                        source.path,
+                        Reason.INVALID_FIELD,
+                        "invalid value in date_range/end",
+                        item.part,
+                    )
+                )
                 continue
 
             # The domain filter comes first, so a report of another domain is never a duplicate and

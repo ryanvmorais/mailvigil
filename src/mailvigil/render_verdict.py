@@ -518,12 +518,18 @@ def _quarantine(note: Note, messages: Messages) -> str:
     return messages.verdict.notes[NoteKind.CURRENTLY_QUARANTINE].format()
 
 
+def _stale(note: Note, messages: Messages) -> str:
+    """Say how long ago the latest report ended."""
+    return messages.verdict.notes[NoteKind.STALE].format(days=note.numbers[0])
+
+
 _NOTE_TEXT: dict[NoteKind, Callable[[Note, Messages], str]] = {
     NoteKind.FRAGILE: _fragile,
     NoteKind.PARTIAL_POLICY: _partial,
     NoteKind.POLICY_CHANGED: _changed,
     NoteKind.SUBDOMAIN_POLICY: _subdomains,
     NoteKind.CURRENTLY_QUARANTINE: _quarantine,
+    NoteKind.STALE: _stale,
 }
 
 

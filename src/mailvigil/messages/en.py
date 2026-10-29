@@ -198,6 +198,10 @@ _VERDICT = VerdictMessages(
             NoteKind.CURRENTLY_QUARANTINE: (
                 "The policy is p=quarantine now; this verdict is about moving to p=reject."
             ),
+            NoteKind.STALE: (
+                "The latest report ended {days} days ago, so the figures may not describe the "
+                "mail you send today."
+            ),
         }
     ),
     next_label="Next:",

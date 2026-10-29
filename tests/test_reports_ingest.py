@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import importlib
 from collections.abc import Callable, Mapping
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -41,6 +42,7 @@ from mailvigil.reports import (
     parse_report,
     read_xml,
 )
+from mailvigil.reports.ingest import FUTURE_TOLERANCE
 
 # The shapes of the ``conftest.py`` factories, named once so each test signature stays short.
 type _MakeReport = Callable[..., bytes]
@@ -583,6 +585,30 @@ def test_ingesting_mail_twice_gives_equal_results(
     )
 
     assert ingest([tmp_path], "example.com") == ingest([tmp_path], "example.com")
+
+
+# ---------------------------------------------------------------------------
+# A report cannot end after the clock
+# ---------------------------------------------------------------------------
+
+
+def test_a_report_ending_beyond_the_tolerance_is_refused_with_a_clock(
+    tmp_path: Path, make_report_xml: _MakeReport
+) -> None:
+    """With ``now``, a report ending over a day ahead is skipped; without it nothing is checked."""
+    now = datetime(2026, 10, 20, tzinfo=UTC)
+    ahead = int((now + FUTURE_TOLERANCE).timestamp()) + 60
+    _attachment(tmp_path, "future", make_report_xml(report_id="f", begin=ahead - 3600, end=ahead))
+    _attachment(
+        tmp_path, "fine", make_report_xml(report_id="ok", begin=ahead - 7200, end=ahead - 61)
+    )
+
+    checked = ingest([tmp_path], "example.com", now)
+
+    assert [report.report_id for report in checked.reports] == ["ok"]
+    assert [skip.reason for skip in checked.skipped] == [Reason.INVALID_FIELD]
+    assert len(ingest([tmp_path], "example.com").reports) == 2
+    assert timedelta(0) < FUTURE_TOLERANCE
 
 
 # ---------------------------------------------------------------------------

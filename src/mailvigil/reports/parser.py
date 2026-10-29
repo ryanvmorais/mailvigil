@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import ipaddress
 import re
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from xml.etree.ElementTree import Element
 
 from mailvigil.reports.errors import Reason, ReportRefused
@@ -45,6 +45,11 @@ _DIGITS = re.compile(r"[0-9]+")
 # text (CPython stops at 4,300 digits), so the run would end in a traceback. With it, the sum of
 # every record of every file stays far below that limit.
 MAX_COUNT = 10**12
+
+# The longest period one report may cover. Aggregate reports cover a day; a week leaves room for
+# reporters that batch. Without a ceiling, one report with a long window would satisfy the rules
+# about the period and its coverage by itself.
+MAX_PERIOD = timedelta(days=7)
 
 # ---------------------------------------------------------------------------
 # Text
@@ -297,7 +302,8 @@ def parse_report(xml: bytes, *, source: str = "") -> Report:
         ReportRefused: ``FORBIDDEN_DECLARATION`` or ``MALFORMED_XML`` from the XML parser;
             ``NOT_A_REPORT`` for a wrong root or a missing ``report_metadata`` or
             ``policy_published``; ``UNSUPPORTED_VERSION`` for a ``version`` other than ``1.0``;
-            ``INVALID_FIELD`` for a period, a ``pct`` or a ``count`` that cannot be trusted.
+            ``INVALID_FIELD`` for a period (backwards or longer than ``MAX_PERIOD``), a ``pct`` or a
+            ``count`` that cannot be trusted.
     """
     root = parse_xml(xml)
     if root.tag != "feedback":
@@ -314,7 +320,7 @@ def parse_report(xml: bytes, *, source: str = "") -> Report:
 
     begin = _timestamp(_raw_text(metadata, "date_range/begin"), "date_range/begin")
     end = _timestamp(_raw_text(metadata, "date_range/end"), "date_range/end")
-    if end < begin:
+    if end < begin or end - begin > MAX_PERIOD:
         raise ReportRefused(Reason.INVALID_FIELD, "invalid value in date_range/end")
 
     return Report(
