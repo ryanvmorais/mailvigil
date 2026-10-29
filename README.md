@@ -1,4 +1,4 @@
-# <img align="absmiddle" alt="MailVigil logo: an envelope with an open eye" src="https://raw.githubusercontent.com/ryanvmorais/mailvigil/main/docs/images/mailvigil-dmarc-analyzer-logo.svg" width="44"> MailVigil
+# <img align="absmiddle" alt="MailVigil logo: an envelope with an open eye" src="https://raw.githubusercontent.com/ryanvmorais/mailvigil/main/docs/images/mailvigil-dmarc-analyzer-logo.svg" width="32"> MailVigil
 
 **English** · [Português (Brasil)](https://github.com/ryanvmorais/mailvigil/blob/main/README.pt-BR.md)
 
