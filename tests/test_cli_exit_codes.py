@@ -153,6 +153,36 @@ def test_each_row_of_the_table_returns_its_code_with_and_without_json(
     assert main([*arguments, *json_flag]) == code, name
 
 
+@pytest.mark.parametrize(
+    "output",
+    [["summary"], ["summary", "--json"], ["verdict"], ["verdict", "--json"], ["verdict", "--html"]],
+    ids=" ".join,
+)
+def test_an_enormous_count_is_a_refused_report_not_a_traceback(
+    output: list[str],
+    tmp_path: Path,
+    make_report_xml: ReportXml,
+    make_record_xml: RecordXml,
+) -> None:
+    """
+    A count of thousands of digits is refused at the parser, so no output ever sums it.
+
+    The only report kept would be the one with the enormous count, so the run ends as "no report
+    kept" (1), the code of a refusal, and not as an uncaught ``ValueError``.
+    """
+    reports = tmp_path / "reports"
+    reports.mkdir()
+    record = make_record_xml(count="9" * 4000)
+    (reports / "example.net!example.com!1790000000!1790086399.xml").write_bytes(
+        make_report_xml(records=[record])
+    )
+    config = write_config(tmp_path / "mailvigil.toml")
+
+    code = main([*output, str(reports), "--config", str(config)])
+
+    assert code == 1
+
+
 def test_an_unknown_option_is_a_usage_error_with_code_two(
     capsys: pytest.CaptureFixture[str],
 ) -> None:

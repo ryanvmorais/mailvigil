@@ -40,6 +40,12 @@ from mailvigil.text import MAX_TEXT, clean_text
 # and digits of other scripts, none of which a report has any reason to hold.
 _DIGITS = re.compile(r"[0-9]+")
 
+# The most messages one record may claim: a trillion, which no real report reaches. Without a
+# ceiling, a count of thousands of digits is a valid ``int`` that the output cannot turn back into
+# text (CPython stops at 4,300 digits), so the run would end in a traceback. With it, the sum of
+# every record of every file stays far below that limit.
+MAX_COUNT = 10**12
+
 # ---------------------------------------------------------------------------
 # Text
 # ---------------------------------------------------------------------------
@@ -120,27 +126,32 @@ def _text(node: Element, path: str, default: str = "", *, lower: bool = False) -
 # ---------------------------------------------------------------------------
 
 
-def _integer(value: str | None, field: str) -> int:
+def _integer(value: str | None, field: str, maximum: int | None = None) -> int:
     """
     Read a whole number a report must get right.
 
     Args:
         value (str | None): The raw text, or ``None`` when the element is absent.
         field (str): The path of the field, named in the refusal.
+        maximum (int | None, optional): The largest value accepted. Default: no ceiling.
 
     Returns:
         int: The number, zero or more.
 
     Raises:
-        ReportRefused: ``INVALID_FIELD`` when the value is absent, empty or not ASCII digits, or is
-            so long that ``int`` refuses it. The detail names the field, never the value.
+        ReportRefused: ``INVALID_FIELD`` when the value is absent, empty or not ASCII digits, is
+            so long that ``int`` refuses it, or is above ``maximum``. The detail names the field,
+            never the value.
     """
     if value is None or _DIGITS.fullmatch(value) is None:
         raise ReportRefused(Reason.INVALID_FIELD, f"invalid value in {field}")
     try:
-        return int(value)
+        number = int(value)
     except ValueError:  # more digits than the interpreter converts
         raise ReportRefused(Reason.INVALID_FIELD, f"invalid value in {field}") from None
+    if maximum is not None and number > maximum:
+        raise ReportRefused(Reason.INVALID_FIELD, f"invalid value in {field}")
+    return number
 
 
 def _timestamp(value: str | None, field: str) -> datetime:
@@ -235,12 +246,13 @@ def _parse_record(node: Element) -> Record:
         Record: The row, every DKIM and SPF block, and the override reasons, in document order.
 
     Raises:
-        ReportRefused: ``INVALID_FIELD`` when ``row/count`` is absent or not a whole number.
+        ReportRefused: ``INVALID_FIELD`` when ``row/count`` is absent, not a whole number or above
+            ``MAX_COUNT``.
     """
     evaluated = "row/policy_evaluated"
     return Record(
         source_ip=_source_ip(node),
-        count=_integer(_raw_text(node, "row/count"), "row/count"),
+        count=_integer(_raw_text(node, "row/count"), "row/count", MAX_COUNT),
         disposition=_text(node, f"{evaluated}/disposition", "none"),
         dkim_evaluated=_text(node, f"{evaluated}/dkim"),
         spf_evaluated=_text(node, f"{evaluated}/spf"),
