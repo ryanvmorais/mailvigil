@@ -32,8 +32,11 @@ the reporter in the advisory unless asked not to.
 
 ## Scope
 
-MailVigil is an offline command-line tool: it reads files you give it and writes to your terminal.
-It makes no network request and has no runtime dependency. Reports are treated as hostile input.
+MailVigil is a command-line tool that reads files you give it and writes to your terminal. It is
+offline except for `mailvigil fetch`, which is opt-in: it connects to the IMAP server you name,
+reads the report messages and saves them as files in a folder you choose. `summary` and `verdict`
+make no network request, and the tool has no runtime dependency. Reports are treated as hostile
+input.
 
 **Report here** (a vulnerability in MailVigil itself): anything that lets a crafted input turn the
 tool against its user, or that breaks one of its safety guarantees. For example:
@@ -44,8 +47,19 @@ tool against its user, or that breaks one of its safety guarantees. For example:
 - a path inside an archive that makes the tool read or write outside the files it was given;
 - a configuration file or report that makes the tool run code or open a network connection;
 - anything from a report or a configuration file reaching a place it should not (a log line, a
-  file other than the requested output).
+  file other than the requested output);
+- in `mailvigil fetch`: a connection that is not TLS, or that accepts a certificate or a host name
+  that does not verify;
+- in `mailvigil fetch`: the password reaching an output, a log line, a file, an argument or the
+  environment;
+- in `mailvigil fetch`: any command that changes the mailbox or marks a message as read (the tool
+  only reads it);
+- in `mailvigil fetch`: text from the server shaping a file name or a path, or a read that is not
+  bounded in size or in time.
 
 **Not a vulnerability in MailVigil**: what a report says about a domain (an unknown sender, a
 failing source, a spoofing attempt: that is for the domain's owner), and a wrong verdict or a
 wrong classification of a report (open a regular bug report instead, with a synthetic sample).
+
+The verdict is only as good as the reports it was given: it describes the reports you received,
+not the mail you did not receive a report for.
