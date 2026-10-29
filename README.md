@@ -1,5 +1,7 @@
 # MailVigil
 
+**English** · [Português (Brasil)](https://github.com/ryanvmorais/mailvigil/blob/main/README.pt-BR.md)
+
 ![Python](https://img.shields.io/badge/Python-3.12+-3776AB?logo=python&logoColor=white)
 ![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)
 [![CI](https://github.com/ryanvmorais/mailvigil/actions/workflows/ci.yml/badge.svg)](https://github.com/ryanvmorais/mailvigil/actions/workflows/ci.yml)
