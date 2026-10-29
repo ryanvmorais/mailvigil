@@ -86,7 +86,7 @@ Why: a recognized sender fails DMARC.
 Rules                                  measured    needed    result
   1  period covered                    27 days     >= 28     fail (too early)
   2  days with a report                27 of 28    >= 80%    pass
-  3  messages seen                     12480       >= 1000   pass
+  3  messages seen                     12480       >= 100    pass
   4  recognized senders that fail      12          0         FAIL
   5  unrecognized failures             0.3%        <= 0.5%   pass
 
@@ -124,7 +124,7 @@ named constants in one module (Resolved decisions 1 and 2).
 |---|---|---|---|
 | 1 | data | period covered (`days_spanned`) | at least 28 days |
 | 2 | data | days with a report over days spanned | at least 80% |
-| 3 | data | messages seen (`totals.total`) | at least 1000 |
+| 3 | data | messages seen (`totals.total`) | at least 100 |
 | 4 | problem | messages failing under a recognized sender | exactly 0 |
 | 5 | problem | failing messages of unrecognized sources over all messages | at most 0.5% |
 
@@ -333,9 +333,14 @@ source failing rule 5 on its own) had no recommendation; the design settles it (
 
 ## Resolved decisions
 
-1. **The data thresholds** are 28 days spanned, 80% of those days with a report and 1000 messages.
-   A domain that sends little stays `too early` until it has enough traffic; that is the honest
-   answer, since a percentage over a handful of messages proves nothing.
+1. **The data thresholds** are 28 days spanned, 80% of those days with a report and 100 messages.
+   A domain that sends very little stays `too early` until it has enough traffic; that is the
+   honest answer, since a percentage over a handful of messages proves nothing. *Amended
+   2026-10-29:* the volume started at 1000 messages. A first run over a real domain's reports
+   showed a domain that sends only a few messages a day would take about 200 days to reach 1000,
+   far longer than the 28 days of rule 1, so the number was lowered to 100 (a domain with 28 days
+   and 100 messages still has a failure share resolved to one message in a hundred). Rules 1, 2
+   and 5 still wait for a full window of real reports.
 2. **Rule 5 allows at most 0.5% of all messages** failing from unrecognized sources. Zero would
    punish every public domain that is spoofed daily, which is what `reject` is for.
 3. **The thresholds are constants, not configuration.** Every verdict means the same thing

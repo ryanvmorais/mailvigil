@@ -23,15 +23,16 @@ from mailvigil.summary import FailingSource, Summary
 # ---------------------------------------------------------------------------
 
 # The four thresholds are a first proposal, to be checked against real reports before 1.0.0 (design,
-# Risk 1). They live here and nowhere else: the text is built from these names, never from retyped
-# numbers, and a test fails if the two disagree.
+# Risk 1). The volume came down from 1000 to 100 after a first check (requirements, Resolved
+# decision 1); the others still wait for a full window. They live here and nowhere else: the text
+# is built from these names, never from retyped numbers, and a test fails if the two disagree.
 
 #: Rule 1, in days: the reports must span at least this many.
 MIN_DAYS_SPANNED = 28
 #: Rule 2, in percent of the days spanned: at least this share must have a report.
 MIN_COVERAGE_PERCENT = 80
 #: Rule 3, in messages: at least this many must have been seen.
-MIN_MESSAGES = 1000
+MIN_MESSAGES = 100
 #: Rule 5, in tenths of a percent of all messages: unrecognized failures may be at most this much
 #: (5 is 0.5%). Per mille, not percent, so the comparison stays in integers (ADR-4).
 MAX_UNRECOGNIZED_PER_MILLE = 5

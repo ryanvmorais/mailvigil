@@ -135,7 +135,7 @@ exactly when the answer is `ready`.
 ```python
 MIN_DAYS_SPANNED = 28            # rule 1
 MIN_COVERAGE_PERCENT = 80        # rule 2
-MIN_MESSAGES = 1000              # rule 3
+MIN_MESSAGES = 100               # rule 3
 MAX_UNRECOGNIZED_PER_MILLE = 5   # rule 5: 0.5% of all messages
 ```
 
@@ -439,7 +439,7 @@ services and addresses are invented (RNF-06).
 | Requirement | Tests |
 |---|---|
 | RF-01 | clean table with a short window is `too early`; a recognized failure with a short window is `not ready`; every rule passing is `ready`; no reports is `too early` with rules 1 to 3 failed and no division by zero; reports with zero messages is `too early` |
-| RF-02 | each rule at the threshold and the value beside it (27/28 days, 22/23 of 28 days with a report, 999/1000 messages, 1 recognized failing message, unrecognized at exactly 0.5% and just over); a rule carries id, kind, measured, whole, needed and result as fields; `deciding` is the first failed rule of the deciding kind and `None` for `ready` |
+| RF-02 | each rule at the threshold and the value beside it (27/28 days, 22/23 of 28 days with a report, 99/100 messages, 1 recognized failing message, unrecognized at exactly 0.5% and just over); a rule carries id, kind, measured, whole, needed and result as fields; `deciding` is the first failed rule of the deciding kind and `None` for `ready` |
 | RF-03 | the recognized and the unrecognized failing sources are split by outcome and keep 004's order; the reason names the recognized sources, each IP and the override types; more than 5 unrecognized sources print 5 and a remainder with its failing count; `too early` names each failed data rule with what is missing; `ready` never prints "safe" and lists unrecognized failing sources when there are any; the next step matches `deciding` |
 | RF-04 | the fragile note carries share and SPF-only; `pct` below 100, a changed `p`, an `sp` or `np` that differs, and `quarantine` each give their note and no other; none of them changes the answer |
 | RF-05 | with `p=reject` the same inputs give the same answer and the reject wording; with `p=quarantine` the note; with `p=none` and with `?` neither |

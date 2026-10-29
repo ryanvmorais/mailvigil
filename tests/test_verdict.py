@@ -195,7 +195,7 @@ def test_the_thresholds_are_the_ones_of_the_requirements() -> None:
     """The four named constants hold the first proposal, in their documented units."""
     assert MIN_DAYS_SPANNED == 28
     assert MIN_COVERAGE_PERCENT == 80
-    assert MIN_MESSAGES == 1000
+    assert MIN_MESSAGES == 100
     assert MAX_UNRECOGNIZED_PER_MILLE == 5
 
 
@@ -249,13 +249,13 @@ def test_rule_2_missing_days_round_up() -> None:
     assert rule(judge(make_summary(days=28, with_reports=23)), RuleId.COVERAGE).missing == 0
 
 
-@pytest.mark.parametrize(("messages", "passed"), [(1000, True), (999, False), (1001, True)])
-def test_rule_3_volume_needs_1000_messages(messages: int, passed: bool) -> None:
-    """1000 messages pass and 999 do not; the failing ones count in the total."""
+@pytest.mark.parametrize(("messages", "passed"), [(100, True), (99, False), (101, True)])
+def test_rule_3_volume_needs_100_messages(messages: int, passed: bool) -> None:
+    """100 messages pass and 99 do not; the failing ones count in the total."""
     result = rule(judge(make_summary(ok=messages)), RuleId.VOLUME)
     assert result.passed is passed
-    assert (result.measured, result.needed) == (messages, 1000)
-    assert result.missing == max(0, 1000 - messages)
+    assert (result.measured, result.needed) == (messages, 100)
+    assert result.missing == max(0, 100 - messages)
 
 
 def test_rule_3_counts_fragile_and_failing_messages_too() -> None:
@@ -364,7 +364,7 @@ def test_a_summary_without_reports_is_too_early_without_dividing_by_zero() -> No
     assert verdict.deciding is RuleId.PERIOD
     assert [r.passed for r in verdict.rules] == [False, False, False, True, True]
     assert rule(verdict, RuleId.PERIOD).missing == 28
-    assert rule(verdict, RuleId.VOLUME).missing == 1000
+    assert rule(verdict, RuleId.VOLUME).missing == 100
     assert verdict.enforcing == ""
     assert verdict.notes == ()
     assert verdict.recognized_failing == verdict.unrecognized_failing == ()
@@ -376,7 +376,7 @@ def test_reports_with_zero_messages_are_too_early() -> None:
     assert verdict.answer is Answer.TOO_EARLY
     assert verdict.deciding is RuleId.VOLUME
     assert [r.passed for r in verdict.rules] == [True, True, False, True, True]
-    assert rule(verdict, RuleId.VOLUME).missing == 1000
+    assert rule(verdict, RuleId.VOLUME).missing == 100
 
 
 def test_the_missing_amount_is_zero_for_a_problem_rule() -> None:
