@@ -23,7 +23,7 @@ from mailvigil.reports.model import (
     Report,
     SpfResult,
 )
-from mailvigil.reports.parser import MAX_TEXT, _clean, parse_report
+from mailvigil.reports.parser import MAX_COUNT, MAX_TEXT, _clean, parse_report
 
 ReportBuilder = Callable[..., bytes]
 RecordBuilder = Callable[..., str]
@@ -448,11 +448,15 @@ def test_unknown_elements_and_order_do_not_matter() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("count", ["-1", "1.5", "three", "", "1e3", "1_0", "9" * 5000], ids=str)
+@pytest.mark.parametrize(
+    "count",
+    ["-1", "1.5", "three", "", "1e3", "1_0", str(MAX_COUNT + 1), "9" * 4000, "9" * 5000],
+    ids=str,
+)
 def test_a_bad_count_refuses_the_whole_report(
     make_report_xml: ReportBuilder, make_record_xml: RecordBuilder, count: str
 ) -> None:
-    """Negative, non-integer and absurdly long counts refuse the report, not just the record."""
+    """Negative, non-integer, over-the-ceiling and absurdly long counts refuse the whole report."""
     xml = make_report_xml(records=[make_record_xml(), make_record_xml(count=count)])
 
     with pytest.raises(ReportRefused) as caught:
@@ -479,6 +483,15 @@ def test_zero_and_large_counts_are_accepted(
     xml = make_report_xml(records=[make_record_xml(count=0), make_record_xml(count=10**9)])
 
     assert [record.count for record in parse_report(xml).records] == [0, 10**9]
+
+
+def test_the_count_ceiling_itself_is_accepted(
+    make_report_xml: ReportBuilder, make_record_xml: RecordBuilder
+) -> None:
+    """``MAX_COUNT`` is the last value taken; one more is refused (see the test above)."""
+    xml = make_report_xml(records=[make_record_xml(count=MAX_COUNT)])
+
+    assert parse_report(xml).records[0].count == MAX_COUNT
 
 
 def test_whitespace_around_record_values_is_stripped(
