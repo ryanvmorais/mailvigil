@@ -17,6 +17,8 @@ network: it saves the report mail of an IMAP mailbox as `.eml` files, for those 
 The project is one small program with no runtime dependency:
 
 ```text
+IMAP mailbox ──► mailvigil fetch ──► .eml files   (imaplib + ssl, TLS verified, read-only)
+                                            │  the one step that reaches the network
 report files (.zip, .gz, .xml)        mail files (.eml, .mbox)
         │                                   │  email   (bounded: size, lines, parts, depth)
         │                                   ▼

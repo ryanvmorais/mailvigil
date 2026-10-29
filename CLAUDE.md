@@ -131,15 +131,20 @@ tests/               # pytest, one test file per module (test_reports_*.py incl.
                      # test_cli_exit_codes.py, test_cli_mail.py, test_htmlkit.py, test_html_style.py,
                      # test_html_charts.py, test_render_html.py, test_render_html_hostile.py,
                      # test_cli_html.py, test_fetch_*.py, test_render_fetch.py,
-                     # test_cli_fetch.py); fixtures are synthetic, built in conftest.py,
-                     # cli_helpers.py, mail_helpers.py, schema_examples.py, html_helpers.py,
-                     # render_verdict_golden.py or tmp_path
+                     # test_cli_fetch.py, test_smoke.py, test_gitignore.py and
+                     # test_offline_isolation.py, which runs fresh interpreters to prove that
+                     # summary and verdict never load the network code); fixtures are synthetic,
+                     # built in conftest.py, cli_helpers.py, mail_helpers.py, schema_examples.py,
+                     # html_helpers.py, render_verdict_golden.py, fetch_helpers.py (FakeMailbox),
+                     # imap_peer.py (a scripted IMAP server on a socket pair), help_golden.py (the
+                     # recorded --help texts) or tmp_path
 specs/               # spec-driven development: requirements → design → tasks per feature
 docs/stack.md        # each technology of the stack, why it was chosen, what to study first
 docs/json-schema.md  # every field of the two --json documents and the compatibility promise
 docs/demo/           # build_demo.py makes the invented reports and runs the CLI to write verdict.cast,
                      # the recording behind the README demo (see its docstring for the SVG and the
-                     # page captures); docs/images/ holds the README pictures
+                     # page captures); tidy_svg.py pins the SVG text to a character grid;
+                     # docs/images/ holds the README pictures
 .githooks/           # versioned pre-commit hook (core.hooksPath)
 .claude/             # Claude Code hooks: format on edit, validate at turn end, guard uv.lock
 .github/             # CI, CodeQL, dependency review, weekly pip-audit, Dependabot, issue/PR templates
