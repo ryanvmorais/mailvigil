@@ -22,10 +22,11 @@ from mailvigil.summary import FailingSource, Summary
 # The criterion (RNF-05)
 # ---------------------------------------------------------------------------
 
-# The four thresholds are a first proposal, to be checked against real reports before 1.0.0 (design,
-# Risk 1). The volume came down from 1000 to 100 after a first check (requirements, Resolved
-# decision 1); the others still wait for a full window. They live here and nowhere else: the text
-# is built from these names, never from retyped numbers, and a test fails if the two disagree.
+# The four thresholds are the tool's judgment, not fixed numbers: a first proposal (design, Risk 1)
+# that may change in a minor version (docs/stability.md). The volume came down from 1000 to 100
+# after a first check (requirements, Resolved decision 1); the others have not yet been tuned on a
+# full window of real traffic. They live here and nowhere else: the text is built from these
+# names, never from retyped numbers, and a test fails if the two disagree.
 
 #: Rule 1, in days: the reports must span at least this many.
 MIN_DAYS_SPANNED = 28
