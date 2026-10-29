@@ -160,6 +160,9 @@ Two things keep the contract honest:
   | `2` | usage error (argparse) | both |
   | `3` | `verdict` printed `too early` | `verdict` |
   | `4` | `verdict` printed `not ready` | `verdict` |
+  | `70` | internal error (a bug): one line on standard error | both |
+  | `130` | interrupted with Ctrl+C, no output | both |
+  | `141` | the output pipe was closed, no output | both |
 
 - **Given** any verdict word of the enforcing form (005 RF-05: `blocking real mail`,
   `no problem seen`)
@@ -169,11 +172,11 @@ Two things keep the contract honest:
 - **Given** `--json` or `--lang`
   **When** the command ends
   **Then** the code is exactly what it would be without them.
-- **Given** an unexpected error (a bug)
-  **When** it escapes
-  **Then** it is not turned into one of the codes above: Python's own `1` with a traceback would be
-  indistinguishable from a refusal, so the entry point lets it be the interpreter's problem (see
-  open question 3).
+- **Given** an unexpected error (a bug), Ctrl+C or a closed output pipe
+  **When** it escapes the command
+  **Then** it ends as `70`, `130` or `141` (amendment of 2026-10-29, Resolved decision 7); the
+  original wording, which let a bug exit with Python's `1` and a traceback, was withdrawn because
+  that code is the refusal's.
 - **Given** the table
   **When** the test suite runs
   **Then** a test per code feeds the input that produces it, through `main(argv)`, and asserts the
@@ -336,7 +339,8 @@ The maintainer approved the requirements, with the recommendations of questions 
    standard error, as without `--json`. Standard output is either a full document or empty.
 2. **The language is explicit.** `--lang {en,pt-BR}`, default `en`; the system locale is never read.
    The `CLAUDE.md` line "locale or `--lang`" is rewritten to match.
-3. **An unexpected exception keeps Python's behavior** (traceback, exit `1`). No sixth public code.
+3. **~~An unexpected exception keeps Python's behavior~~** (traceback, exit `1`). Superseded by
+   decision 7.
 4. **The Portuguese text is ASCII only** (`nao`, not `não`), so there is one layout rule.
 5. **The JSON conversion lives in a new `render_json.py`**; `summary.py` and `verdict.py` are not
    touched and `dataclasses.asdict` is not used (the design makes the mapping explicit, ADR-2).
@@ -359,3 +363,11 @@ Following [specs/README.md](../README.md#how-a-spec-is-tested):
 - **Synthetic only** (RNF-06).
 - **Quality gate last:** `ruff` → `black --check` → `mypy` → `pytest --cov`, with its real result
   recorded in `tasks.md`.
+7. **Amendment (2026-10-29, issue #60): a bug, Ctrl+C and a closed pipe have codes.** Before the
+   first release, while a new code is still free. An uncaught exception ends as `70` (`EX_SOFTWARE`
+   of `sysexits.h`), so a script can tell a bug from a refusal (`1`); the line on standard error
+   names the exception class and the file and line, never the message (it may hold report text),
+   and asks for a report. Ctrl+C ends as `130` and a closed pipe as `141` (128 plus the signal),
+   both without output; on a closed pipe standard output is pointed at the null device so the
+   interpreter does not complain at exit. The line stays in English, like argparse's usage errors,
+   and there is no flag for the traceback. Reverses decision 3 and open question 3.

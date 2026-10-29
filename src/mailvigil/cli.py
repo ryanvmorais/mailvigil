@@ -25,6 +25,7 @@ import getpass
 import os
 import sys
 import time
+import traceback
 from collections.abc import Sequence
 from datetime import date
 from pathlib import Path
@@ -52,7 +53,7 @@ from mailvigil.verdict import Answer, judge
 DEFAULT_CONFIG = Path("mailvigil.toml")
 
 # Exit codes, the contract of spec 006 (RF-04): 0 is "an answer was printed", not "healthy".
-# This is the one table; the README lists the same five and a test compares the two. Changing a
+# This is the one table; the README lists the same eight and a test compares the two. Changing a
 # value is a breaking change.
 EXIT_OK = 0
 EXIT_REFUSED = 1
@@ -61,6 +62,15 @@ EXIT_USAGE = 2
 # (spec 005 ADR-6).
 EXIT_TOO_EARLY = 3
 EXIT_NOT_READY = 4
+# A bug and the two ways a run is cut short (spec 006 amendment, 2026-10-29). A bug must not look
+# like a refusal (1), so it takes ``EX_SOFTWARE`` of ``sysexits.h``; the other two are the shell
+# convention of 128 plus the signal (SIGINT 2, SIGPIPE 13).
+EXIT_INTERNAL = 70
+EXIT_INTERRUPTED = 130
+EXIT_PIPE_CLOSED = 141
+
+# Where the line of an internal error sends the reader.
+_ISSUES_URL = "https://github.com/ryanvmorais/mailvigil/issues"
 
 # The one place an answer becomes an exit code (spec 005 ADR-6).
 _VERDICT_EXIT = {
@@ -678,20 +688,53 @@ def _run_fetch(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int
     return EXIT_OK
 
 
-def main(argv: Sequence[str] | None = None) -> int:
+def _internal_error_line(error: Exception) -> str:
     """
-    Run the ``mailvigil`` command.
+    Write the one line of an internal error.
+
+    It names the exception class and the file and line where it was raised, never the exception's
+    message: the message may carry text from a report, and the line is meant to be pasted into an
+    issue.
 
     Args:
-        argv (Sequence[str] | None): Arguments without the program name; ``None`` reads
-            ``sys.argv``.
+        error (Exception): The exception that escaped the command.
 
     Returns:
-        int: The process exit code. A usage error or ``--version`` ends the process through
-            ``SystemExit``, as argparse does.
+        str: The line, without a trailing newline.
     """
-    parser = build_parser()
-    args = parser.parse_args(argv)
+    frames = traceback.extract_tb(error.__traceback__)
+    where = f" at {Path(frames[-1].filename).name}:{frames[-1].lineno}" if frames else ""
+    return (
+        f"mailvigil: internal error ({type(error).__name__}{where}). "
+        f"This is a bug; please report it at {_ISSUES_URL}"
+    )
+
+
+def _silence_stdout() -> None:
+    """
+    Point standard output at the null device after a closed pipe.
+
+    Without it the interpreter tries to flush the broken stream on exit and prints a second error.
+    A stream with no file descriptor (a test, a wrapper) is left as it is.
+    """
+    try:
+        devnull = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(devnull, sys.stdout.fileno())
+    except (OSError, ValueError):
+        pass
+
+
+def _dispatch(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
+    """
+    Run the command the arguments name.
+
+    Args:
+        args (argparse.Namespace): The parsed arguments.
+        parser (argparse.ArgumentParser): Used to end the run with a usage error.
+
+    Returns:
+        int: The exit code of the command.
+    """
     # A run has one format; argparse cannot make a group across a parent parser and a subparser's
     # own argument, so the pair is refused here, before any work (ADR-6).
     if args.command == "verdict" and args.json and args.html:
@@ -704,3 +747,34 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _run_fetch(args, parser)
     parser.print_help(sys.stderr)
     return EXIT_USAGE
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """
+    Run the ``mailvigil`` command.
+
+    Nothing escapes as a traceback: a bug ends as ``EXIT_INTERNAL`` after one line on standard
+    error, Ctrl+C as ``EXIT_INTERRUPTED`` and a closed output pipe (``mailvigil ... | head``) as
+    ``EXIT_PIPE_CLOSED``, both without a word. The line of a bug stays in English, as the usage
+    errors of argparse do.
+
+    Args:
+        argv (Sequence[str] | None): Arguments without the program name; ``None`` reads
+            ``sys.argv``.
+
+    Returns:
+        int: The process exit code. A usage error or ``--version`` ends the process through
+            ``SystemExit``, as argparse does.
+    """
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    try:
+        return _dispatch(args, parser)
+    except KeyboardInterrupt:
+        return EXIT_INTERRUPTED
+    except BrokenPipeError:
+        _silence_stdout()
+        return EXIT_PIPE_CLOSED
+    except Exception as error:  # the one catch-all: a bug must not look like a refusal
+        _write(sys.stderr, _internal_error_line(error))
+        return EXIT_INTERNAL

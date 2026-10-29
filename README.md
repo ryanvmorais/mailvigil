@@ -294,7 +294,7 @@ Microsoft 365 and Google accounts without an app password are not supported in t
 password with a character outside ASCII is refused in this version.
 
 Exit codes: `0` when the run finished, even with nothing new; `1` when it was refused (the one-line
-reason is printed); `2` for a usage error.
+reason is printed); `2` for a usage error; `70` for a bug (see below).
 
 ### Exit codes
 
@@ -308,6 +308,9 @@ without reading the text. `--json` does not change it.
 | `2` | Usage error (an unknown option, a missing argument) | all |
 | `3` | `verdict` printed `too early`: wait for more reports | `verdict` |
 | `4` | `verdict` printed `not ready`: a source fails | `verdict` |
+| `70` | Internal error, a bug: one line on standard error says where; please report it | all |
+| `130` | Interrupted with Ctrl+C | all |
+| `141` | The output pipe was closed (`mailvigil verdict ... \| head`) | all |
 
 Note that `1` is a refusal and `4` is "not ready"; a script that treats every non-zero code alike
 mixes them up:

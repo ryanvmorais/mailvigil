@@ -28,6 +28,9 @@ invented data, and a test compares them with the code, so this page cannot drift
 | `2` | Usage error | both |
 | `3` | `verdict` printed `too early` | `verdict` |
 | `4` | `verdict` printed `not ready` | `verdict` |
+| `70` | Internal error (a bug); one line on standard error, no document | both |
+| `130` | Interrupted with Ctrl+C; no document | both |
+| `141` | The output pipe was closed | both |
 
 A refused run (`1`) prints no document: standard output is empty and the one line goes to standard
 error. A `too early` or `not ready` verdict still prints the full document.
