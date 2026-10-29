@@ -3,7 +3,8 @@
 **English** · [Português (Brasil)](https://github.com/ryanvmorais/mailvigil/blob/main/README.pt-BR.md)
 
 ![Python](https://img.shields.io/badge/Python-3.12+-3776AB?logo=python&logoColor=white)
-![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)
+![deps](https://img.shields.io/badge/deps-uv-DE5FE9)
+![runtime deps](https://img.shields.io/badge/runtime%20deps-0-brightgreen)
 [![CI](https://github.com/ryanvmorais/mailvigil/actions/workflows/ci.yml/badge.svg)](https://github.com/ryanvmorais/mailvigil/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/mailvigil)](https://pypi.org/project/mailvigil/)
 [![Release](https://img.shields.io/github/v/release/ryanvmorais/mailvigil)](https://github.com/ryanvmorais/mailvigil/releases)
