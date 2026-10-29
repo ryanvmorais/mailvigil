@@ -277,7 +277,8 @@ network connection, and `summary` and `verdict` never load its code.
 mailvigil fetch --host imap.example.com --user me@example.com --to reports/
 
 # Only recent mail, at most 200 messages, the password read from a file (for cron)
-mailvigil fetch --host imap.example.com --user me@example.com --to reports/   --since 2026-10-01 --limit 200 --password-file ~/.mailvigil-password
+mailvigil fetch --host imap.example.com --user me@example.com --to reports/ \
+  --since 2026-10-01 --limit 200 --password-file ~/.mailvigil-password
 ```
 
 What it does:
@@ -399,10 +400,16 @@ before every commit through a versioned hook:
 # Activate the pre-commit hook once per clone
 git config core.hooksPath .githooks
 
-# The same sequence the hook and the CI run
+# Lint (the hook and the CI run the same four steps, in this order)
 uv run ruff check .
+
+# Check the formatting
 uv run black --check .
+
+# Check the types (strict)
 uv run mypy
+
+# Run the tests with coverage
 uv run pytest --cov
 ```
 
