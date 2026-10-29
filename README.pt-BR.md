@@ -1,8 +1,6 @@
-# MailVigil
+# <img align="absmiddle" alt="Logotipo do MailVigil: um envelope com um olho aberto" src="docs/images/mailvigil-dmarc-analyzer-logo.svg" width="44"> MailVigil
 
 [English](README.md) · **Português (Brasil)**
-
-<img align="right" alt="MailVigil: um envelope com um olho aberto, o logotipo do analisador de relatórios DMARC" src="docs/images/mailvigil-dmarc-analyzer-logo.svg" width="96">
 
 ![Python](https://img.shields.io/badge/Python-3.12+-3776AB?logo=python&logoColor=white)
 ![dependências](https://img.shields.io/badge/dependências-0-brightgreen)
