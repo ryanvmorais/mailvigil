@@ -137,6 +137,9 @@ tests/               # pytest, one test file per module (test_reports_*.py incl.
 specs/               # spec-driven development: requirements → design → tasks per feature
 docs/stack.md        # each technology of the stack, why it was chosen, what to study first
 docs/json-schema.md  # every field of the two --json documents and the compatibility promise
+docs/demo/           # build_demo.py makes the invented reports and runs the CLI to write verdict.cast,
+                     # the recording behind the README demo (see its docstring for the SVG and the
+                     # page captures); docs/images/ holds the README pictures
 .githooks/           # versioned pre-commit hook (core.hooksPath)
 .claude/             # Claude Code hooks: format on edit, validate at turn end, guard uv.lock
 .github/             # CI, CodeQL, dependency review, weekly pip-audit, Dependabot, issue/PR templates

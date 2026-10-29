@@ -24,6 +24,14 @@ out DMARC, and it runs entirely on your machine: your reports are never sent to 
 > until the first version is out. Rows marked "Built" work today through `mailvigil summary`,
 > `mailvigil verdict` and `mailvigil fetch`; the rest of the table is the plan.
 
+![A terminal running mailvigil verdict on a folder of DMARC reports: NOT READY for p=reject with exit code 4, then, a month of reports later, READY for p=reject with exit code 0](https://raw.githubusercontent.com/ryanvmorais/mailvigil/main/docs/images/mailvigil-dmarc-verdict-terminal-demo.svg)
+
+*Two real runs on invented reports (`example.com`, documentation addresses): the first period is
+`NOT READY` and the command exits with `4`; after the sender fixes its DKIM key, a month of newer
+reports gives `READY` and `0`. The commands are typed for the recording and the wait between the
+two runs is cut. The recording is [`docs/demo/verdict.cast`](docs/demo/verdict.cast), made by
+[`docs/demo/build_demo.py`](docs/demo/build_demo.py); play it with `asciinema play`.*
+
 ## What it will do
 
 | Area | What | Version | Status |
@@ -80,6 +88,21 @@ in the current folder, if there is one; with neither a file nor `--domain` it as
 MailVigil is not a replacement for a monitoring pipeline: if you already run parsedmarc, keep it.
 It answers one question, and answers it without a stack to install.
 
+## Scope and limitations
+
+MailVigil is deliberately small. For each limit below, what to reach for instead.
+
+- **It reads only the reports you give it.** Mail that no receiver reports on, and senders that
+  were quiet in the period, are not covered, and the verdict says so under every answer. *Instead:*
+  collect a full cycle first; the verdict asks for 28 days.
+- **`fetch` has no OAuth.** It logs in with a name and a password, so Microsoft 365 and Google
+  accounts without an app password are not supported (see [Fetch](#fetch)). *Instead:* save the
+  report messages from your mail client into a folder as `.eml` files and point `summary` at it.
+- **It is not a monitoring pipeline.** There are no dashboards, no history and no alerts, and a
+  web dashboard is not planned (see [Permanent non-goals](specs/README.md#permanent-non-goals)).
+  *Instead:*
+  [parsedmarc](https://github.com/domainaware/parsedmarc) with Elasticsearch or Kibana.
+
 ## Quick start
 
 Not published yet, so for now run it from a clone. You need [uv](https://docs.astral.sh/uv/).
@@ -119,7 +142,10 @@ network. Only `fetch` connects to a server (see [Fetch](#fetch)).
 A folder is searched, one level deep, only for the names providers use for their attachments
 (`provider!domain!begin!end.zip`, also `.gz` and `.xml`) and for `.eml` and `.mbox` files, whose
 report attachments are taken out of the messages in memory. A file named on the command line is
-read whatever its name. The output looks like this (invented data):
+read whatever its name.
+
+<details>
+<summary>What <code>summary</code> prints (invented data)</summary>
 
 ```text
 MailVigil summary for example.com
@@ -160,6 +186,8 @@ Left out of these numbers
 
 A `!` marks a sender with failing messages. Files that were refused, duplicates and reports of
 another domain are counted at the bottom, so a number never silently drops out.
+
+</details>
 
 Installing with `pipx install mailvigil` or `uv tool install mailvigil` will be possible once the
 first version is on PyPI.
@@ -206,9 +234,12 @@ answer, then shows each of the five rules as a meter against its limit, the spli
 in four situations, one column per day of the period, the senders and the failing sources. It
 follows `--lang`, switches to dark with the system, and prints on paper.
 
-![MailVigil HTML report of a DMARC verdict: NOT READY for p=reject, five rules as meters against their limits, the message mix and a day-by-day chart](https://raw.githubusercontent.com/ryanvmorais/mailvigil/main/docs/images/dmarc-reject-verdict-html-report.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ryanvmorais/mailvigil/main/docs/images/dmarc-reject-verdict-html-report-dark.png">
+  <img alt="MailVigil HTML report of a DMARC verdict: NOT READY for p=reject, five rules as meters against their limits, the message mix and a day-by-day chart" src="https://raw.githubusercontent.com/ryanvmorais/mailvigil/main/docs/images/dmarc-reject-verdict-html-report.png">
+</picture>
 
-*The page for an invented domain (`example.com`, documentation addresses): unrecognized sources fail 1.1% of the messages, above the 0.5% limit, so the answer is `NOT READY`.*
+*The page for an invented domain (`example.com`, documentation addresses), in the light and the dark palette: unrecognized sources fail 0.8% of the messages (56 of 7056), above the 0.5% limit, so the answer is `NOT READY`.*
 
 ```bash
 uv run mailvigil verdict --config mailvigil.toml reports/ --html > report.html
@@ -308,7 +339,10 @@ compatibility promise.
 The text of both commands and the one-line refusals are in English by default. `--lang pt-BR`
 (`pt-br` works too) prints them in Brazilian Portuguese; `--lang en` is the default spelled out, and
 any other code is a usage error (exit `2`). The Portuguese is plain ASCII (`nao`, not `não`), so no
-console encoding can break the layout. The same invented `NOT READY` as above:
+console encoding can break the layout.
+
+<details>
+<summary>The same invented <code>NOT READY</code> as above, in Portuguese</summary>
 
 ```text
 Veredito do MailVigil para example.com: NAO PRONTO para p=reject
@@ -331,6 +365,8 @@ Proximo: olhe as origens acima e acrescente os seletores das que forem suas a
 Isto le apenas os relatorios que voce deu: email que nenhum receptor reporta, e
 remetentes que ficaram quietos neste periodo, nao sao cobertos.
 ```
+
+</details>
 
 Numbers keep the decimal point in both languages, `--json` has no language (its identifiers do not
 change), `--help` stays in English, and neither the language nor `--json` changes an exit code.
