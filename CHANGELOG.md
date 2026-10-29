@@ -12,8 +12,14 @@ All notable changes to MailVigil are written here. The format follows
 - **Portuguese README.** `README.pt-BR.md` is the whole README in Brazilian Portuguese, with the
   sample output of `--lang pt-BR`; the English README links to it.
 
+- **A logo for the tool.** An envelope with an open eye, `docs/images/mailvigil-dmarc-analyzer-logo.svg`,
+  shown at the top of both READMEs.
+
 ### Changed
 
+- **The HTML report header.** `verdict --html` now opens with the new symbol, in the accent colour
+  of the page, where it had a shield outline. The page still loads nothing: the symbol is an inline
+  SVG.
 - **License metadata.** The package now declares its license as the SPDX expression `Apache-2.0`
   (PEP 639) instead of the deprecated table and classifier. The license itself is unchanged.
 

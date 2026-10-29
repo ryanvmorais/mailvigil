@@ -11,7 +11,9 @@ same run, since the two must agree (RF-02). The attack strings are in ``test_ren
 from __future__ import annotations
 
 import itertools
+import re
 from datetime import timedelta
+from pathlib import Path
 
 import pytest
 from tests.html_helpers import (
@@ -40,6 +42,11 @@ from mailvigil.render_verdict import (
 from mailvigil.senders import Outcome
 from mailvigil.summary import Counts, FailingSource, SenderRow, Summary
 from mailvigil.verdict import Answer, Verdict, judge
+
+# The README shows this file, so the page must draw the same path (one symbol for the tool).
+_SYMBOL_FILE = (
+    Path(__file__).resolve().parent.parent / "docs" / "images" / "mailvigil-dmarc-analyzer-logo.svg"
+)
 
 _RUNS = {
     Answer.READY: ready_summary,
@@ -151,6 +158,18 @@ def test_every_svg_is_named_or_marked_decorative(answer: Answer) -> None:
         decorative = attrs.get("aria-hidden") == "true"
         named = attrs.get("role") == "img" and bool(attrs.get("aria-label"))
         assert decorative or named
+
+
+@answers
+def test_the_symbol_in_the_header_is_the_one_of_the_svg_file(answer: Answer) -> None:
+    # The file is what the README shows; the page draws the same path, so the tool has one symbol.
+    _document, page, _summary, _verdict = page_of(answer)
+    marks = [attrs for tag, attrs in page.elements if tag == "path" and "fill-rule" in attrs]
+    assert len(marks) == 1
+    assert marks[0]["fill-rule"] == "evenodd"
+    found = re.search(r' d="([^"]+)"', _SYMBOL_FILE.read_text(encoding="utf-8"))
+    assert found is not None
+    assert marks[0]["d"] == found.group(1)
 
 
 @answers

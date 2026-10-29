@@ -2,6 +2,8 @@
 
 [English](README.md) · **Português (Brasil)**
 
+<img alt="MailVigil: um envelope com um olho aberto, o logotipo do analisador de relatórios DMARC" src="docs/images/mailvigil-dmarc-analyzer-logo.svg" width="72">
+
 ![Python](https://img.shields.io/badge/Python-3.12+-3776AB?logo=python&logoColor=white)
 ![dependências](https://img.shields.io/badge/dependências-0-brightgreen)
 [![CI](https://github.com/ryanvmorais/mailvigil/actions/workflows/ci.yml/badge.svg)](https://github.com/ryanvmorais/mailvigil/actions/workflows/ci.yml)

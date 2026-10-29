@@ -51,8 +51,17 @@ _VALUE_MAX = 30
 # limit); the senders table shows every row (RF-05).
 _LIMIT = 10
 
+# The symbol of the tool, drawn on a 64-unit grid as one filled path (``evenodd``): a solid envelope
+# with the flap and an open eye cut out. ``docs/images/mailvigil-dmarc-analyzer-logo.svg`` holds
+# the same path, and a test keeps the two equal.
+_SYMBOL: Final = (
+    "M12 9H52A9 9 0 0 1 61 18V47A9 9 0 0 1 52 56H12A9 9 0 0 1 3 47V18A9 9 0 0 1 12 9Z"
+    "M7.18 12.39L32 30.53L56.82 12.39L59.18 15.62L32 35.48L4.82 15.62Z"
+    "M15 44Q32 32 49 44Q32 56 15 44Z"
+    "M27.4 44a4.6 4.6 0 1 0 9.2 0a4.6 4.6 0 1 0-9.2 0Z"
+)
+
 # The paths of the icons, drawn on a 24-unit grid.
-_SHIELD: Final = "M12 2.5l8 3v6c0 5-3.4 8.7-8 10-4.6-1.3-8-5-8-10v-6z"
 _CHECK: Final = "M5 12.5l4.5 4.5L19 7.5"
 _CROSS: Final = "M6 6l12 12M18 6L6 18"
 _CLOCK: Final = "M12 6.5V12l3.5 2"
@@ -93,6 +102,26 @@ def _icon(path: str, size: int, width: str) -> Safe:
         stroke_width=width,
         stroke_linecap="round",
         stroke_linejoin="round",
+        aria_hidden="true",
+    )
+
+
+def _symbol(size: int) -> Safe:
+    """
+    Draw the symbol of the tool, in the accent colour of the page.
+
+    Args:
+        size (int): The side in pixels.
+
+    Returns:
+        Safe: An SVG that is hidden from screen readers; the name of the tool is beside it.
+    """
+    return el(
+        "svg",
+        el("path", d=_SYMBOL, fill="currentColor", fill_rule="evenodd"),
+        width=str(size),
+        height=str(size),
+        viewBox="0 0 64 64",
         aria_hidden="true",
     )
 
@@ -192,7 +221,7 @@ def _header(summary: Summary, messages: Messages) -> Safe:
         reports=summary.reports, reporters=words.reporter.of(summary.reporters)
     )
     meta = " \u00b7 ".join([fit(summary.domain, _DOMAIN_MAX), when, reports])
-    brand = el("div", _icon(_SHIELD, 24, "2"), el("span", text("MailVigil")), class_="brand")
+    brand = el("div", _symbol(28), el("span", text("MailVigil")), class_="brand")
     return el("header", brand, el("p", text(meta), class_="meta"), class_="top")
 
 

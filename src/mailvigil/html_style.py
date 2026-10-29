@@ -140,6 +140,7 @@ body{margin:0;background:var(--page);color:var(--fg);font:15px/1.5 system-ui,"Se
 main{display:flex;flex-direction:column;gap:16px}
 .top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 24px}
 .brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:17px}
+.brand svg{flex:none;color:var(--accent)}
 .meta{margin:0;color:var(--muted);font-size:14px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:20px;min-width:0}
 h1,h2,h3,p{margin:0}
