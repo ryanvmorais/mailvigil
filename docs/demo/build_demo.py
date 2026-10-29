@@ -10,12 +10,18 @@ The picture files are made from the output of this script with two tools that ar
 project (nothing is added to ``pyproject.toml``):
 
     uv run python docs/demo/build_demo.py WORKDIR
-    npx svg-term-cli --in docs/demo/verdict.cast --out docs/images/<name>.svg --window --no-cursor
-    # the page captures, from WORKDIR/before (light, then dark):
+    npx svg-term-cli --in docs/demo/verdict.cast --out docs/images/<name>.svg \\
+        --window --no-cursor --width 80 --height 29
+    uv run python docs/demo/tidy_svg.py docs/images/<name>.svg    # pins the letters to the grid
+
+The page captures come from WORKDIR/before, with an absolute path for ``--screenshot``:
+
     uv run mailvigil verdict --config mailvigil.toml reports/ --html > report.html
-    chrome --headless=new --screenshot=light.png --window-size=1280,1262 file:///.../report.html
-    chrome --headless=new --screenshot=dark.png --window-size=1280,1262 \\
-        --blink-settings=preferredColorScheme=1 file:///.../report.html
+    chrome --headless=new --screenshot=/abs/light.png --window-size=1280,1278 \\
+        file:///.../report.html
+
+For the dark one, copy ``report.html`` with ``@media (prefers-color-scheme:dark)`` replaced by
+``@media all`` (the page picks its palette by that query alone) and capture the copy the same way.
 """
 
 from __future__ import annotations
