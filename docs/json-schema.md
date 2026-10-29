@@ -410,7 +410,7 @@ Both use invented data: `example.com`, a made-up service and the documentation a
       "kind": "data",
       "measured": 7006,
       "whole": 0,
-      "needed": 1000,
+      "needed": 100,
       "unit": "messages",
       "comparison": "at_least",
       "passed": true,

@@ -450,7 +450,7 @@ def test_the_table_has_the_five_rules_with_what_was_measured_and_needed() -> Non
         ["regra", "medido", "necessario", "resultado"],
         ["1", "periodo coberto", "28 dias", ">= 28", "passa"],
         ["2", "dias com relatorio", "27 de 28 (96.4%)", ">= 80%", "passa"],
-        ["3", "mensagens vistas", "12480", ">= 1000", "passa"],
+        ["3", "mensagens vistas", "12480", ">= 100", "passa"],
         ["4", "falhas reconhecidas", "12", "<= 0", "FALHA"],
         ["5", "falhas nao reconhecidas", "0 (0%)", "<= 0.5%", "passa"],
     ]

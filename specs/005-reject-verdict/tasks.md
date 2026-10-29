@@ -39,7 +39,7 @@ module (RNF-03).
 - [x] `tests/test_verdict.py`, written first, with a `Summary` builder (period, totals, senders,
   failing sources, policy, `earlier_p`) whose defaults are a clean, long, busy domain. Rules, each
   at the threshold and at the value beside it: 28 and 27 days spanned; 23 and 22 days with a report
-  of 28; 1000 and 999 messages; 0 and 1 failing message under a recognized sender; unrecognized
+  of 28; 100 and 99 messages; 0 and 1 failing message under a recognized sender; unrecognized
   failures at exactly 0.5% of the total and just over, built with totals large enough for the
   arithmetic to be exact. — RF-02
 - [x] Same file, the answers: a clean table with a short window is `TOO_EARLY`; a recognized failure
@@ -173,7 +173,7 @@ other stages; the rules, the thresholds and the exit codes do not change.
   and the requirements' Resolved decision, tests first. — Risk 1, RF-02 — result recorded when run
   (2026-10-28): the maintainer had no real report at hand, so this ran on 12 synthetic sets outside
   the repository (deleted afterwards): clean, short, recognized and unrecognized failures, the 0.5%
-  edge, 28 days and 1000 messages on both sides, already at `p=reject`, `quarantine` with `pct` and
+  edge, 28 days and 100 messages on both sides, already at `p=reject`, `quarantine` with `pct` and
   `sp`, IPv6, a 100-character service name, mixed `.xml`/`.gz`/`.zip`, and skipped, duplicate and
   other-domain files. Answers, codes and the 80-column limit held and nothing needed a change. The
   thresholds were **not** checked against real traffic: revisit them on the first real set

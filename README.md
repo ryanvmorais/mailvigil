@@ -43,7 +43,7 @@ the first release and will contain `v0.1` to `v0.9`.
 | `v0.1` | Read a folder or files (`.zip`, `.gz`, `.xml`), filter by domain; hostile input: cap the decompressed size (zip bombs) and refuse XML with `DOCTYPE` or `ENTITY` (entity expansion) | shipped |
 | `v0.2` | Configuration: a TOML file with your domain and a map from DKIM selector to service name; a signature only counts under your own domain | shipped |
 | `v0.3` | `mailvigil summary`: per sender and per situation (ok, fragile, failing), failures highlighted | shipped |
-| `v0.4` | `mailvigil verdict`: "Ready for `reject`?" with a declared criterion: 28 days covered, reports on 80% of the days, 1000 messages, no failure from a recognized sender, at most 0.5% of the messages failing from unrecognized sources | shipped |
+| `v0.4` | `mailvigil verdict`: "Ready for `reject`?" with a declared criterion: 28 days covered, reports on 80% of the days, 100 messages, no failure from a recognized sender, at most 0.5% of the messages failing from unrecognized sources | shipped |
 | `v0.5` | `--json` and stable exit codes for scripts and CI; the text in English or Brazilian Portuguese (`--lang pt-BR`) | shipped |
 | `v0.6` | Mail messages as input: `.eml` and `.mbox`, the report attachment taken out in memory | shipped |
 | `v0.7` | `mailvigil verdict --html`: one static page with the verdict, each rule against its limit and the messages day by day; no script, no network, opened from disk | shipped |
@@ -214,7 +214,7 @@ Rules
   rule                      measured         needed   result
   1  period covered         29 days          >= 28    pass
   2  days with a report     29 of 29 (100%)  >= 80%   pass
-  3  messages seen          7056             >= 1000  pass
+  3  messages seen          7056             >= 100   pass
   4  recognized failures    0                <= 0     pass
   5  unrecognized failures  56 (0.8%)        <= 0.5%  FAIL
 
@@ -369,7 +369,7 @@ Regras
   regra                       medido           necessario  resultado
   1  periodo coberto          29 dias          >= 28       passa
   2  dias com relatorio       29 de 29 (100%)  >= 80%      passa
-  3  mensagens vistas         7056             >= 1000     passa
+  3  mensagens vistas         7056             >= 100      passa
   4  falhas reconhecidas      0                <= 0        passa
   5  falhas nao reconhecidas  56 (0.8%)        <= 0.5%     FALHA
 

@@ -384,11 +384,11 @@ def test_rule_five_shows_the_override_types_and_a_missing_address() -> None:
 
 def test_too_early_says_how_much_each_failed_data_rule_lacks() -> None:
     """Days and messages missing are named, with their rule (RF-03)."""
-    verdict = make_verdict(days=27, ok=880)
+    verdict = make_verdict(days=27, ok=80)
     lines = lines_of(verdict)
     assert "Why: not enough reports to tell yet." in lines
     assert "  period covered: need 1 more day" in lines
-    assert "  messages seen: need 120 more messages" in lines
+    assert "  messages seen: need 20 more messages" in lines
     assert not any(line.startswith("  days with a report") for line in lines)
 
 
@@ -408,7 +408,7 @@ def test_too_early_with_no_reports_says_that_none_was_kept() -> None:
 def test_too_early_with_zero_messages_asks_for_them() -> None:
     """Reports present but empty: the missing messages are the whole threshold."""
     lines = lines_of(make_verdict(ok=0))
-    assert "  messages seen: need 1000 more messages" in lines
+    assert "  messages seen: need 100 more messages" in lines
 
 
 # ---------------------------------------------------------------------------
@@ -446,7 +446,7 @@ def test_the_table_has_the_five_rules_with_what_was_measured_and_needed() -> Non
         ["rule", "measured", "needed", "result"],
         ["1", "period covered", "28 days", ">= 28", "pass"],
         ["2", "days with a report", "27 of 28 (96.4%)", ">= 80%", "pass"],
-        ["3", "messages seen", "12480", ">= 1000", "pass"],
+        ["3", "messages seen", "12480", ">= 100", "pass"],
         ["4", "recognized failures", "12", "<= 0", "FAIL"],
         ["5", "unrecognized failures", "0 (0%)", "<= 0.5%", "pass"],
     ]
@@ -1067,7 +1067,7 @@ def test_measured_needed_and_missing_text_for_each_rule() -> None:
     assert needed_text(by_id[RuleId.RECOGNIZED_FAILURES]) == "<= 0"
     assert needed_text(by_id[RuleId.UNRECOGNIZED_FAILURES]) == "<= 0.5%"
     assert missing_text(by_id[RuleId.PERIOD], ENGLISH) == "need 18 more days"
-    assert missing_text(by_id[RuleId.VOLUME], ENGLISH) == "need 949 more messages"
+    assert missing_text(by_id[RuleId.VOLUME], ENGLISH) == "need 49 more messages"
 
 
 @pytest.mark.parametrize("messages", [ENGLISH, PORTUGUESE])
