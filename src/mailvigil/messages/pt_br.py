@@ -264,6 +264,10 @@ _REFUSALS = RefusalMessages(
 # Fetch
 # ---------------------------------------------------------------------------
 
+# Muitos planos gratuitos de e-mail nao tem IMAP, e um provedor que o desligou responde como uma
+# senha errada ou como um servidor fora do ar; as duas frases que parecem isso dizem o que fazer.
+_IMAP_HINT = "; seu provedor precisa liberar o IMAP, senao baixe os relatorios a mao e use summary"
+
 # O que o fetch diz, no mesmo molde de en.py.
 _FETCH = FetchMessages(
     title="Mensagens de relatorio baixadas da caixa de e-mail.",
@@ -281,12 +285,12 @@ _FETCH = FetchMessages(
     password_file_exposed="aviso: {path} pode ser lido por outros usuarios; rode chmod 600 nele",
     reasons=MappingProxyType(
         {
-            FetchReason.HOST_UNREACHABLE: "nao foi possivel alcancar o servidor",
+            FetchReason.HOST_UNREACHABLE: f"nao foi possivel alcancar o servidor{_IMAP_HINT}",
             FetchReason.TIMEOUT: "o servidor demorou demais para responder",
             FetchReason.DEADLINE_EXCEEDED: "a execucao demorou demais e foi interrompida",
             FetchReason.CERTIFICATE_INVALID: "o certificado do servidor nao foi aceito",
             FetchReason.TLS_FAILED: "nao foi possivel abrir uma conexao segura",
-            FetchReason.LOGIN_FAILED: "o servidor recusou o usuario ou a senha",
+            FetchReason.LOGIN_FAILED: f"o servidor recusou o usuario ou a senha{_IMAP_HINT}",
             FetchReason.PASSWORD_UNUSABLE: (
                 "a senha esta vazia, tem quebra de linha ou tem caracteres fora do ASCII"
             ),
