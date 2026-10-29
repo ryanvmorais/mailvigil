@@ -186,3 +186,13 @@ signature changed (the parent parser split); if any other one fails, the code is
   coverage. **Result:** 2026-10-28: ruff, black and mypy (34 source files) clean; 2629 tests passed and 1
   skipped (file modes, a POSIX idea), 100% coverage; `uv build` succeeds and the wheel declares 0
   `Requires-Dist`.
+
+## Stage 7 — A provider with no IMAP (RF-08)
+
+- [x] `messages/en.py` and `messages/pt_br.py`: the phrases of `LOGIN_FAILED` and
+  `HOST_UNREACHABLE` say that the provider must allow IMAP and that otherwise the reports can be
+  downloaded by hand and read with `summary` (a provider that has IMAP off answers like one of the
+  two); the README says the same under Fetch. Test: both refusals mention IMAP and `summary` in
+  both languages. — RF-08
+- [x] Quality gate. — result recorded when run: ruff, black and mypy clean; pytest passed with
+  coverage 100% (Python 3.12, 2026-10-29).
