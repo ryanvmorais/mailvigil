@@ -10,15 +10,19 @@ answer, stay silent or write raw bytes through the peer. Hosts, users and passwo
 from __future__ import annotations
 
 import contextlib
+import select
 import socket
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from typing import Any
 
 from mailvigil.fetch.imap import ImapMailbox, _Bounds, quote
 
 # A handler gets the tag, the whole command line without its line break, and the peer.
 Handler = Callable[[bytes, bytes, "ScriptedPeer"], bytes | None]
+
+# How long the server thread waits for a command before it looks at the stop signal.
+_POLL = 0.02
 
 # A password no output may ever contain: the tests search every refusal and command for it (RNF-02).
 CANARY = "canary-pw-7Q!"
@@ -99,6 +103,7 @@ class ScriptedPeer:
         self.received: list[bytes] = []
         self._handler = handler
         self._greeting = greeting
+        self._stopping = threading.Event()
         self._thread = threading.Thread(target=self._serve, daemon=True)
         self._thread.start()
 
@@ -111,13 +116,35 @@ class ScriptedPeer:
         """
         self._server.sendall(data)
 
+    def _lines(self) -> Iterator[bytes]:
+        """
+        Read command lines from the client until it leaves or the peer is told to stop.
+
+        Yields:
+            bytes: Each line, with its line break.
+        """
+        pending = b""
+        while not self._stopping.is_set():
+            line, found, rest = pending.partition(b"\n")
+            if found:
+                pending = rest
+                yield line + found
+                continue
+            # A short wait instead of a blocking read: ``shutdown`` from another thread does not
+            # wake a blocked ``recv`` on every system, and the join would run to its limit.
+            if not select.select([self._server], [], [], _POLL)[0]:
+                continue
+            data = self._server.recv(65536)
+            if not data:
+                return
+            pending += data
+
     def _serve(self) -> None:
         """Read command lines and answer them until the client leaves."""
         # The client may close first, or the test may close us: both end the loop.
-        with contextlib.suppress(OSError):
+        with contextlib.suppress(OSError, ValueError):
             self.send(self._greeting)
-            reader = self._server.makefile("rb")
-            while line := reader.readline():
+            for line in self._lines():
                 text = line.rstrip(b"\r\n")
                 self.received.append(text)
                 tag, _, rest = text.partition(b" ")
@@ -134,7 +161,7 @@ class ScriptedPeer:
 
     def hang_up(self) -> None:
         """Cut the server end, as a server that drops the connection does, and wait for it."""
-        # ``shutdown`` wakes a read blocked in the thread; ``close`` alone would not.
+        self._stopping.set()
         with contextlib.suppress(OSError):
             self._server.shutdown(socket.SHUT_RDWR)
         self._thread.join(timeout=5)
