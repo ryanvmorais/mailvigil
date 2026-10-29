@@ -349,7 +349,8 @@ class _ShortReadStream:
     A stream that returns less than asked, as a raw stream is allowed to.
 
     Attributes:
-        remaining (bytes): What has not been handed out yet.
+        content (memoryview): The whole stream.
+        position (int): How many bytes have been handed out.
     """
 
     def __init__(self, content: bytes) -> None:
@@ -359,7 +360,9 @@ class _ShortReadStream:
         Args:
             content (bytes): The whole stream.
         """
-        self.remaining = content
+        # A view and a position: slicing the bytes again on every read copies the rest each time.
+        self.content = memoryview(content)
+        self.position = 0
 
     def read(self, size: int, /) -> bytes:
         """
@@ -371,7 +374,9 @@ class _ShortReadStream:
         Returns:
             bytes: Up to ``min(size, 1000)`` bytes; empty at the end.
         """
-        chunk, self.remaining = self.remaining[: min(size, 1000)], self.remaining[1000:]
+        end = self.position + min(size, 1000)
+        chunk = bytes(self.content[self.position : end])
+        self.position = end
         return chunk
 
 
