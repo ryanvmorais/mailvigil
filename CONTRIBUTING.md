@@ -3,8 +3,9 @@
 Thanks for your interest in improving MailVigil. By taking part you agree to follow the
 [Code of Conduct](CODE_OF_CONDUCT.md).
 
-MailVigil is not released yet: the interface can change until the first version (1.0.0) is out, so open an issue
-before starting anything large.
+MailVigil follows [Semantic Versioning](https://semver.org/) from `1.0.0`: what is public is listed in
+[docs/stability.md](docs/stability.md) and changes only in a major version, so open an issue before
+starting anything large.
 
 ## Development
 
