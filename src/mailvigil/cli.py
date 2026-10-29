@@ -27,7 +27,7 @@ import sys
 import time
 import traceback
 from collections.abc import Sequence
-from datetime import date
+from datetime import UTC, date, datetime
 from pathlib import Path
 from types import MappingProxyType
 from typing import TextIO
@@ -217,6 +217,16 @@ def resolve_config(
 # ---------------------------------------------------------------------------
 # Writing (ADR-4)
 # ---------------------------------------------------------------------------
+
+
+def _now() -> datetime:
+    """
+    Read the clock, the one place the run does.
+
+    Returns:
+        datetime: The current moment, timezone-aware (UTC). Tests replace this function.
+    """
+    return datetime.now(UTC)
 
 
 def _write(stream: TextIO, text: str) -> None:
@@ -518,7 +528,7 @@ def _load(
         _write(sys.stderr, f"mailvigil: {refusal.message}")
         return None
 
-    result = ingest(args.paths, config.domain)
+    result = ingest(args.paths, config.domain, _now())
     if not result.reports:
         _write(sys.stderr, no_reports_message(result, config.domain, messages))
         return None
@@ -567,7 +577,7 @@ def _run_verdict(args: argparse.Namespace) -> int:
     config, _source, result = loaded
 
     summary = summarize(result, config)
-    verdict = judge(summary)
+    verdict = judge(summary, _now())
     if args.json:
         _write(sys.stdout, dumps(verdict_document(verdict)))
     elif args.html:

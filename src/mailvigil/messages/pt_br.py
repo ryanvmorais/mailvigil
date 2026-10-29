@@ -196,6 +196,10 @@ _VERDICT = VerdictMessages(
             NoteKind.CURRENTLY_QUARANTINE: (
                 "A politica atual e p=quarantine; este veredito trata da mudanca para p=reject."
             ),
+            NoteKind.STALE: (
+                "O ultimo relatorio terminou ha {days} dias; os numeros podem nao descrever o "
+                "e-mail que voce envia hoje."
+            ),
         }
     ),
     next_label="Proximo:",

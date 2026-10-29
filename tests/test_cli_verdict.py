@@ -12,10 +12,12 @@ folder, so a ``mailvigil.toml`` of the working directory can never leak in, and 
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
 
+from mailvigil import cli
 from mailvigil.cli import main
 from mailvigil.verdict import MIN_DAYS_SPANNED, MIN_MESSAGES
 
@@ -138,6 +140,27 @@ def test_a_long_clean_busy_set_is_ready_and_returns_zero(
     assert code == 0
     assert captured.out.startswith("MailVigil verdict for example.com: READY")
     assert captured.err == ""
+
+
+def test_a_late_run_keeps_the_answer_and_adds_the_stale_note(
+    tmp_path: Path,
+    make_report_xml: _ReportXml,
+    make_record_xml: _RecordXml,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Run a month after the last report: still READY, with the note saying how long ago."""
+    folder = write_window(tmp_path / "reports", make_report_xml, make_record_xml, days=_LONG)
+    config = write_config(tmp_path / "config.toml")
+    late = cli._now() + timedelta(days=30)
+    monkeypatch.setattr(cli, "_now", lambda: late)
+
+    code = main(["verdict", str(folder), "--config", str(config)])
+
+    captured = capsys.readouterr()
+    assert code == 0
+    assert "READY" in captured.out
+    assert "The latest report ended 30 days ago" in captured.out
 
 
 def test_a_clean_set_that_is_short_is_too_early_and_returns_three(

@@ -13,11 +13,23 @@ import gzip
 import io
 import zipfile
 from collections.abc import Callable, Mapping, Sequence
+from datetime import UTC, datetime
 
 import pytest
 
 # The RFC 9990 namespace; an RFC 7489 report has no namespace at all.
 _NAMESPACE_9990 = "urn:ietf:params:xml:ns:dmarc-2.0"
+
+# The moment every CLI run believes it is: the day after the 28-day windows of ``cli_helpers.py``
+# end, so no test depends on the real date (a future report, or a stale note, would).
+CLOCK = datetime(2026, 10, 20, 12, 0, tzinfo=UTC)
+
+
+@pytest.fixture(autouse=True)
+def fixed_clock(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Pin the clock the CLI reads, so the date of the run never changes a result."""
+    monkeypatch.setattr("mailvigil.cli._now", lambda: CLOCK)
+
 
 # ---------------------------------------------------------------------------
 # Builders

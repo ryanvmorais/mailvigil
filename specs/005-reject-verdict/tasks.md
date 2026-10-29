@@ -190,3 +190,11 @@ other stages; the rules, the thresholds and the exit codes do not change.
   coverage 100%, Python 3.12); the CI run URL goes here once the PR is open. The built wheel declares
   no `Requires-Dist`, holds both new modules, imports in a clean environment, and `mailvigil verdict`
   on 28 synthetic daily reports prints `READY` with code 0
+
+## Stage 9 — A note for old data
+
+- [x] `verdict.py`: `STALE_AFTER`, `NoteKind.STALE` and the optional `now` of `judge`; texts in both
+  languages, `render_verdict.py`, `docs/json-schema.md`. The CLI reads the clock in one function
+  (`cli._now`) and the tests pin it. — RF-04
+- [x] Quality gate. — result recorded when run: ruff, black and mypy clean; pytest passed with
+  coverage 100% (Python 3.12, 2026-10-29).

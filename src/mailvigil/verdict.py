@@ -12,6 +12,7 @@ replaces text modules and not these rules. It does no I/O, reads no clock and ne
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from enum import IntEnum, StrEnum
 
 from mailvigil.senders import Outcome
@@ -34,6 +35,8 @@ MIN_MESSAGES = 1000
 #: Rule 5, in tenths of a percent of all messages: unrecognized failures may be at most this much
 #: (5 is 0.5%). Per mille, not percent, so the comparison stays in integers (ADR-4).
 MAX_UNRECOGNIZED_PER_MILLE = 5
+#: Older data may no longer describe the mail sent today, so the stale note appears past this age.
+STALE_AFTER = timedelta(days=14)
 
 # ---------------------------------------------------------------------------
 # Vocabulary and model
@@ -100,6 +103,7 @@ class NoteKind(StrEnum):
         SUBDOMAIN_POLICY (str): ``sp`` or ``np`` differs from ``p``. Texts: ``sp`` and ``np``
             (empty when absent).
         CURRENTLY_QUARANTINE (str): The policy is ``quarantine`` now.
+        STALE (str): The latest report ended long before the run. Numbers: whole days since.
     """
 
     FRAGILE = "fragile"
@@ -107,6 +111,7 @@ class NoteKind(StrEnum):
     POLICY_CHANGED = "policy_changed"
     SUBDOMAIN_POLICY = "subdomain_policy"
     CURRENTLY_QUARANTINE = "currently_quarantine"
+    STALE = "stale"
 
 
 @dataclass(frozen=True, slots=True)
@@ -284,13 +289,14 @@ def _rules(
     )
 
 
-def _notes(summary: Summary, enforcing: str) -> tuple[Note, ...]:
+def _notes(summary: Summary, enforcing: str, now: datetime | None) -> tuple[Note, ...]:
     """
     Collect the notes that apply, in the order of ``NoteKind`` (RF-04).
 
     Args:
         summary (Summary): The summary.
         enforcing (str): The latest ``p``, normalized.
+        now (datetime | None): The moment of the run, ``None`` when the caller gave no clock.
 
     Returns:
         tuple[Note, ...]: The notes; none changes the answer.
@@ -313,10 +319,14 @@ def _notes(summary: Summary, enforcing: str) -> tuple[Note, ...]:
             notes.append(Note(NoteKind.SUBDOMAIN_POLICY, texts=(sp, np)))
     if enforcing == "quarantine":
         notes.append(Note(NoteKind.CURRENTLY_QUARANTINE))
+    if now is not None and summary.period is not None:
+        age = now - summary.period.end
+        if age > STALE_AFTER:
+            notes.append(Note(NoteKind.STALE, numbers=(age.days,)))
     return tuple(notes)
 
 
-def judge(summary: Summary) -> Verdict:
+def judge(summary: Summary, now: datetime | None = None) -> Verdict:
     """
     Say whether the domain is ready for ``p=reject``, and why.
 
@@ -327,6 +337,9 @@ def judge(summary: Summary) -> Verdict:
 
     Args:
         summary (Summary): What the reports say, from ``summarize``.
+        now (datetime | None, optional): The moment of the run, timezone-aware. It only adds the
+            ``STALE`` note; the function still reads no clock of its own. Default: ``None``, no
+            note.
 
     Returns:
         Verdict: The five rules, the answer, the failing sources split by whether the sender is
@@ -363,7 +376,7 @@ def judge(summary: Summary) -> Verdict:
         deciding=deciding,
         recognized_failing=recognized_failing,
         unrecognized_failing=unrecognized_failing,
-        notes=_notes(summary, enforcing),
+        notes=_notes(summary, enforcing, now),
         left_out=LeftOut(
             skipped=len(summary.skipped),
             duplicates=summary.duplicates,

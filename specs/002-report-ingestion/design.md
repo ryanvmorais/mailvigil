@@ -198,7 +198,8 @@ unnoticed and had its entity expanded.
 2. `version` text, when present, must be `1.0` → else `UNSUPPORTED_VERSION`.
 3. `report_metadata`: `org_name`, `report_id`, and `date_range/begin` and `end` parsed with
    `int` and `datetime.fromtimestamp(…, UTC)`. `ValueError`, `OverflowError` and `OSError` from
-   that conversion, and `end < begin`, → `INVALID_FIELD` (detail: the field name only).
+   that conversion, `end < begin` and a period over `MAX_PERIOD` (7 days) → `INVALID_FIELD` (detail:
+   the field name only).
 4. `policy_published`: the fields of `PolicyPublished`; `pct` parsed as `int`, must be 0 to 100.
 5. Each `record`: `row/count` via `int`, must be 0 to `MAX_COUNT` (10^12, one module constant); a
    non-integer count (including one so long that `int` refuses it) or one above the ceiling →
@@ -241,7 +242,9 @@ ignored.
 
 ### Ingest (RF-07, RF-08, RF-09)
 
-`ingest(paths: Sequence[Path], domain: str) -> IngestionResult`.
+`ingest(paths: Sequence[Path], domain: str, now: datetime | None = None) -> IngestionResult`.
+With `now`, a report whose `end` is later than `now + FUTURE_TOLERANCE` (one day) goes to `skipped`
+with `INVALID_FIELD`; the caller reads the clock, so `ingest` stays free of one.
 
 ```text
 wanted = domain.strip().lower().rstrip(".")      # empty -> ValueError: a programming error
@@ -262,7 +265,7 @@ an error is the caller's call (RF-09, spec `006`).
 
 | Contract | Shape |
 |---|---|
-| `mailvigil.reports.ingest(paths, domain)` | `Sequence[Path], str -> IngestionResult` |
+| `mailvigil.reports.ingest(paths, domain, now=None)` | `Sequence[Path], str, datetime \| None -> IngestionResult` |
 | `mailvigil.reports.discover(paths)` | `Sequence[Path] -> (tuple[Path, ...], tuple[SkippedFile, ...])` |
 | `mailvigil.reports.read_xml(path)` | `Path -> bytes`; raises `ReportRefused` |
 | `mailvigil.reports.parse_report(xml, *, source="")` | `bytes -> Report`; raises `ReportRefused` |

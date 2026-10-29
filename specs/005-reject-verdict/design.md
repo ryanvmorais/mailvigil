@@ -98,6 +98,7 @@ class NoteKind(StrEnum):
     POLICY_CHANGED = "policy_changed"      # texts: the earlier p values, oldest first
     SUBDOMAIN_POLICY = "subdomain_policy"  # texts: sp, np ("" when absent)
     CURRENTLY_QUARANTINE = "currently_quarantine"
+    STALE = "stale"
 
 class Note:
     kind: NoteKind
@@ -175,6 +176,8 @@ retyped numbers, and a test fails if the rendered column and the constants disag
    - `POLICY_CHANGED` when `summary.earlier_p` is not empty.
    - `SUBDOMAIN_POLICY` when `sp` or `np` is present and differs from `p`.
    - `CURRENTLY_QUARANTINE` when the latest `p` is `quarantine`.
+   - `STALE` when `judge(summary, now)` got a `now` and the latest `end` is more than `STALE_AFTER`
+     (14 days) before it; `numbers` holds the whole days.
 6. **Left out (RF-09).** `left_out = LeftOut(len(summary.skipped), summary.duplicates,
    summary.other_domain)`: three figures the `Summary` already holds, copied, never recomputed. They
    take no part in the rules or the answer.
