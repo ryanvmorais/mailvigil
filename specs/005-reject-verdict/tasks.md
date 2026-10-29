@@ -186,8 +186,9 @@ other stages; the rules, the thresholds and the exit codes do not change.
   gains `IntEnum`, integer comparison of thresholds and `argparse` parent parsers. — docs
 - [x] Mark the three files `done` and move the roadmap row of `005` in `specs/README.md` to `done`.
   — all
-- [ ] Quality gate and CI. — result recorded when run: local gate green on 2026-10-28 (704 tests,
-  coverage 100%, Python 3.12); the CI run URL goes here once the PR is open. The built wheel declares
+- [x] Quality gate and CI. — result recorded when run: local gate green on 2026-10-28 (704 tests,
+  coverage 100%, Python 3.12); CI green on the closing commit of the spec (#30):
+  https://github.com/ryanvmorais/mailvigil/actions/runs/40702729246. The built wheel declares
   no `Requires-Dist`, holds both new modules, imports in a clean environment, and `mailvigil verdict`
   on 28 synthetic daily reports prints `READY` with code 0
 
