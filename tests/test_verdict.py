@@ -31,12 +31,20 @@ from mailvigil.reports import (
     SkippedFile,
 )
 from mailvigil.senders import Outcome
-from mailvigil.summary import Counts, FailingSource, Period, Summary, summarize
+from mailvigil.summary import (
+    Counts,
+    FailingSource,
+    Period,
+    ReporterActivity,
+    Summary,
+    summarize,
+)
 from mailvigil.verdict import (
     MAX_UNRECOGNIZED_PER_MILLE,
     MIN_COVERAGE_PERCENT,
     MIN_DAYS_SPANNED,
     MIN_MESSAGES,
+    SILENT_AFTER,
     STALE_AFTER,
     Answer,
     LeftOut,
@@ -77,6 +85,7 @@ def make_summary(
     skipped: int = 0,
     duplicates: int = 0,
     other_domain: int = 0,
+    reporter_activity: tuple[ReporterActivity, ...] = (),
 ) -> Summary:
     """
     Build a ``Summary`` of ``example.com`` whose figures agree with each other.
@@ -101,6 +110,8 @@ def make_summary(
         skipped (int, optional): Files refused. Default: 0.
         duplicates (int, optional): Reports dropped as already seen. Default: 0.
         other_domain (int, optional): Reports of another domain. Default: 0.
+        reporter_activity (tuple[ReporterActivity, ...], optional): What each reporter sent.
+            Default: none.
 
     Returns:
         Summary: The summary.
@@ -143,6 +154,7 @@ def make_summary(
         earlier_p=earlier_p,
         totals=Counts(ok=ok, dkim_only=dkim_only, spf_only=spf_only, failing=failing),
         failing=sources,
+        reporter_activity=reporter_activity,
         **left_out,
     )
 
@@ -491,7 +503,9 @@ def test_several_notes_come_in_the_order_of_note_kind() -> None:
             spf_only=100,
         )
     )
-    assert note_kinds(verdict) == [kind for kind in NoteKind if kind is not NoteKind.STALE]
+    assert note_kinds(verdict) == [
+        kind for kind in NoteKind if kind not in (NoteKind.SILENT_REPORTER, NoteKind.STALE)
+    ]
 
 
 def test_a_report_older_than_two_weeks_adds_the_stale_note() -> None:
@@ -517,6 +531,55 @@ def test_the_stale_note_needs_more_than_the_limit_and_a_clock() -> None:
     )
     assert not judge(summary).notes
     assert not judge(make_summary(days=0), summary.period.end + timedelta(days=99)).notes
+
+
+def _activity(summary: Summary, *reporters: tuple[str, int, timedelta]) -> Summary:
+    """
+    Give a summary reporters that went quiet this long before the latest report ended.
+
+    Args:
+        summary (Summary): The summary, with a period.
+        *reporters (tuple[str, int, timedelta]): The name, the messages and how long before the end
+            of the period the latest report of each reporter ended.
+
+    Returns:
+        Summary: The same summary with those reporters in ``reporter_activity``.
+    """
+    assert summary.period is not None
+    seen = tuple(
+        ReporterActivity(name, messages, summary.period.end - silent)
+        for name, messages, silent in reporters
+    )
+    return dataclasses.replace(summary, reporter_activity=seen)
+
+
+def test_a_large_reporter_silent_for_over_a_week_adds_the_note_for_the_largest() -> None:
+    """Two reporters stopped; the note names the one with most messages, in whole days."""
+    summary = _activity(
+        make_summary(),
+        ("big.example.net", 1200, timedelta(days=10, hours=3)),
+        ("mid.example.org", 400, timedelta(days=20)),
+        ("live.example.com", 400, timedelta(0)),
+    )
+
+    verdict = judge(summary)
+
+    assert verdict.notes == (
+        Note(NoteKind.SILENT_REPORTER, numbers=(10, 1200, 2000), texts=("big.example.net",)),
+    )
+    assert verdict.answer is judge(make_summary()).answer
+
+
+@pytest.mark.parametrize(
+    ("messages", "silent"),
+    [(1200, SILENT_AFTER), (199, timedelta(days=30)), (0, timedelta(days=30))],
+    ids=["silent exactly a week", "under a tenth of the messages", "no messages"],
+)
+def test_a_quiet_reporter_below_the_limits_adds_no_note(messages: int, silent: timedelta) -> None:
+    """A week is allowed, and a reporter with under a tenth of the messages is not worth a line."""
+    summary = _activity(make_summary(), ("some.example.net", messages, silent))
+
+    assert NoteKind.SILENT_REPORTER not in note_kinds(judge(summary))
 
 
 def test_no_note_changes_the_answer() -> None:
@@ -666,6 +729,7 @@ def test_the_answer_and_kind_words_are_the_stable_strings() -> None:
         "policy_changed",
         "subdomain_policy",
         "currently_quarantine",
+        "silent_reporter",
         "stale",
     ]
 

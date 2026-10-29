@@ -518,6 +518,14 @@ def _quarantine(note: Note, messages: Messages) -> str:
     return messages.verdict.notes[NoteKind.CURRENTLY_QUARANTINE].format()
 
 
+def _silent(note: Note, messages: Messages) -> str:
+    """Say which large reporter went quiet, and for how long."""
+    days, sent, total = note.numbers
+    return messages.verdict.notes[NoteKind.SILENT_REPORTER].format(
+        name=fit(note.texts[0], _NAME_MAX), share=format_share(sent, total), days=days
+    )
+
+
 def _stale(note: Note, messages: Messages) -> str:
     """Say how long ago the latest report ended."""
     return messages.verdict.notes[NoteKind.STALE].format(days=note.numbers[0])
@@ -529,6 +537,7 @@ _NOTE_TEXT: dict[NoteKind, Callable[[Note, Messages], str]] = {
     NoteKind.POLICY_CHANGED: _changed,
     NoteKind.SUBDOMAIN_POLICY: _subdomains,
     NoteKind.CURRENTLY_QUARANTINE: _quarantine,
+    NoteKind.SILENT_REPORTER: _silent,
     NoteKind.STALE: _stale,
 }
 

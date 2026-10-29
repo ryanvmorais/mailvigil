@@ -14,12 +14,16 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from enum import StrEnum
 
 from mailvigil.config import Config
 from mailvigil.reports import IngestionResult, PolicyPublished, Reason, Record, Report, SkippedFile
 from mailvigil.senders import Outcome, identify_sender
+
+#: A UTC day counts as having a report when the reports cover at least this much of it: half a day,
+#: so one missing report of 24 hours leaves a day uncovered whatever hour the reports start at.
+MIN_COVERED_SECONDS = 12 * 3600
 
 # ---------------------------------------------------------------------------
 # Vocabulary and model
@@ -171,6 +175,22 @@ class DayCounts:
 
 
 @dataclass(frozen=True, slots=True)
+class ReporterActivity:
+    """
+    What one reporting organization sent, so a reporter that went quiet can be noticed.
+
+    Attributes:
+        name (str): The organization, as the report gave it (already cleaned).
+        messages (int): The messages in all its reports.
+        last_end (datetime): The latest ``end`` among its reports, UTC.
+    """
+
+    name: str
+    messages: int
+    last_end: datetime
+
+
+@dataclass(frozen=True, slots=True)
 class Summary:
     """
     Everything the reports of one domain say, added up.
@@ -198,8 +218,10 @@ class Summary:
             only the days on which a report begins; internal, the ``--json`` documents do not carry
             it. Default: none.
         covered (tuple[tuple[date, date], ...]): The merged ``[first, last]`` intervals of the days
-            some report touches, the list ``period.days_with_reports`` is counted from. Default:
-            none.
+            some report covers for at least ``MIN_COVERED_SECONDS``, the list
+            ``period.days_with_reports`` is counted from. Default: none.
+        reporter_activity (tuple[ReporterActivity, ...]): One entry per reporting organization, the
+            one with most messages first. Default: none.
     """
 
     domain: str
@@ -219,6 +241,7 @@ class Summary:
     other_domain: int = 0
     days: tuple[DayCounts, ...] = ()
     covered: tuple[tuple[date, date], ...] = ()
+    reporter_activity: tuple[ReporterActivity, ...] = ()
 
 
 # ---------------------------------------------------------------------------
@@ -405,33 +428,61 @@ def _days_touched(report: Report) -> tuple[date, date]:
 
 def _covered(reports: tuple[Report, ...]) -> tuple[tuple[date, date], ...]:
     """
-    Merge the days the reports touch into ``[first, last]`` intervals.
+    Find the UTC days the reports cover, as ``[first, last]`` intervals.
 
-    The days are kept as intervals, never as a set of days: a report may legitimately span centuries
-    (RNF-09). Rule 2 of the verdict and the timeline of the HTML report both read this list, so they
-    cannot disagree about which days have a report (spec 008, ADR-3).
+    A day counts only when the periods of the reports, merged so that overlaps are not added twice,
+    cover at least ``MIN_COVERED_SECONDS`` of it. Touching a day is not covering it: with reports
+    that do not start at midnight, a report that never arrived would otherwise leave both
+    neighbouring days looking complete.
+
+    The days are kept as intervals, never as a set of days (RNF-09); only the days some report
+    touches are visited, so the work follows the reports, not the distance between them. Rule 2 of
+    the verdict and the timeline of the HTML report both read this list, so they cannot disagree
+    about which days have a report (spec 008, ADR-3).
 
     Args:
         reports (tuple[Report, ...]): The reports kept.
 
     Returns:
         tuple[tuple[date, date], ...]: The intervals, ordered, with at least one day between two of
-            them; empty without reports.
+            them; empty without reports or when no day is covered enough.
     """
-    if not reports:
-        return ()
-    intervals = sorted(_days_touched(report) for report in reports)
-    merged: list[tuple[date, date]] = []
-    run_first, run_last = intervals[0]
-    for first, last in intervals[1:]:
-        # why: days that follow each other are one interval, so a gap is exactly a hole in the list
-        if (first - run_last).days > 1:
-            merged.append((run_first, run_last))
-            run_first, run_last = first, last
+    # 1. Merge the periods in time. A report of zero length covers nothing.
+    spans = sorted((report.begin, report.end) for report in reports if report.end > report.begin)
+    merged: list[tuple[datetime, datetime]] = []
+    for begin, end in spans:
+        if merged and begin <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], end))
         else:
-            run_last = max(run_last, last)
-    merged.append((run_first, run_last))
-    return tuple(merged)
+            merged.append((begin, end))
+
+    # 2. Only the first and the last day of a merged period can be partly covered; the days between
+    #    are covered whole, so they are one range and not a loop over the length of the period
+    #    (RNF-09). Several periods can share a day, so the partial seconds are added per day.
+    seconds: Counter[date] = Counter()
+    ranges: list[tuple[date, date]] = []
+    for begin, end in merged:
+        first = begin.date()
+        last = (end - timedelta(microseconds=1)).date()
+        if first == last:
+            seconds[first] += int((end - begin).total_seconds())
+            continue
+        next_midnight = datetime.combine(first + timedelta(days=1), time.min, tzinfo=UTC)
+        last_midnight = datetime.combine(last, time.min, tzinfo=UTC)
+        seconds[first] += int((next_midnight - begin).total_seconds())
+        seconds[last] += int((end - last_midnight).total_seconds())
+        if (last - first).days > 1:
+            ranges.append((first + timedelta(days=1), last - timedelta(days=1)))
+    ranges.extend((day, day) for day, covered in seconds.items() if covered >= MIN_COVERED_SECONDS)
+
+    # 3. Days that follow each other are one interval, so a gap is exactly a hole in the list.
+    intervals: list[tuple[date, date]] = []
+    for first, last in sorted(ranges):
+        if intervals and (first - intervals[-1][1]).days <= 1:
+            intervals[-1] = (intervals[-1][0], max(intervals[-1][1], last))
+        else:
+            intervals.append((first, last))
+    return tuple(intervals)
 
 
 def _period(reports: tuple[Report, ...], covered: tuple[tuple[date, date], ...]) -> Period | None:
@@ -440,15 +491,17 @@ def _period(reports: tuple[Report, ...], covered: tuple[tuple[date, date], ...])
 
     Args:
         reports (tuple[Report, ...]): The reports kept.
-        covered (tuple[tuple[date, date], ...]): Their merged intervals, from ``_covered``.
+        covered (tuple[tuple[date, date], ...]): The days covered enough, from ``_covered``.
 
     Returns:
-        Period | None: The period, or ``None`` without reports.
+        Period | None: The period, or ``None`` without reports. It runs from the day the earliest
+            report begins to the last day any report touches, whether or not those days are
+            covered enough.
     """
     if not reports:
         return None
-    first_day = covered[0][0]
-    last_day = covered[-1][1]
+    first_day = min(report.begin for report in reports).date()
+    last_day = max(_days_touched(report)[1] for report in reports)
     return Period(
         begin=min(report.begin for report in reports),
         end=max(report.end for report in reports),
@@ -456,6 +509,27 @@ def _period(reports: tuple[Report, ...], covered: tuple[tuple[date, date], ...])
         last_day=last_day,
         days_spanned=(last_day - first_day).days + 1,
         days_with_reports=sum((last - first).days + 1 for first, last in covered),
+    )
+
+
+def _activity(reports: tuple[Report, ...]) -> tuple[ReporterActivity, ...]:
+    """
+    Sum the messages and find the last end of each reporting organization.
+
+    Args:
+        reports (tuple[Report, ...]): The reports kept.
+
+    Returns:
+        tuple[ReporterActivity, ...]: One per organization, most messages first, then by name.
+    """
+    messages: Counter[str] = Counter()
+    last_end: dict[str, datetime] = {}
+    for report in reports:
+        messages[report.reporter] += sum(max(record.count, 0) for record in report.records)
+        last_end[report.reporter] = max(report.end, last_end.get(report.reporter, report.end))
+    return tuple(
+        ReporterActivity(name, messages[name], last_end[name])
+        for name in sorted(messages, key=lambda name: (-messages[name], name))
     )
 
 
@@ -620,4 +694,5 @@ def summarize(result: IngestionResult, config: Config) -> Summary:
             for day in sorted(day_tallies)
         ),
         covered=covered,
+        reporter_activity=_activity(result.reports),
     )

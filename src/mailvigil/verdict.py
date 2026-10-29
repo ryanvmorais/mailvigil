@@ -37,6 +37,10 @@ MIN_MESSAGES = 1000
 MAX_UNRECOGNIZED_PER_MILLE = 5
 #: Older data may no longer describe the mail sent today, so the stale note appears past this age.
 STALE_AFTER = timedelta(days=14)
+#: The silent-reporter note: a reporter with at least this share of the messages (percent) ...
+SILENT_MIN_PERCENT = 10
+#: ... that sent nothing for longer than this before the latest report ended.
+SILENT_AFTER = timedelta(days=7)
 
 # ---------------------------------------------------------------------------
 # Vocabulary and model
@@ -103,6 +107,9 @@ class NoteKind(StrEnum):
         SUBDOMAIN_POLICY (str): ``sp`` or ``np`` differs from ``p``. Texts: ``sp`` and ``np``
             (empty when absent).
         CURRENTLY_QUARANTINE (str): The policy is ``quarantine`` now.
+        SILENT_REPORTER (str): A reporter with a large share of the messages stopped sending while
+            others went on. Numbers: whole days it has been silent, its messages, all messages.
+            Texts: its name.
         STALE (str): The latest report ended long before the run. Numbers: whole days since.
     """
 
@@ -111,6 +118,7 @@ class NoteKind(StrEnum):
     POLICY_CHANGED = "policy_changed"
     SUBDOMAIN_POLICY = "subdomain_policy"
     CURRENTLY_QUARANTINE = "currently_quarantine"
+    SILENT_REPORTER = "silent_reporter"
     STALE = "stale"
 
 
@@ -319,6 +327,21 @@ def _notes(summary: Summary, enforcing: str, now: datetime | None) -> tuple[Note
             notes.append(Note(NoteKind.SUBDOMAIN_POLICY, texts=(sp, np)))
     if enforcing == "quarantine":
         notes.append(Note(NoteKind.CURRENTLY_QUARANTINE))
+    if summary.period is not None:
+        total = summary.totals.total
+        for activity in summary.reporter_activity:
+            silent = summary.period.end - activity.last_end
+            # why: the union of the reporters hides one that went quiet, and only a large one is
+            # worth a line; the list is sorted, so the first match is the largest.
+            if 100 * activity.messages >= SILENT_MIN_PERCENT * total and silent > SILENT_AFTER:
+                notes.append(
+                    Note(
+                        NoteKind.SILENT_REPORTER,
+                        numbers=(silent.days, activity.messages, total),
+                        texts=(activity.name,),
+                    )
+                )
+                break
     if now is not None and summary.period is not None:
         age = now - summary.period.end
         if age > STALE_AFTER:
