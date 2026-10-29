@@ -12,6 +12,11 @@ All notable changes to MailVigil are written here. The format follows
 - **Portuguese README.** `README.pt-BR.md` is the whole README in Brazilian Portuguese, with the
   sample output of `--lang pt-BR`; the English README links to it.
 
+### Changed
+
+- **License metadata.** The package now declares its license as the SPDX expression `Apache-2.0`
+  (PEP 639) instead of the deprecated table and classifier. The license itself is unchanged.
+
 ## [1.0.0] - 2026-10-29
 
 ### Added
