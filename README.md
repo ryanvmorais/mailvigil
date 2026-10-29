@@ -29,13 +29,13 @@ out DMARC, and it runs entirely on your machine: your reports are never sent to 
 *Two real runs on invented reports (`example.com`, documentation addresses): the first period is
 `NOT READY` and the command exits with `4`; after the sender fixes its DKIM key, a month of newer
 reports gives `READY` and `0`. The commands are typed for the recording and the wait between the
-two runs is cut. The recording is [`docs/demo/verdict.cast`](docs/demo/verdict.cast), made by
-[`docs/demo/build_demo.py`](docs/demo/build_demo.py); play it with `asciinema play`.*
+two runs is cut. The recording is [`docs/demo/verdict.cast`](https://github.com/ryanvmorais/mailvigil/blob/main/docs/demo/verdict.cast), made by
+[`docs/demo/build_demo.py`](https://github.com/ryanvmorais/mailvigil/blob/main/docs/demo/build_demo.py); play it with `asciinema play`.*
 
 ## What it does
 
 MailVigil is built milestone by milestone, each one designed as a spec first, under
-[`specs/`](specs/). The milestones are the history of the build, not published versions: `1.0.0` is
+[`specs/`](https://github.com/ryanvmorais/mailvigil/tree/main/specs). The milestones are the history of the build, not published versions: `1.0.0` is
 the first release and will contain `v0.1` to `v0.9`.
 
 | Milestone | Focus | Status |
@@ -51,7 +51,7 @@ the first release and will contain `v0.1` to `v0.9`.
 | `v0.9` | Hardening before the release: bounds on a report's count and period, a day counts as covered by time, notes for old data and for a reporter that went quiet, and distinct exit codes for a bug, Ctrl+C and a closed pipe | shipped |
 
 Not planned, on purpose: indexing in Elasticsearch, a web dashboard served by the tool and sending
-e-mail, each with its reason in [Permanent non-goals](specs/README.md#permanent-non-goals).
+e-mail, each with its reason in [Permanent non-goals][non-goals].
 
 ## Configuration
 
@@ -105,7 +105,7 @@ MailVigil is deliberately small. For each limit below, what to reach for instead
   report messages from your mail client into a folder as `.eml` files and point `summary` at it.
   The same goes for a provider with no IMAP.
 - **It is not a monitoring pipeline.** There are no dashboards, no history and no alerts, and a
-  web dashboard is not planned (see [Permanent non-goals](specs/README.md#permanent-non-goals)).
+  web dashboard is not planned (see [Permanent non-goals][non-goals]).
   *Instead:*
   [parsedmarc](https://github.com/domainaware/parsedmarc) with Elasticsearch or Kibana.
 
@@ -336,7 +336,7 @@ case $? in
 esac
 ```
 
-A change to this table is a breaking change. [docs/stability.md](docs/stability.md) lists what else
+A change to this table is a breaking change. [docs/stability.md](https://github.com/ryanvmorais/mailvigil/blob/main/docs/stability.md) lists what else
 is public and what is not.
 
 ### JSON
@@ -402,13 +402,15 @@ uv run mypy
 uv run pytest --cov
 ```
 
-Each technology of the stack, and why it was chosen, is explained in [docs/stack.md](docs/stack.md).
-Features are specified under [specs/](specs/) before they are built.
+Each technology of the stack, and why it was chosen, is explained in [docs/stack.md](https://github.com/ryanvmorais/mailvigil/blob/main/docs/stack.md).
+Features are specified under [specs/](https://github.com/ryanvmorais/mailvigil/tree/main/specs) before they are built.
 
-Contributions are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). To report a vulnerability in
-MailVigil itself, use the private channel described in [SECURITY.md](SECURITY.md), never a public
+Contributions are welcome: see [CONTRIBUTING.md](https://github.com/ryanvmorais/mailvigil/blob/main/CONTRIBUTING.md). To report a vulnerability in
+MailVigil itself, use the private channel described in [SECURITY.md](https://github.com/ryanvmorais/mailvigil/blob/main/SECURITY.md), never a public
 issue.
 
 ## License
 
-[Apache License 2.0](LICENSE).
+[Apache License 2.0](https://github.com/ryanvmorais/mailvigil/blob/main/LICENSE).
+
+[non-goals]: https://github.com/ryanvmorais/mailvigil/blob/main/specs/README.md#permanent-non-goals
