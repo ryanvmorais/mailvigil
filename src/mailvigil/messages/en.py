@@ -249,6 +249,12 @@ _REFUSALS = RefusalMessages(
 # Fetch
 # ---------------------------------------------------------------------------
 
+# Many free mail plans have no IMAP, and a provider that has it off answers like a bad login or no
+# server at all, so the two phrases that look that way say what to do instead.
+_IMAP_HINT = (
+    "; your provider must allow IMAP, otherwise download the reports by hand and use summary"
+)
+
 # What ``fetch`` prints. One phrase per reason: a test iterates ``FetchReason``, so a reason added
 # later cannot go without a sentence in both languages. A refused login carries no server text.
 _FETCH = FetchMessages(
@@ -267,12 +273,14 @@ _FETCH = FetchMessages(
     password_file_exposed="warning: {path} can be read by other users; run chmod 600 on it",
     reasons=MappingProxyType(
         {
-            FetchReason.HOST_UNREACHABLE: "could not reach the server",
+            FetchReason.HOST_UNREACHABLE: f"could not reach the server{_IMAP_HINT}",
             FetchReason.TIMEOUT: "the server took too long to answer",
             FetchReason.DEADLINE_EXCEEDED: "the run took too long and was stopped",
             FetchReason.CERTIFICATE_INVALID: "the server certificate was not accepted",
             FetchReason.TLS_FAILED: "could not open a secure connection",
-            FetchReason.LOGIN_FAILED: "the server refused the user name or the password",
+            FetchReason.LOGIN_FAILED: (
+                f"the server refused the user name or the password{_IMAP_HINT}"
+            ),
             FetchReason.PASSWORD_UNUSABLE: (
                 "the password is empty, has a line break or has characters outside ASCII"
             ),

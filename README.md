@@ -98,6 +98,7 @@ MailVigil is deliberately small. For each limit below, what to reach for instead
 - **`fetch` has no OAuth.** It logs in with a name and a password, so Microsoft 365 and Google
   accounts without an app password are not supported (see [Fetch](#fetch)). *Instead:* save the
   report messages from your mail client into a folder as `.eml` files and point `summary` at it.
+  The same goes for a provider with no IMAP.
 - **It is not a monitoring pipeline.** There are no dashboards, no history and no alerts, and a
   web dashboard is not planned (see [Permanent non-goals](specs/README.md#permanent-non-goals)).
   *Instead:*
@@ -287,6 +288,11 @@ What it does not do:
 - The password is asked for on the terminal, or read from the first line of `--password-file`. It is
   never an argument or an environment variable, and nothing stores it.
 - It does not parse the reports: it saves bytes, and the ingestion reads them.
+
+No IMAP at your provider? `fetch` needs one, and many free mail plans do not offer it. Then
+download the report messages by hand (save each as `.eml`, or save the attachments) into a folder
+and point `summary` or `verdict` at it: everything but the download works the same. When a login is
+refused or the server cannot be reached, the message says so.
 
 Provider limits: it logs in with a name and a password (`LOGIN`), with no OAuth. Gmail works with
 an [app password](https://support.google.com/accounts/answer/185833) (two-step verification on).

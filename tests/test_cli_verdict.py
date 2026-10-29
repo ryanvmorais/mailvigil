@@ -12,7 +12,7 @@ folder, so a ``mailvigil.toml`` of the working directory can never leak in, and 
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -161,6 +161,16 @@ def test_a_late_run_keeps_the_answer_and_adds_the_stale_note(
     assert code == 0
     assert "READY" in captured.out
     assert "The latest report ended 30 days ago" in captured.out
+
+
+def test_the_real_clock_is_aware_and_current(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every other test pins ``cli._now``; this one runs the real function once."""
+    monkeypatch.undo()
+
+    now = cli._now()
+
+    assert now.tzinfo is not None
+    assert abs((datetime.now(UTC) - now).total_seconds()) < 60
 
 
 def test_a_clean_set_that_is_short_is_too_early_and_returns_three(

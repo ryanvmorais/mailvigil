@@ -158,6 +158,16 @@ def test_a_refusal_is_english_by_default() -> None:
 
 
 @_BOTH
+@pytest.mark.parametrize("reason", [FetchReason.LOGIN_FAILED, FetchReason.HOST_UNREACHABLE])
+def test_the_refusals_that_look_like_a_provider_without_imap_say_what_to_do(
+    messages: Messages, reason: FetchReason
+) -> None:
+    line = refusal_line(FetchRefused(reason), messages)
+    assert "IMAP" in line
+    assert "summary" in line
+
+
+@_BOTH
 def test_a_refusal_before_any_work_has_one_line(messages: Messages) -> None:
     assert "\n" not in refusal_line(FetchRefused(FetchReason.LOGIN_FAILED), messages)
 
