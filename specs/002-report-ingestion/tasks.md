@@ -164,3 +164,12 @@ public entry point.
 - [x] Quality gate and CI. — result recorded when run: all green on 2026-10-27; 178 passed, coverage
   100% (Python 3.12); CI on `main` at the merge of #12 passed all four jobs (Quality on 3.12 and
   3.15, Package, Security): https://github.com/ryanvmorais/mailvigil/actions/runs/40615130889
+
+## Stage 7 — A ceiling for `count` (issue #59)
+
+- [x] `parser.py`: `MAX_COUNT` (10^12) and the check in `_integer`'s caller for `row/count`; a count
+  above it refuses the report with `INVALID_FIELD`. Tests at the boundary (`MAX_COUNT` accepted,
+  `MAX_COUNT + 1` refused, a 4,000-digit count refused) and one run through `main(argv)` for each of
+  the four outputs. — RF-04
+- [x] Quality gate. — result recorded when run: ruff, black and mypy clean; pytest passed with
+  coverage 100% (Python 3.12, 2026-10-28); the new `main(argv)` test fails without the ceiling.

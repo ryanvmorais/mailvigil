@@ -167,8 +167,9 @@ adds the reading layer; it does not add a command (Resolved decision 5).
   **When** it is parsed
   **Then** `1.0` and its absence are accepted; any other value is refused with a reason saying the
   version is unsupported.
-- **Given** a record whose `count` is not an integer or is negative, or a period that is not a
-  valid timestamp, or a `pct` outside 0 to 100
+- **Given** a record whose `count` is not an integer, is negative or is above one trillion
+  (10^12, a figure no real report reaches), or a period that is not a valid timestamp, or a `pct`
+  outside 0 to 100
   **When** it is parsed
   **Then** the whole report is refused: a number the verdict cannot trust is worse than a missing
   report.

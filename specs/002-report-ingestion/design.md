@@ -200,8 +200,10 @@ unnoticed and had its entity expanded.
    `int` and `datetime.fromtimestamp(…, UTC)`. `ValueError`, `OverflowError` and `OSError` from
    that conversion, and `end < begin`, → `INVALID_FIELD` (detail: the field name only).
 4. `policy_published`: the fields of `PolicyPublished`; `pct` parsed as `int`, must be 0 to 100.
-5. Each `record`: `row/count` via `int`, must be ≥ 0; a non-integer count (including one so long
-   that `int` refuses it) → `INVALID_FIELD`. `row/source_ip` through `ipaddress.ip_address`: when
+5. Each `record`: `row/count` via `int`, must be 0 to `MAX_COUNT` (10^12, one module constant); a
+   non-integer count (including one so long that `int` refuses it) or one above the ceiling →
+   `INVALID_FIELD`. The ceiling keeps every total far below the 4,300 digits CPython turns back
+   into text, so no output can raise on a sum. `row/source_ip` through `ipaddress.ip_address`: when
    it parses, store `str(address)` (so `2001:DB8::1` and `2001:db8:0::1` group together later);
    when it does not, keep the sanitized text, because a source the report named but that cannot be
    reasoned about is still worth showing. Then `policy_evaluated`, `reason` blocks,
@@ -265,7 +267,7 @@ an error is the caller's call (RF-09, spec `006`).
 | `mailvigil.reports.read_xml(path)` | `Path -> bytes`; raises `ReportRefused` |
 | `mailvigil.reports.parse_report(xml, *, source="")` | `bytes -> Report`; raises `ReportRefused` |
 | `ReportRefused.reason` | a `Reason`; the stable key later specs translate to text |
-| `MAX_BYTES`, `MAX_TEXT` | module constants (5 MiB, 255) |
+| `MAX_BYTES`, `MAX_TEXT`, `MAX_COUNT` | module constants (5 MiB, 255, 10^12) |
 
 None of this is a public contract yet: there is no release. `Reason` values and the model fields
 become one at the first version, as specs `004` to `006` build on them.
