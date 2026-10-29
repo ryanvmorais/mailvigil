@@ -132,7 +132,7 @@ tests/               # pytest, one test file per module (test_reports_*.py incl.
                      # test_cli_exit_codes.py, test_cli_mail.py, test_htmlkit.py, test_html_style.py,
                      # test_html_charts.py, test_render_html.py, test_render_html_hostile.py,
                      # test_cli_html.py, test_fetch_*.py, test_render_fetch.py,
-                     # test_cli_fetch.py, test_smoke.py, test_gitignore.py and
+                     # test_cli_fetch.py, test_smoke.py, test_gitignore.py, test_readme_pt_br.py and
                      # test_offline_isolation.py, which runs fresh interpreters to prove that
                      # summary and verdict never load the network code); fixtures are synthetic,
                      # built in conftest.py, cli_helpers.py, mail_helpers.py, schema_examples.py,
@@ -187,7 +187,10 @@ uv.lock              # never edit by hand (generated; a hook blocks it)
 
 - **Language:** code, commits, branches, docstrings and docs in English (open source; rule from
   `/idioma`). User-facing CLI text: English (default) and Brazilian Portuguese, chosen only by
-  `--lang` (no locale detection), ASCII in both, decided in the specs.
+  `--lang` (no locale detection), ASCII in both, decided in the specs. The one documentation
+  exception is `README.pt-BR.md`, the Portuguese README for the Brazilian audience (a user-facing
+  text, so the product's audience language): keep it in step with `README.md`, whose headings
+  `tests/test_readme_pt_br.py` compares.
 - **File style:** follow `/estilo-arquivos` for each file type (docstrings with `Args:` /
   `Returns:`, full annotations, `# why` comments); do not copy its rules here.
 - **Python floor:** 3.12, tested in CI together with 3.13, 3.14 and the newest stable release (3.15), on Linux and

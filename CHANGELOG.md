@@ -7,6 +7,11 @@ All notable changes to MailVigil are written here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Portuguese README.** `README.pt-BR.md` is the whole README in Brazilian Portuguese, with the
+  sample output of `--lang pt-BR`; the English README links to it.
+
 ## [1.0.0] - 2026-10-29
 
 ### Added
