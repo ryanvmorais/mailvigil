@@ -3,6 +3,7 @@
 [English](README.md) · **Português (Brasil)**
 
 ![Python](https://img.shields.io/badge/Python-3.12+-3776AB?logo=python&logoColor=white)
+![deps](https://img.shields.io/badge/deps-uv-DE5FE9)
 ![dependências](https://img.shields.io/badge/dependências-0-brightgreen)
 [![CI](https://github.com/ryanvmorais/mailvigil/actions/workflows/ci.yml/badge.svg)](https://github.com/ryanvmorais/mailvigil/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/mailvigil)](https://pypi.org/project/mailvigil/)
