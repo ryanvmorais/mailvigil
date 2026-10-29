@@ -50,20 +50,21 @@ No phase starts without the maintainer's explicit approval of the previous one.
 
 ## Roadmap
 
-The first six rows are a proposal for the first release (`v1.0.0`). Each one is refined, and may be
-merged or split, when its spec is opened.
+Delivery is the milestone of the build (`v0.x`), as in the README. No milestone was published: the
+first release is `1.0.0` and contains them all. `v0.9` (hardening before the release) has no spec of
+its own: it amends 002, 004, 005, 006 and 009.
 
 | Spec | Scope | Delivery | Status |
 |---|---|---|---|
-| [`001-foundation`](001-foundation/) | package skeleton, `mailvigil --version`, the local quality gate, CI, supply-chain hygiene | — | **in progress** |
-| [`002-report-ingestion`](002-report-ingestion/) | read folders and files (`.zip`, `.gz`, `.xml`), domain filter, the hostile-input defenses, the report record model | `v1.0.0` | **done** |
-| [`003-config-and-senders`](003-config-and-senders/) | TOML config with the domain and the DKIM selector → service name map, and sender identification | `v1.0.0` | **done** |
-| [`004-summary`](004-summary/) | per-sender and per-situation summary (ok, fragile, failing), failures highlighted, and the first command (`mailvigil summary`) | `v1.0.0` | **done** |
-| [`005-reject-verdict`](005-reject-verdict/) | "ready for `reject`?" with a declared criterion (minimum window, minimum volume, no legitimate failures); the thresholds are decided there | `v1.0.0` | **done** |
-| [`006-output-and-exit-codes`](006-output-and-exit-codes/) | `--json`, stable exit codes, English and Portuguese text (`--lang`) | `v1.0.0` | **done** |
-| [`007-mail-message-input`](007-mail-message-input/) | read `.eml` and `.mbox` files: the report attachment is taken out of the message in memory and goes through the same reader, parser, filter and dedup | — | **done** |
-| [`008-html-report`](008-html-report/) | a single static HTML file with the summary and the verdict (`--html` on `verdict`): no server, no script, no network. Interface decided on 2026-10-28 from a mockup: the verdict first, then each rule as a meter against its limit (alternative B), with the stacked bar of the message mix (from C); WebVigil's visual language (slate palette, 0.5 rem radius, icon plus text on every badge, 4.5:1 contrast, dark mode from the system); a per-day timeline drawn from the reports' own dates, in inline SVG | — | **done** |
-| [`009-imap-fetch`](009-imap-fetch/) | `mailvigil fetch`: download the report messages from a mailbox into a folder, opt-in; `summary` and `verdict` stay offline | — | **done** |
+| [`001-foundation`](001-foundation/) | package skeleton, `mailvigil --version`, the local quality gate, CI, supply-chain hygiene | `v0.1` | **in progress** |
+| [`002-report-ingestion`](002-report-ingestion/) | read folders and files (`.zip`, `.gz`, `.xml`), domain filter, the hostile-input defenses, the report record model | `v0.1` | **done** |
+| [`003-config-and-senders`](003-config-and-senders/) | TOML config with the domain and the DKIM selector → service name map, and sender identification | `v0.2` | **done** |
+| [`004-summary`](004-summary/) | per-sender and per-situation summary (ok, fragile, failing), failures highlighted, and the first command (`mailvigil summary`) | `v0.3` | **done** |
+| [`005-reject-verdict`](005-reject-verdict/) | "ready for `reject`?" with a declared criterion (minimum window, minimum volume, no legitimate failures); the thresholds are decided there | `v0.4` | **done** |
+| [`006-output-and-exit-codes`](006-output-and-exit-codes/) | `--json`, stable exit codes, English and Portuguese text (`--lang`) | `v0.5` | **done** |
+| [`007-mail-message-input`](007-mail-message-input/) | read `.eml` and `.mbox` files: the report attachment is taken out of the message in memory and goes through the same reader, parser, filter and dedup | `v0.6` | **done** |
+| [`008-html-report`](008-html-report/) | a single static HTML file with the summary and the verdict (`--html` on `verdict`): no server, no script, no network. Interface decided on 2026-10-28 from a mockup: the verdict first, then each rule as a meter against its limit (alternative B), with the stacked bar of the message mix (from C); WebVigil's visual language (slate palette, 0.5 rem radius, icon plus text on every badge, 4.5:1 contrast, dark mode from the system); a per-day timeline drawn from the reports' own dates, in inline SVG | `v0.7` | **done** |
+| [`009-imap-fetch`](009-imap-fetch/) | `mailvigil fetch`: download the report messages from a mailbox into a folder, opt-in; `summary` and `verdict` stay offline | `v0.8` | **done** |
 
 Specs 007 to 009 were planned on 2026-10-28, after the first six were done. 009 depends on 007: the
 fetch only saves raw messages and leaves the reading to the ingestion.

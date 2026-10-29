@@ -20,9 +20,9 @@ verdict with an explicit, documented criterion instead of a wall of numbers.
 It is built for site owners, developers, agencies and infrastructure freelancers who are rolling
 out DMARC, and it runs entirely on your machine: your reports are never sent to anyone.
 
-> **Status:** under development (pre-1.0). Nothing is released yet and the interface will change
-> until the first version is out. Rows marked "Built" work today through `mailvigil summary`,
-> `mailvigil verdict` and `mailvigil fetch`; the rest of the table is the plan.
+> **Status:** under development, not released yet. The first release will be `1.0.0`; until it is
+> out the interface can still change. Everything below works today through `mailvigil summary`,
+> `mailvigil verdict` and `mailvigil fetch`.
 
 ![A terminal running mailvigil verdict on a folder of DMARC reports: NOT READY for p=reject with exit code 4, then, a month of reports later, READY for p=reject with exit code 0](https://raw.githubusercontent.com/ryanvmorais/mailvigil/main/docs/images/mailvigil-dmarc-verdict-terminal-demo.svg)
 
@@ -32,18 +32,23 @@ reports gives `READY` and `0`. The commands are typed for the recording and the 
 two runs is cut. The recording is [`docs/demo/verdict.cast`](docs/demo/verdict.cast), made by
 [`docs/demo/build_demo.py`](docs/demo/build_demo.py); play it with `asciinema play`.*
 
-## What it will do
+## What it does
 
-| Area | What | Version | Status |
-|---|---|---|---|
-| Input | Read a folder or files (`.zip`, `.gz`, `.xml`, and mail messages: `.eml`, `.mbox`), filter by domain | v1.0.0 | Built (`mailvigil summary`) |
-| Hostile input | Cap decompressed size (zip bombs) and refuse XML with `DOCTYPE` or `ENTITY` (entity expansion) | v1.0.0 | Built (`mailvigil summary`) |
-| Configuration | A TOML file with your domain and a map from DKIM selector to service name; a signature only counts under your own domain | v1.0.0 | Built (`mailvigil summary`) |
-| Summary | Per sender and per situation (ok, fragile, failing), failures highlighted | v1.0.0 | Built (`mailvigil summary`) |
-| Verdict | "Ready for `reject`?" with a declared criterion: 28 days covered, reports on 80% of the days, 1000 messages, no failure from a recognized sender, at most 0.5% of the messages failing from unrecognized sources | v1.0.0 | Built (`mailvigil verdict`) |
-| Output and language | `--json` and stable exit codes for scripts and CI; the text in English or Brazilian Portuguese (`--lang pt-BR`) | v1.0.0 | Built (`--json` and `--lang` on `summary` and `verdict`) |
-| HTML report | One static page with the verdict, each rule against its limit and the messages day by day: no script, no network, opened from disk | v1.0.0 | Built (`mailvigil verdict --html`) |
-| Fetch | Download the report messages from a mailbox over IMAP into a folder, opt-in, read-only, always over verified TLS | v1.0.0 | Built (`mailvigil fetch`) |
+MailVigil is built milestone by milestone, each one designed as a spec first, under
+[`specs/`](specs/). The milestones are the history of the build, not published versions: `1.0.0` is
+the first release and will contain `v0.1` to `v0.9`.
+
+| Milestone | Focus | Status |
+|---|---|---|
+| `v0.1` | Read a folder or files (`.zip`, `.gz`, `.xml`), filter by domain; hostile input: cap the decompressed size (zip bombs) and refuse XML with `DOCTYPE` or `ENTITY` (entity expansion) | shipped |
+| `v0.2` | Configuration: a TOML file with your domain and a map from DKIM selector to service name; a signature only counts under your own domain | shipped |
+| `v0.3` | `mailvigil summary`: per sender and per situation (ok, fragile, failing), failures highlighted | shipped |
+| `v0.4` | `mailvigil verdict`: "Ready for `reject`?" with a declared criterion: 28 days covered, reports on 80% of the days, 1000 messages, no failure from a recognized sender, at most 0.5% of the messages failing from unrecognized sources | shipped |
+| `v0.5` | `--json` and stable exit codes for scripts and CI; the text in English or Brazilian Portuguese (`--lang pt-BR`) | shipped |
+| `v0.6` | Mail messages as input: `.eml` and `.mbox`, the report attachment taken out in memory | shipped |
+| `v0.7` | `mailvigil verdict --html`: one static page with the verdict, each rule against its limit and the messages day by day; no script, no network, opened from disk | shipped |
+| `v0.8` | `mailvigil fetch`: download the report messages from a mailbox over IMAP into a folder, opt-in, read-only, always over verified TLS | shipped |
+| `v0.9` | Hardening before the release: bounds on a report's count and period, a day counts as covered by time, notes for old data and for a reporter that went quiet, and distinct exit codes for a bug, Ctrl+C and a closed pipe | shipped |
 
 Not planned, on purpose: indexing in Elasticsearch, a web dashboard served by the tool and sending
 e-mail, each with its reason in [Permanent non-goals](specs/README.md#permanent-non-goals).
