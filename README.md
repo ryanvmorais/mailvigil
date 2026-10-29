@@ -1,9 +1,10 @@
 # MailVigil
 
-[![PyPI](https://img.shields.io/pypi/v/mailvigil)](https://pypi.org/project/mailvigil/)
 ![Python](https://img.shields.io/badge/Python-3.12+-3776AB?logo=python&logoColor=white)
 ![deps](https://img.shields.io/badge/deps-uv-DE5FE9)
 [![CI](https://github.com/ryanvmorais/mailvigil/actions/workflows/ci.yml/badge.svg)](https://github.com/ryanvmorais/mailvigil/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/mailvigil)](https://pypi.org/project/mailvigil/)
+[![Release](https://img.shields.io/github/v/release/ryanvmorais/mailvigil)](https://github.com/ryanvmorais/mailvigil/releases)
 ![Lint](https://img.shields.io/badge/lint-ruff-261230)
 ![Format](https://img.shields.io/badge/style-black-000000)
 ![Types](https://img.shields.io/badge/types-mypy%20strict-2A6DB2)
