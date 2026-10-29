@@ -336,7 +336,8 @@ case $? in
 esac
 ```
 
-A change to this table is a breaking change.
+A change to this table is a breaking change. [docs/stability.md](docs/stability.md) lists what else
+is public and what is not.
 
 ### JSON
 
