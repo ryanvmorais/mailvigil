@@ -1,5 +1,6 @@
 # MailVigil
 
+[![PyPI](https://img.shields.io/pypi/v/mailvigil)](https://pypi.org/project/mailvigil/)
 ![Python](https://img.shields.io/badge/Python-3.12+-3776AB?logo=python&logoColor=white)
 ![deps](https://img.shields.io/badge/deps-uv-DE5FE9)
 [![CI](https://github.com/ryanvmorais/mailvigil/actions/workflows/ci.yml/badge.svg)](https://github.com/ryanvmorais/mailvigil/actions/workflows/ci.yml)
@@ -20,9 +21,9 @@ verdict with an explicit, documented criterion instead of a wall of numbers.
 It is built for site owners, developers, agencies and infrastructure freelancers who are rolling
 out DMARC, and it runs entirely on your machine: your reports are never sent to anyone.
 
-> **Status:** under development, not released yet. The first release will be `1.0.0`; until it is
-> out the interface can still change. Everything below works today through `mailvigil summary`,
-> `mailvigil verdict` and `mailvigil fetch`.
+> **Status:** stable, from `1.0.0`. The commands, the exit codes, the `--json` documents and the
+> configuration file are a contract that changes only in a major version; what is public and what
+> is not is in [docs/stability.md](https://github.com/ryanvmorais/mailvigil/blob/main/docs/stability.md).
 
 ![A terminal running mailvigil verdict on a folder of DMARC reports: NOT READY for p=reject with exit code 4, then, a month of reports later, READY for p=reject with exit code 0](https://raw.githubusercontent.com/ryanvmorais/mailvigil/main/docs/images/mailvigil-dmarc-verdict-terminal-demo.svg)
 
@@ -36,7 +37,7 @@ two runs is cut. The recording is [`docs/demo/verdict.cast`](https://github.com/
 
 MailVigil is built milestone by milestone, each one designed as a spec first, under
 [`specs/`](https://github.com/ryanvmorais/mailvigil/tree/main/specs). The milestones are the history of the build, not published versions: `1.0.0` is
-the first release and will contain `v0.1` to `v0.9`.
+the first release and contains `v0.1` to `v0.9`.
 
 | Milestone | Focus | Status |
 |---|---|---|
@@ -111,36 +112,36 @@ MailVigil is deliberately small. For each limit below, what to reach for instead
 
 ## Quick start
 
-Not published yet, so for now run it from a clone. You need [uv](https://docs.astral.sh/uv/).
+Install it as a command, with [pipx](https://pipx.pypa.io/) or [uv](https://docs.astral.sh/uv/). It
+needs Python 3.12 or newer and nothing else.
 
 ```bash
-# Clone and install the (dev) environment
-git clone https://github.com/ryanvmorais/mailvigil.git
-cd mailvigil
-uv sync
+# Install the command (one of the two)
+pipx install mailvigil
+uv tool install mailvigil
 
 # Check that the command runs
-uv run mailvigil --version
+mailvigil --version
 
 # Sum up a folder of reports (or name the files); mailvigil.toml is read if it is here
-uv run mailvigil summary reports/
-uv run mailvigil summary --config mailvigil.toml reports/
-uv run mailvigil summary --domain example.com report.xml.gz
+mailvigil summary reports/
+mailvigil summary --config mailvigil.toml reports/
+mailvigil summary --domain example.com report.xml.gz
 
 # Ask if the domain is ready for p=reject (same arguments as summary)
-uv run mailvigil verdict --config mailvigil.toml reports/
+mailvigil verdict --config mailvigil.toml reports/
 
 # The same answers as one JSON document, for a script or a CI job
-uv run mailvigil verdict --config mailvigil.toml reports/ --json
+mailvigil verdict --config mailvigil.toml reports/ --json
 
 # The text in Brazilian Portuguese (English is the default)
-uv run mailvigil verdict --config mailvigil.toml reports/ --lang pt-BR
+mailvigil verdict --config mailvigil.toml reports/ --lang pt-BR
 
 # One HTML page to open in a browser (redirect it to a file)
-uv run mailvigil verdict --config mailvigil.toml reports/ --html > report.html
+mailvigil verdict --config mailvigil.toml reports/ --html > report.html
 
 # Bring the report messages home from a mailbox (asks for the password), then read them
-uv run mailvigil fetch --host imap.example.com --user me@example.com --to reports/
+mailvigil fetch --host imap.example.com --user me@example.com --to reports/
 ```
 
 `summary` and `verdict` print their text and nothing else; they only read your files and touch no
@@ -195,9 +196,6 @@ another domain are counted at the bottom, so a number never silently drops out.
 
 </details>
 
-Installing with `pipx install mailvigil` or `uv tool install mailvigil` will be possible once the
-first version is on PyPI.
-
 ### The verdict
 
 `mailvigil verdict` answers one of three things, each with the rule that decided it. This is a
@@ -248,7 +246,7 @@ follows `--lang`, switches to dark with the system, and prints on paper.
 *The page for an invented domain (`example.com`, documentation addresses), in the light and the dark palette: unrecognized sources fail 0.8% of the messages (56 of 7056), above the 0.5% limit, so the answer is `NOT READY`.*
 
 ```bash
-uv run mailvigil verdict --config mailvigil.toml reports/ --html > report.html
+mailvigil verdict --config mailvigil.toml reports/ --html > report.html
 ```
 
 - **It is a file, not a server.** The page has no script, loads nothing from the network and
@@ -259,7 +257,7 @@ uv run mailvigil verdict --config mailvigil.toml reports/ --html > report.html
 - **The exit code is the same** as without `--html` (`0`, `3`, `4`), and `--html` cannot be
   combined with `--json`. `summary` has no `--html`.
 - **Windows PowerShell 5.1** writes a redirect as UTF-16, which browsers do not read as the page
-  intends; use `uv run mailvigil verdict ... --html | Out-File -Encoding ascii report.html` there. The
+  intends; use `mailvigil verdict ... --html | Out-File -Encoding ascii report.html` there. The
   page is ASCII, so any other shell's `>` is fine.
 
 ### Fetch
@@ -270,10 +268,10 @@ network connection, and `summary` and `verdict` never load its code.
 
 ```bash
 # Ask for the password on the terminal
-uv run mailvigil fetch --host imap.example.com --user me@example.com --to reports/
+mailvigil fetch --host imap.example.com --user me@example.com --to reports/
 
 # Only recent mail, at most 200 messages, the password read from a file (for cron)
-uv run mailvigil fetch --host imap.example.com --user me@example.com --to reports/   --since 2026-10-01 --limit 200 --password-file ~/.mailvigil-password
+mailvigil fetch --host imap.example.com --user me@example.com --to reports/   --since 2026-10-01 --limit 200 --password-file ~/.mailvigil-password
 ```
 
 What it does:
