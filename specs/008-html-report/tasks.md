@@ -254,7 +254,7 @@ maintainer, not decided here.
   branch is merged.
 - [x] `status:` of the three files of the spec to `done`, and the maintainer's memory of the
   project updated (the 008 closed, the next is 009), in the same session. — RNF-05
-- [ ] `/atualizar-docs`, then `/fechar-sessao` (commit, push, PR; no merge).
+- [x] `/atualizar-docs`, then `/fechar-sessao` (commit, push, PR; no merge). — #48
 - [x] Final quality gate: the same four commands, plus `uv build` and the check that the wheel has
   no `Requires-Dist` (RNF-01). **Result:** ruff, black, mypy strict clean; 2231 tests pass,
   coverage 100%; `uv build` makes the sdist and the wheel and the wheel has 0 `Requires-Dist`.
