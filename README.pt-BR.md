@@ -1,4 +1,4 @@
-# <img align="bottom" alt="Logotipo do MailVigil: um envelope com um olho aberto" src="docs/images/mailvigil-dmarc-analyzer-logo.svg" width="30"> MailVigil
+# <img align="bottom" alt="Logotipo do MailVigil: um envelope com um olho aberto" src="docs/images/mailvigil-dmarc-analyzer-logo.svg" width="36"> MailVigil
 
 [English](README.md) · **Português (Brasil)**
 
