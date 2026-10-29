@@ -1,6 +1,6 @@
 ---
 feature: IMAP fetch — download the DMARC report messages from a mailbox into a folder (`mailvigil fetch`)
-status: approved
+status: done
 date: 2026-10-28
 related:
   - 009-imap-fetch/requirements.md
@@ -163,16 +163,16 @@ signature changed (the parent parser split); if any other one fails, the code is
 
 ## Stage 6 — Close the spec (RF-08, RF-09, RNF-01, RNF-07)
 
-- [ ] `README.md`: a `fetch` section with the command, what it does and does not do (read-only,
+- [x] `README.md`: a `fetch` section with the command, what it does and does not do (read-only,
   verified TLS, password by prompt or file), the exit codes, the provider limits (Gmail with an
   app password; Microsoft 365 not supported, no OAuth) and a line saying a non-ASCII password is
   not accepted in this version. `CLAUDE.md`: the architecture tree (`fetch/`, `render_fetch.py`),
   the commands block, the ⚠️ "`imaplib` and `ssl` only in `fetch/imap.py`; never an unverified
   context; `summary` and `verdict` never load them", and the line on the project overview.
   `docs/stack.md`: `imaplib`, `ssl`, `getpass`, `os.replace`. Run `/atualizar-docs`. — RF-08, RF-09
-- [ ] `specs/README.md`: the roadmap row of 009 to **done**; the three statuses of the spec to
+- [x] `specs/README.md`: the roadmap row of 009 to **done**; the three statuses of the spec to
   `done`; the memory of the project updated in the same session.
-- [ ] Zero dependencies still true: `[project].dependencies` is empty, `uv build` succeeds and the
+- [x] Zero dependencies still true: `[project].dependencies` is empty, `uv build` succeeds and the
   CI `package` job passes. — RNF-01
 - [ ] **Manual check by the maintainer, with a real mailbox (not in CI, nothing from it enters the
   repository):** run `mailvigil fetch` against his own mailbox; compare the number matched with the
@@ -181,6 +181,8 @@ signature changed (the parent parser split); if any other one fails, the code is
   folder; confirm in the mail client that no message was marked as read. If a provider's subject
   does not match, the criterion changes in `imap.py` with a test, in a new PR. — RF-03, RF-04,
   RF-07
-- [ ] Quality gate of the spec: `uv run ruff check .` → `uv run black --check .` → `uv run mypy` →
+- [x] Quality gate of the spec: `uv run ruff check .` → `uv run black --check .` → `uv run mypy` →
   `uv run pytest --cov`, then `uv build`. Record the result here, with the number of tests and the
-  coverage. **Result:** _pending_.
+  coverage. **Result:** 2026-10-28: ruff, black and mypy (34 source files) clean; 2629 tests passed and 1
+  skipped (file modes, a POSIX idea), 100% coverage; `uv build` succeeds and the wheel declares 0
+  `Requires-Dist`.

@@ -11,7 +11,8 @@ configuration loader, the sender identification, the summary, the verdict and th
 and tested (it reads `.eml` and `.mbox` too, spec 007), and `mailvigil summary` and `mailvigil
 verdict` run them end to end, in English or Portuguese (`--lang`), as text or as one JSON document
 (`--json`), with exit codes that are a public contract (spec 006); `verdict --html` writes one
-static HTML page (spec 008).
+static HTML page (spec 008). `mailvigil fetch` (spec 009) is the one command that reaches the
+network: it saves the report mail of an IMAP mailbox as `.eml` files, for those commands to read.
 
 The project is one small program with no runtime dependency:
 
@@ -267,6 +268,32 @@ paths"), `add_subparsers(dest="command")` for a command with its own flags, a pa
 
 **Docs:** [argparse](https://docs.python.org/3/library/argparse.html)
 
+### `imaplib` and `ssl`
+
+Talk to the mailbox for `mailvigil fetch`. `mailvigil/fetch/imap.py` is the only module that imports
+them, and `cli.py` loads it inside `_run_fetch`, so `summary` and `verdict` never load the network
+code. It opens `IMAP4_SSL` on port 993 with `ssl.create_default_context()`, searches by subject (and
+`SINCE`) and reads each message with `BODY.PEEK[]<0.N>`, so the message is not marked as read and a
+server that sends more than announced is cut at the cap.
+
+**Why this:** both are in the standard library, so the promise of zero runtime dependencies holds.
+The work is in what the library does not do for you. Given no context, `IMAP4_SSL` builds an
+*unverified* one, so a tool that asks for a password and says "TLS" would be open to anyone on the
+path; `fetch` always passes `ssl.create_default_context()` and has no switch to relax it (ADR-2 of
+spec 009). `imaplib` also reads a literal of any announced size, so a mixin refuses it by its
+announced size and reads in chunks under a deadline (ADR-3). The login is `LOGIN` with a
+printable-ASCII name and password, because OAuth needs an application registered with the provider
+(ADR-5). Every library failure becomes a typed `FetchReason`, never a traceback.
+
+**Learn:** the IMAP commands `LOGIN`, `SELECT` (read-only), `UID SEARCH` and `UID FETCH`; what
+`UIDVALIDITY` is and why a saved name carries it; `BODY.PEEK` against `BODY`;
+`ssl.create_default_context()` against the unverified context `IMAP4_SSL` falls back to, and what
+`check_hostname` does; why a timeout on a socket is not a deadline on a run.
+
+**Docs:** [imaplib](https://docs.python.org/3/library/imaplib.html),
+[ssl](https://docs.python.org/3/library/ssl.html),
+[RFC 9051 (IMAP4rev2)](https://www.rfc-editor.org/rfc/rfc9051)
+
 ---
 
 ## Quality tools
@@ -404,6 +431,9 @@ hands anything back.
 | `collections.Counter` | counts the skipped files per reason for the "left out" section |
 | integer arithmetic | `format_share` rounds a percentage to one decimal with `//`, never a float, and prints `<0.1%` so a small failing share is not rounded to zero (ADR-5 of spec 004). `share_tenths` is the integer under it: the verdict asks it whether a failed rule rounds to its own limit and then prints `>0.5%` (or `<80%`) instead of a number that reads as a pass beside `FAIL` (ADR-8 of spec 005) |
 | `html.parser` | tests only: `tests/html_helpers.py` parses the page the renderer built and asserts on its structure (one `h1`, no `script`, no event handler, no link other than `#…`), because a test that compares strings would not notice a broken tag |
+| `getpass` | asks for the IMAP password on the terminal without echoing it; the alternative is the first line of `--password-file`. There is no argument and no environment variable, so the password is in neither the process list nor the shell history |
+| `os.replace` | `fetch/store.py` writes a message to a temporary file and renames it onto its final name, which is atomic on the same volume, so a run that dies never leaves a half-written `.eml` for the next run to count as saved |
+| `hashlib` | the tag at the start of a saved file name is a hash of host, user and folder, so two mailboxes saved in one folder do not clash and the name carries no address |
 | `NO_COLOR` | convention for turning terminal colors off, honored by the output (**planned**) |
 
 ---
@@ -416,6 +446,6 @@ hands anything back.
 - **gettext / Babel** — the CLI text exists in two languages (English and Portuguese), a small dictionary is simpler than a translation toolchain.
 - **Elasticsearch, Splunk, Kibana, a web dashboard served by the tool** — permanent non-goals: that is parsedmarc's territory, and a server breaks "offline, nothing to run" (reasons in `specs/README.md`). `--json` feeds them from outside.
 - **Sending e-mail** — a permanent non-goal: SMTP credentials and deliverability for no unmet need, since exit codes and `--json` compose with `cron`.
-- **IMAP fetching** — planned as an opt-in `fetch` command (spec 009, standard-library `imaplib`); `summary` and `verdict` stay offline and read files you already have.
+- **OAuth 2 / XOAUTH2 for IMAP, `--insecure`, STARTTLS** — `fetch` logs in with a password over implicit TLS; OAuth needs a registered application and a token endpoint, and an option that skips the certificate check would make the tool unsafe to run from `cron` (spec 009).
 - **Docker / GHCR** — a pure-Python wheel installs with `pipx` or `uv tool`; an image adds a release surface for no gain.
 - **Pydantic** — would validate the report records, but it is a dependency and the shape is small enough to check by hand.

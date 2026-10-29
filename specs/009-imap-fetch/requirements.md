@@ -1,6 +1,6 @@
 ---
 feature: IMAP fetch — download the DMARC report messages from a mailbox into a folder (`mailvigil fetch`)
-status: approved
+status: done
 date: 2026-10-28
 related:
   - 007-mail-message-input/requirements.md

@@ -11,7 +11,8 @@ dependencies), offline. It is pre-0.1: the CLI answers `mailvigil --version`, `m
 and `mailvigil verdict` (report ingestion, configuration, sender identification, the summary, the
 verdict on `p=reject` and their texts are built and wired); `--json`, `--lang en|pt-BR` and the stable
 exit codes (a public contract, `docs/json-schema.md`) are built (spec 006 is done), and so is the
-static HTML page of `verdict --html` (spec 008 is done). Everything
+static HTML page of `verdict --html` (spec 008 is done). `mailvigil fetch` (spec 009, IMAP into a
+folder, opt-in) is built too; it is the only command that touches the network. Everything
 is specified in [specs/](specs/) first. The repository has been public since
 2026-10-27 (the maintainer made it public, not Claude); nothing is announced or published to PyPI
 until the first version is ready.
@@ -32,6 +33,7 @@ uv run mailvigil verdict --domain example.com path/to/reports   # exit 0 ready, 
 uv run mailvigil verdict --config FILE path/to/reports --json   # one JSON document, same exit code
 uv run mailvigil summary --config FILE path/to/reports --lang pt-BR   # the text in Portuguese
 uv run mailvigil verdict --config FILE path/to/reports --html > report.html   # one static page (spec 008)
+uv run mailvigil fetch --host HOST --user NAME --to DIR   # saves the report mail as .eml (spec 009); asks for the password
 
 # Run the tests (one file, then one test)
 uv run pytest
@@ -108,6 +110,15 @@ src/mailvigil/
   html_charts.py     # meter, stacked_bar and timeline as inline SVG, integer geometry, figures in words
   render_html.py     # render_html(summary, verdict, messages) → one self-contained ASCII page: no script,
                      # no network, no path or file name
+  render_fetch.py    # render_fetch(outcome, directory, messages) → the six numbers of a run;
+                     # refusal_line(refusal, messages) → the one line of a refused run (spec 009)
+  fetch/             # `mailvigil fetch` (spec 009): the only code that reaches the network
+    errors.py        #   FetchReason (StrEnum) and FetchRefused: every refusal is typed
+    model.py         #   FetchOutcome and the limits (DEFAULT_LIMIT, MAX_LIMIT, DEADLINE_SECONDS…)
+    store.py         #   Store: `<tag>-<validity>-<uid>.eml` names, atomic writes (`os.replace`)
+    run.py           #   fetch_reports(): the loop over a mailbox protocol; tested with FakeMailbox
+    imap.py          #   the ONLY module that imports `imaplib` and `ssl`: verified TLS context,
+                     #   BODY.PEEK reads, bounded reads, every library failure becomes a FetchReason
   messages/          # every sentence of the tool, one Messages per language (spec 006): model.py
                      # (Plural and the frozen dataclasses), en.py (ENGLISH), pt_br.py (PORTUGUESE,
                      # ASCII only); language_by_code; imports no renderer
@@ -119,7 +130,8 @@ tests/               # pytest, one test file per module (test_reports_*.py incl.
                      # test_cli_verdict.py, test_cli_json.py, test_cli_lang.py,
                      # test_cli_exit_codes.py, test_cli_mail.py, test_htmlkit.py, test_html_style.py,
                      # test_html_charts.py, test_render_html.py, test_render_html_hostile.py,
-                     # test_cli_html.py); fixtures are synthetic, built in conftest.py,
+                     # test_cli_html.py, test_fetch_*.py, test_render_fetch.py,
+                     # test_cli_fetch.py); fixtures are synthetic, built in conftest.py,
                      # cli_helpers.py, mail_helpers.py, schema_examples.py, html_helpers.py,
                      # render_verdict_golden.py or tmp_path
 specs/               # spec-driven development: requirements → design → tasks per feature
@@ -141,6 +153,13 @@ uv.lock              # never edit by hand (generated; a hook blocks it)
 > `text()`, which escapes it into a `Safe`; never write a tag, an attribute or a `Safe(...)` anywhere
 > else, and keep the page free of script, network and `url()` (`test_render_html_hostile.py` feeds
 > the attacks).
+
+> ⚠️ **`imaplib` and `ssl` are imported in `fetch/imap.py` only**, and that module is loaded inside
+> `_run_fetch`, never at import: `summary` and `verdict` never load the network code. The TLS
+> context always verifies the certificate (no `--insecure`, no plain IMAP, no STARTTLS); the
+> mailbox is only read (`BODY.PEEK`, no flag, no delete); the password is never an argument, an
+> environment variable or a log line. See spec 009, ADR-2 (the library's default context does not
+> verify) and ADR-3 (bounds live in the connection).
 
 > ⚠️ **Reports are hostile input.** The parser refuses any XML containing `DOCTYPE` or `ENTITY`
 > (entity expansion) inside `reports/xmlsafe.py`, and `reports/reader.py` caps the decompressed

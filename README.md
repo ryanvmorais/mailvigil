@@ -21,8 +21,8 @@ It is built for site owners, developers, agencies and infrastructure freelancers
 out DMARC, and it runs entirely on your machine: your reports are never sent to anyone.
 
 > **Status:** under development (pre-0.1). Nothing is released yet and the interface will change
-> until the first version is out. Rows marked "Built" work today through `mailvigil summary` and
-> `mailvigil verdict`; the rest of the table is the plan.
+> until the first version is out. Rows marked "Built" work today through `mailvigil summary`,
+> `mailvigil verdict` and `mailvigil fetch`; the rest of the table is the plan.
 
 ## What it will do
 
@@ -35,10 +35,10 @@ out DMARC, and it runs entirely on your machine: your reports are never sent to 
 | Verdict | "Ready for `reject`?" with a declared criterion: 28 days covered, reports on 80% of the days, 1000 messages, no failure from a recognized sender, at most 0.5% of the messages failing from unrecognized sources | v0.1 | Built (`mailvigil verdict`) |
 | Output and language | `--json` and stable exit codes for scripts and CI; the text in English or Brazilian Portuguese (`--lang pt-BR`) | v0.1 | Built (`--json` and `--lang` on `summary` and `verdict`) |
 | HTML report | One static page with the verdict, each rule against its limit and the messages day by day: no script, no network, opened from disk | v0.1 | Built (`mailvigil verdict --html`) |
+| Fetch | Download the report messages from a mailbox over IMAP into a folder, opt-in, read-only, always over verified TLS | v0.1 | Built (`mailvigil fetch`) |
 
-Planned: an opt-in `fetch` over IMAP (see [specs/](specs/README.md#roadmap)). Not planned, on purpose: indexing in Elasticsearch, a web
-dashboard served by the tool and sending e-mail, each with its reason in
-[Permanent non-goals](specs/README.md#permanent-non-goals).
+Not planned, on purpose: indexing in Elasticsearch, a web dashboard served by the tool and sending
+e-mail, each with its reason in [Permanent non-goals](specs/README.md#permanent-non-goals).
 
 ## Configuration
 
@@ -109,9 +109,13 @@ uv run mailvigil verdict --config mailvigil.toml reports/ --lang pt-BR
 
 # One HTML page to open in a browser (redirect it to a file)
 uv run mailvigil verdict --config mailvigil.toml reports/ --html > report.html
+
+# Bring the report messages home from a mailbox (asks for the password), then read them
+uv run mailvigil fetch --host imap.example.com --user me@example.com --to reports/
 ```
 
-The commands print their text and nothing else; they only read your files and touch no network.
+`summary` and `verdict` print their text and nothing else; they only read your files and touch no
+network. Only `fetch` connects to a server (see [Fetch](#fetch)).
 A folder is searched, one level deep, only for the names providers use for their attachments
 (`provider!domain!begin!end.zip`, also `.gz` and `.xml`) and for `.eml` and `.mbox` files, whose
 report attachments are taken out of the messages in memory. A file named on the command line is
@@ -221,6 +225,46 @@ uv run mailvigil verdict --config mailvigil.toml reports/ --html > report.html
   intends; use `uv run mailvigil verdict ... --html | Out-File -Encoding ascii report.html` there. The
   page is ASCII, so any other shell's `>` is fine.
 
+### Fetch
+
+`mailvigil fetch` saves the DMARC report messages of a mailbox, untouched, as `.eml` files in a
+folder; `summary` and `verdict` read that folder afterwards. It is the one command that opens a
+network connection, and `summary` and `verdict` never load its code.
+
+```bash
+# Ask for the password on the terminal
+uv run mailvigil fetch --host imap.example.com --user me@example.com --to reports/
+
+# Only recent mail, at most 200 messages, the password read from a file (for cron)
+uv run mailvigil fetch --host imap.example.com --user me@example.com --to reports/   --since 2026-10-01 --limit 200 --password-file ~/.mailvigil-password
+```
+
+What it does:
+
+- Looks in `INBOX` (or `--folder`) for the messages whose subject has `Report Domain:`, the
+  subject providers use for their reports, and saves each one as `<tag>-<validity>-<uid>.eml`.
+- Is incremental: run it again and only the new messages are saved, so it can run from `cron`.
+  `--limit` (default 500, at most 10000) caps one run and takes the newest first.
+- Prints six numbers (matched, saved, already saved, too large, skipped, left for the next run)
+  and the folder, never a subject, sender or address.
+
+What it does not do:
+
+- It never changes the mailbox: no delete, move, flag, and the messages are not marked as read.
+- It never connects without TLS, and the certificate is always checked. There is no option to turn
+  that off, no plain IMAP and no STARTTLS (`--port` defaults to 993).
+- The password is asked for on the terminal, or read from the first line of `--password-file`. It is
+  never an argument or an environment variable, and nothing stores it.
+- It does not parse the reports: it saves bytes, and the ingestion reads them.
+
+Provider limits: it logs in with a name and a password (`LOGIN`), with no OAuth. Gmail works with
+an [app password](https://support.google.com/accounts/answer/185833) (two-step verification on).
+Microsoft 365 and Google accounts without an app password are not supported in this version. A
+password with a character outside ASCII is refused in this version.
+
+Exit codes: `0` when the run finished, even with nothing new; `1` when it was refused (the one-line
+reason is printed); `2` for a usage error.
+
 ### Exit codes
 
 The exit code is a contract: a script can tell "yes", "wait" and "no" from "I could not run"
@@ -228,9 +272,9 @@ without reading the text. `--json` does not change it.
 
 | Code | Meaning | Commands |
 |---|---|---|
-| `0` | An answer was printed; for `verdict`, the answer is `ready` | both |
-| `1` | The run was refused: invalid configuration or domain, or no report kept | both |
-| `2` | Usage error (an unknown option, a missing argument) | both |
+| `0` | An answer was printed; for `verdict`, the answer is `ready`; for `fetch`, the run finished | all |
+| `1` | The run was refused: invalid configuration or domain, no report kept, or (for `fetch`) the connection, login or folder failed | all |
+| `2` | Usage error (an unknown option, a missing argument) | all |
 | `3` | `verdict` printed `too early`: wait for more reports | `verdict` |
 | `4` | `verdict` printed `not ready`: a source fails | `verdict` |
 
