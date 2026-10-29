@@ -24,7 +24,7 @@ from tests.fetch_helpers import FakeMailbox, build_message
 from tests.help_golden import SUMMARY_HELP, VERDICT_HELP
 
 from mailvigil import cli
-from mailvigil.cli import EXIT_OK, EXIT_REFUSED, EXIT_USAGE, main
+from mailvigil.cli import EXIT_INTERNAL, EXIT_OK, EXIT_REFUSED, EXIT_USAGE, main
 from mailvigil.fetch import imap as fetch_imap
 from mailvigil.fetch.errors import FetchReason, FetchRefused
 from mailvigil.fetch.model import DEADLINE_SECONDS, MAX_LIMIT, MAX_MESSAGE_BYTES
@@ -777,9 +777,9 @@ def test_the_mailbox_is_closed_when_the_loop_fails_unexpectedly(
     """Even an exception that is not a refusal passes through the ``finally``."""
     mailbox.on_message = _explode
 
-    with pytest.raises(RuntimeError):
-        main(_args(tmp_path, password_file))
+    code = main(_args(tmp_path, password_file))
 
+    assert code == EXIT_INTERNAL
     assert mailbox.closed == 1
 
 

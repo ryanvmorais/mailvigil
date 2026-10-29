@@ -172,3 +172,10 @@ Behavior-neutral: the output is byte-equal to today's. No Portuguese is written 
 - [x] Mark the three files `done` and move the roadmap row of `006` in `specs/README.md` to `done`,
   with the note that "Exit codes and `--json` are public contract" now applies.
 - [x] Quality gate. — ruff, black and mypy clean; `pytest --cov` 1074 passed, 100% coverage (2026-10-28); only docs and spec files changed in this stage.
+
+## Amendment (2026-10-29, issue #60) — A bug, Ctrl+C and a closed pipe (RF-04, ADR-7)
+
+- [x] `main` wraps the dispatch: `70` and one line for an `Exception`, `130` for Ctrl+C, `141` and a
+  silent null-device stdout for a closed pipe; the README and `docs/json-schema.md` tables and the
+  test that compares them gain the three rows. — RF-04, Resolved decision 7
+- [x] Quality gate. — ruff, black and mypy clean; `pytest --cov` green, 100% coverage (2026-10-29).

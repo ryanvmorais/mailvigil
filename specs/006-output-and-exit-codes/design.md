@@ -299,6 +299,19 @@ argparse's text, and the language is only known after parsing (Risk 4).
 - **Trade-off:** `--lang` with `--json` is accepted and ignored for standard output; it still
   selects the language of a refusal line on standard error.
 
+### ADR-7 — A bug, Ctrl+C and a closed pipe get codes (amendment of 2026-10-29)
+
+- **Decision:** `main` wraps the dispatch: `Exception` gives `70` and one line, `KeyboardInterrupt`
+  gives `130`, `BrokenPipeError` gives `141` after `_silence_stdout()`. `parse_args` stays outside,
+  so a usage error is still argparse's `SystemExit(2)`.
+- **Alternatives:** keep Python's traceback and `1` (the original decision: a script cannot tell a
+  bug from a refusal); a flag that prints the traceback; `5` instead of `70`.
+- **Why:** the table is a contract from the first release and a bug is the one case it did not
+  cover. `70` follows `sysexits.h` and cannot collide with `0` to `4`; `130` and `141` are what a
+  shell reports for the two signals.
+- **Trade-off:** the contract has eight codes, not five, and the traceback is not shown. The line
+  gives the class, file and line, which is what an issue needs; the message is left out on purpose.
+
 ## Impact on existing code
 
 - `render.py` and `render_verdict.py`: every English literal moves to the catalog and the functions
