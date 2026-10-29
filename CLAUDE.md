@@ -142,6 +142,8 @@ tests/               # pytest, one test file per module (test_reports_*.py incl.
 specs/               # spec-driven development: requirements → design → tasks per feature
 docs/stack.md        # each technology of the stack, why it was chosen, what to study first
 docs/json-schema.md  # every field of the two --json documents and the compatibility promise
+docs/stability.md    # what is public (commands, exit codes, JSON, config) and what is not; deprecation
+CHANGELOG.md         # Keep a Changelog; a change a user would notice goes in [Unreleased] in the same PR
 docs/demo/           # build_demo.py makes the invented reports and runs the CLI to write verdict.cast,
                      # the recording behind the README demo (see its docstring for the SVG and the
                      # page captures); tidy_svg.py pins the SVG text to a character grid;

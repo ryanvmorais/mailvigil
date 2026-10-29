@@ -30,6 +30,9 @@ sequence. Activate the hook once per clone with `git config core.hooksPath .gith
 - **Issues and PRs:** a bug or a feature starts as an issue (forms in `.github/ISSUE_TEMPLATE/`);
   the PR that resolves it says `Closes #N`, so the issue closes on merge. A trivial fix can go
   straight to a PR.
+- **Changelog:** a change a user would notice (a command, an option, an output, a fix) adds a line
+  under `[Unreleased]` in [CHANGELOG.md](CHANGELOG.md), in the same PR. What counts as breaking
+  is in [docs/stability.md](docs/stability.md).
 - **Design changes:** non-trivial features are designed as specs under [specs/](specs/) before
   implementation (requirements, design, tasks).
 
