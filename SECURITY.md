@@ -2,13 +2,13 @@
 
 ## Supported Versions
 
-MailVigil is pre-0.1 and has no release yet, so only `main` receives security fixes. Once the first
+MailVigil is pre-1.0 and has no release yet, so only `main` receives security fixes. Once the first
 version is published, only the latest release will.
 
 | Version | Supported |
 |---|---|
 | `main` (until the first release) | yes |
-| latest release (after `0.1`) | yes |
+| latest release (from `1.0.0`) | yes |
 | older releases | no |
 
 ## Reporting a Vulnerability

@@ -273,10 +273,10 @@ and are Resolved decisions 6 to 10.
 4. **No built-in table of well-known services.** Selectors such as `default`, `selector1` or `k1`
    are shared by unrelated services, and a wrong built-in name would be shown as fact. The owner's
    map is the only source; an unknown sender is shown as unknown. A table of curated, unambiguous
-   defaults can be reconsidered after v0.1 if users ask.
+   defaults can be reconsidered after v1.0.0 if users ask.
 5. **No recursion into the file format**: no includes, no variables, no environment expansion
    (RNF-02). A configuration is a short, readable list.
-6. **One `domain` in v0.1.** `ingest` takes one domain and the verdict is per domain; a list can
+6. **One `domain` in 1.0.0.** `ingest` takes one domain and the verdict is per domain; a list can
    be added later without breaking the file format.
 7. **Identify by DKIM selector only.** A sender that passes only SPF is shown as unknown, which is
    the safe failure; an SPF-domain table is the next step if real reports need it.

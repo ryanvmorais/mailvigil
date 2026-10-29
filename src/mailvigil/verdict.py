@@ -22,7 +22,7 @@ from mailvigil.summary import FailingSource, Summary
 # The criterion (RNF-05)
 # ---------------------------------------------------------------------------
 
-# The four thresholds are a first proposal, to be checked against real reports before 0.1 (design,
+# The four thresholds are a first proposal, to be checked against real reports before 1.0.0 (design,
 # Risk 1). They live here and nowhere else: the text is built from these names, never from retyped
 # numbers, and a test fails if the two disagree.
 
