@@ -17,7 +17,9 @@ readme = "README.md"
 # 3.12 is the floor so that anyone still on it can install the tool; 3.12 reaches end of life on
 # 2028-10-31, review then. CI tests the floor and the newest stable release.
 requires-python = ">=3.12"
-license = { text = "Apache-2.0" }
+# SPDX expression (PEP 639); it replaces the table form and the `License ::` classifier.
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 authors = [{ name = "Ryan Morais" }]
 keywords = [
     "dmarc",
@@ -34,7 +36,6 @@ classifiers = [
     "Environment :: Console",
     "Intended Audience :: Developers",
     "Intended Audience :: Information Technology",
-    "License :: OSI Approved :: Apache Software License",
     "Natural Language :: English",
     "Natural Language :: Portuguese (Brazilian)",
     "Operating System :: OS Independent",
@@ -70,7 +71,8 @@ dev = [
 
 # --- Packaging (Hatchling) ---------------------------------------------------
 [build-system]
-requires = ["hatchling"]
+# 1.27 is the first Hatchling that writes PEP 639 license metadata.
+requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
