@@ -470,7 +470,7 @@ and are Resolved decisions 7 to 13.
    counts (an SPF-only pass is the more fragile, since forwarding breaks SPF), so `005` and the
    JSON can use the difference without a new pass.
 8. **The command is `mailvigil summary PATH...`.** When `005` lands it chooses between adding the
-   verdict to this output and a sibling `verdict` command; nothing is a contract before `0.1`.
+   verdict to this output and a sibling `verdict` command; nothing is a contract before `1.0.0`.
 9. **A failing signature does not name the service.** A spoofer can sign badly with the owner's
    `d=` and a copied selector and the report looks identical, so the source is shown as
    `failing signature` with the selector. Naming it later is one change; a wrong name shown as

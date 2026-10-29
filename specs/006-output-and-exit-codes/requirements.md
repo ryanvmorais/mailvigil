@@ -20,13 +20,13 @@ person reading English on a terminal. Three things are still open, each one prom
   a dashboard would have to parse text laid out for humans. The data exists already (`Summary` and
   `Verdict` are frozen dataclasses with no text in them), it just has no machine-readable output.
 - **The exit codes are provisional.** `0`, `1` and `2` come from 004 and `3` and `4` from 005, and
-  both specs say "provisional until 006". Once `0.1` is published a script will depend on them, and
+  both specs say "provisional until 006". Once `1.0.0` is published a script will depend on them, and
   changing a code then is a breaking change.
 - **The text is English only.** The maintainer's audience, and the owners of small domains this
   tool is for, are largely Brazilian. The text of both commands lives in `render.py` and
   `render_verdict.py` precisely so a second language does not need a second implementation.
 
-The job of this spec is to **freeze what a script and a reader may rely on** before `0.1`, and to
+The job of this spec is to **freeze what a script and a reader may rely on** before `1.0.0`, and to
 do it without touching the rules: `summarize` and `judge` do not change, only what turns their
 results into output.
 
@@ -327,7 +327,7 @@ All six were answered on 2026-10-28; the answers are Resolved decisions 1 to 6.
 6. **One spec or two?** Recommended: one, in three delivery stages, each a pull request: the exit
    codes and the JSON (the contract), then the Portuguese text. If the Portuguese text turns out to
    be larger than expected (a string table for ~60 messages), it becomes `007-portuguese-text` and
-   this spec closes with the contract only. The contract is the part that blocks `0.1`; the text
+   this spec closes with the contract only. The contract is the part that blocks `1.0.0`; the text
    language does not.
 
 ## Resolved decisions

@@ -280,7 +280,7 @@ changes, and the 004 suite must pass untouched apart from those names.
 | `mailvigil.verdict.LeftOut` | `skipped`, `duplicates`, `other_domain`: the counts the verdict printed under RF-09 |
 | `mailvigil.render.share_tenths(part, whole)` | `int`; tenths of a percent, the integer behind `format_share` |
 
-Nothing here is a public contract before `0.1`. The rule ids, the threshold values and the exit
+Nothing here is a public contract before `1.0.0`. The rule ids, the threshold values and the exit
 codes become one at the first version.
 
 ## ADRs
@@ -295,7 +295,7 @@ copying a checklist from a vendor guide.
 rule produced it, and two near-equal scores would look the same to the owner. Five rules fit one
 screen, can each be disputed on its own, and can each be unit-tested at the boundary.
 **Trade-off.** Five thresholds are five arguments; they are constants in one place, and the
-maintainer will check them against real reports before `0.1` (Risk 1). (RF-01, RF-02)
+maintainer will check them against real reports before `1.0.0` (Risk 1). (RF-01, RF-02)
 
 ### ADR-2 — `not ready` beats `too early`
 
@@ -413,7 +413,7 @@ block. (RF-09)
 
 ## Risks
 
-1. **The thresholds are a first proposal.** Before `0.1` they are checked against the maintainer's
+1. **The thresholds are a first proposal.** Before `1.0.0` they are checked against the maintainer's
    own reports (never committed): does 28 days with 80% coverage match how reporters actually
    behave, and does 0.5% fit a real domain. If not, the change is four constants and their tests.
    The maintainer's own `reject` date (23/11) is a natural test.

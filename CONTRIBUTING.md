@@ -3,7 +3,7 @@
 Thanks for your interest in improving MailVigil. By taking part you agree to follow the
 [Code of Conduct](CODE_OF_CONDUCT.md).
 
-MailVigil is pre-0.1: the interface will change until the first version is out, so open an issue
+MailVigil is pre-1.0: the interface will change until the first version is out, so open an issue
 before starting anything large.
 
 ## Development

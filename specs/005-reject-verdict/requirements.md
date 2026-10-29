@@ -36,7 +36,7 @@ Two things make the answer honest:
 The thresholds below are a first proposal, in the sense that a rule needs a number to be testable.
 They are constants in one place, chosen from the usual operational advice (observe at least a few
 weeks, fix every legitimate source, then enforce), and they will be checked against the
-maintainer's own reports (never committed) before `0.1`. Nothing here is a contract before `0.1`.
+maintainer's own reports (never committed) before `1.0.0`. Nothing here is a contract before `1.0.0`.
 
 ## Goals
 

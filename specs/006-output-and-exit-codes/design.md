@@ -346,7 +346,7 @@ argparse's text, and the language is only known after parsing (Risk 4).
 6. **A script treats `1` as "not ready".** The table says `1` is a refusal and `4` is "not ready";
    the README gives the three-line shell example (`case $?`) so the difference is visible, and
    `docs/json-schema.md` repeats the table.
-7. **The mixed-language configuration line (ADR-5)** reads oddly. Accepted for `0.1`; it is the
+7. **The mixed-language configuration line (ADR-5)** reads oddly. Accepted for `1.0.0`; it is the
    lesser of the two costs listed in the ADR.
 
 ## Test strategy
