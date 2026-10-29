@@ -188,7 +188,8 @@ uv.lock              # never edit by hand (generated; a hook blocks it)
   `--lang` (no locale detection), ASCII in both, decided in the specs.
 - **File style:** follow `/estilo-arquivos` for each file type (docstrings with `Args:` /
   `Returns:`, full annotations, `# why` comments); do not copy its rules here.
-- **Python floor:** 3.12, tested in CI together with the newest stable release. Ruff and black
+- **Python floor:** 3.12, tested in CI together with 3.13, 3.14 and the newest stable release (3.15), on Linux and
+  on Windows (the one runner outside the `ubuntu-26.04` rule, so "OS Independent" is tested). Ruff and black
   target `py312` and mypy runs with `python_version = "3.12"`, so syntax newer than the floor
   fails the lint. Review when 3.12 reaches end of life (2028-10-31).
 - **Commits:** Conventional Commits (`feat`, `fix`, `docs`, `chore`, `ci`, `deps`…), squash-merged.

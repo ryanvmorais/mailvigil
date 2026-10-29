@@ -360,7 +360,7 @@ coverage on) but has no numeric target.
 
 ### GitHub Actions
 
-The CI (`ci.yml`): quality on Python 3.12 and 3.15, a `package` job (build, `twine check`, the
+The CI (`ci.yml`): quality on Python 3.12 to 3.15, on Linux and Windows, a `package` job (build, `twine check`, the
 wheel must declare no runtime dependency, it must install and run in a clean environment) and a
 `security` job (`pip-audit`). Actions are pinned by commit SHA with the version in a comment, on a
 fixed `ubuntu-26.04` runner.

@@ -1,6 +1,7 @@
 # CI pipeline (GitHub Actions). Three independent jobs, each mirroring a slice of the local
 # quality gate (.githooks/pre-commit) so that a green check means the same as a clean checkout:
-#   quality   ruff, black, mypy and pytest on 3.12 (the floor) and 3.15 (the newest stable)
+#   quality   ruff, black, mypy and pytest on every Python the classifiers claim, 3.12 (the floor)
+#             to 3.15 (the newest stable), on Linux and on Windows
 #   package   `uv build`: the metadata renders on PyPI, the wheel has no runtime dependency, and
 #             it installs and runs in a clean environment (the release ships this exact build)
 #   security  pip-audit over uv.lock (known CVEs in the locked graph)
@@ -27,14 +28,27 @@ concurrency:
 
 jobs:
   quality:
-    name: Quality (Python ${{ matrix.python-version }})
-    runs-on: ubuntu-26.04
-    timeout-minutes: 10
+    # The Linux names stay "Quality (Python X)": the ruleset requires 3.12 and 3.15 by that name.
+    name: Quality (${{ matrix.label }}Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        # The floor is tested, not just declared (requires-python in pyproject.toml).
-        python-version: ["3.12", "3.15"]
+        # Every Python in the classifiers runs on both systems, so "OS Independent" is tested, not
+        # just declared; the floor is requires-python in pyproject.toml.
+        python-version: ["3.12", "3.13", "3.14", "3.15"]
+        os: [linux, windows]
+        # Each include matches every combination of its `os` and only adds the runner and the label.
+        include:
+          - os: linux
+            runner: ubuntu-26.04
+            label: ""
+          # The one exception to the ubuntu-26.04 rule: Windows is where the console encoding, the
+          # file modes and the paths differ.
+          - os: windows
+            runner: windows-2025
+            label: "Windows, "
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
