@@ -1,7 +1,7 @@
 # MailVigil
 
 ![Python](https://img.shields.io/badge/Python-3.12+-3776AB?logo=python&logoColor=white)
-![deps](https://img.shields.io/badge/deps-uv-DE5FE9)
+![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)
 [![CI](https://github.com/ryanvmorais/mailvigil/actions/workflows/ci.yml/badge.svg)](https://github.com/ryanvmorais/mailvigil/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/mailvigil)](https://pypi.org/project/mailvigil/)
 [![Release](https://img.shields.io/github/v/release/ryanvmorais/mailvigil)](https://github.com/ryanvmorais/mailvigil/releases)
@@ -25,6 +25,9 @@ out DMARC, and it runs entirely on your machine: your reports are never sent to 
 > **Status:** stable, from `1.0.0`. The commands, the exit codes, the `--json` documents and the
 > configuration file are a contract that changes only in a major version; what is public and what
 > is not is in [docs/stability.md](https://github.com/ryanvmorais/mailvigil/blob/main/docs/stability.md).
+
+**Install:** `pipx install mailvigil` or `uv tool install mailvigil` (Python 3.12 or newer, nothing
+else). Then `mailvigil verdict --config mailvigil.toml reports/`.
 
 ![A terminal running mailvigil verdict on a folder of DMARC reports: NOT READY for p=reject with exit code 4, then, a month of reports later, READY for p=reject with exit code 0](https://raw.githubusercontent.com/ryanvmorais/mailvigil/main/docs/images/mailvigil-dmarc-verdict-terminal-demo.svg)
 
