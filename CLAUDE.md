@@ -7,15 +7,15 @@ This file guides Claude Code (claude.ai/code) when working in this repository.
 MailVigil is an open-source command-line tool that reads DMARC aggregate reports (RUA, usually
 `.zip`, `.gz` or `.xml`, or still attached to the mail in an `.eml` or `.mbox`) and says, in plain
 language, who is sending mail as a domain and whether it is safe to move the policy to `p=reject`. Python `>=3.12`, standard library only (zero runtime
-dependencies), offline. It is unreleased (the first release will be 1.0.0; `v0.1` to `v0.9` are the milestones of the build, see the README): the CLI answers `mailvigil --version`, `mailvigil summary`
+dependencies), offline. Version 1.0.0 is on PyPI (published by the maintainer on 2026-10-29; `v0.1` to `v0.9` are the milestones of the build, see the README): the CLI answers `mailvigil --version`, `mailvigil summary`
 and `mailvigil verdict` (report ingestion, configuration, sender identification, the summary, the
 verdict on `p=reject` and their texts are built and wired); `--json`, `--lang en|pt-BR` and the stable
 exit codes (a public contract, `docs/json-schema.md`) are built (spec 006 is done), and so is the
 static HTML page of `verdict --html` (spec 008 is done). `mailvigil fetch` (spec 009, IMAP into a
 folder, opt-in) is built too; it is the only command that touches the network. Everything
 is specified in [specs/](specs/) first. The repository has been public since
-2026-10-27 (the maintainer made it public, not Claude); nothing is announced or published to PyPI
-until the first version is ready.
+2026-10-27 (the maintainer made it public, not Claude); releasing and announcing are the
+maintainer's acts (`docs/releasing.md`).
 
 Conversation with the maintainer (Ryan) and plan files are in Portuguese; everything in the
 repository is English.
