@@ -7,7 +7,7 @@ This file guides Claude Code (claude.ai/code) when working in this repository.
 MailVigil is an open-source command-line tool that reads DMARC aggregate reports (RUA, usually
 `.zip`, `.gz` or `.xml`, or still attached to the mail in an `.eml` or `.mbox`) and says, in plain
 language, who is sending mail as a domain and whether it is safe to move the policy to `p=reject`. Python `>=3.12`, standard library only (zero runtime
-dependencies), offline. Version 1.1.1 is on PyPI (1.0.0 was published by the maintainer on 2026-10-29, 1.1.0 and 1.1.1 on 2026-10-30; `v0.1` to `v0.9` are the milestones of the build, see the README): the CLI answers `mailvigil --version`, `mailvigil summary`
+dependencies), offline. Version 1.1.2 is on PyPI (1.0.0 was published by the maintainer on 2026-10-29, 1.1.0, 1.1.1 and 1.1.2 on 2026-10-30; `v0.1` to `v0.9` are the milestones of the build, see the README): the CLI answers `mailvigil --version`, `mailvigil summary`
 and `mailvigil verdict` (report ingestion, configuration, sender identification, the summary, the
 verdict on `p=reject` and their texts are built and wired); `--json`, `--lang en|pt-BR` and the stable
 exit codes (a public contract, `docs/json-schema.md`) are built (spec 006 is done), and so is the
@@ -80,7 +80,8 @@ src/mailvigil/
   reports/           # report ingestion (spec 002); public API re-exported by __init__.py
     errors.py        #   Reason (StrEnum) and ReportRefused: every refusal is typed
     model.py         #   frozen dataclasses: Report, Record, PolicyPublished, IngestionResult…
-    xmlsafe.py       #   the only XML parser: expat handlers refuse DOCTYPE and ENTITY
+    xmlsafe.py       #   the only XML parser: expat handlers refuse DOCTYPE and ENTITY, and a
+                     #                document past MAX_DEPTH levels or MAX_ELEMENTS elements
     reader.py        #   .xml/.gz/.zip to bytes, capped at MAX_BYTES (5 MiB) as it decompresses
     mail.py          #   .eml/.mbox (spec 007): report attachments out of messages, bounded in size,
                      #   lines, parts and depth before and while the `email` parser works
@@ -181,8 +182,10 @@ uv.lock              # never edit by hand (generated; a hook blocks it)
 > ⚠️ **Reports are hostile input.** The parser refuses any XML containing `DOCTYPE` or `ENTITY`
 > (entity expansion) inside `reports/xmlsafe.py`, and `reports/reader.py` caps the decompressed
 > size at `MAX_BYTES` (5 MiB, against zip bombs) by counting the bytes actually read, never a
-> declared size. Both defenses have tests that feed the attack; keep it so when touching them, and
-> keep `xmlsafe.py` the only module that creates an XML parser. The starting point was the script in
+> declared size. The same parser also refuses a document nested past `MAX_DEPTH` levels or holding
+> more than `MAX_ELEMENTS` elements (`Reason.XML_TOO_COMPLEX`, spec 002 ADR-8), because the byte cap
+> alone does not bound the cost of the tree. Each defense has tests that feed the attack; keep it so
+> when touching them, and keep `xmlsafe.py` the only module that creates an XML parser. The starting point was the script in
 > the maintainer's site repository (`site-ryan-morais/scripts/relatorios_dmarc.py`).
 
 > ⚠️ **Never use a real DMARC report** in tests, docs, issues or PRs: it carries IP addresses and
