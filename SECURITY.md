@@ -49,7 +49,7 @@ tool against its user, or that breaks one of its safety guarantees. For example:
 - anything from a report or a configuration file reaching a place it should not (a log line, a
   file other than the requested output);
 - in `mailvigil fetch`: a connection that is not TLS, or that accepts a certificate or a host name
-  that does not verify;
+  that does not verify (including through `--cafile`, which may only add trust);
 - in `mailvigil fetch`: the password reaching an output, a log line, a file, an argument or the
   environment;
 - in `mailvigil fetch`: any command that changes the mailbox or marks a message as read (the tool

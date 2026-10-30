@@ -205,6 +205,13 @@ def add_fetch_parser(
         metavar="FILE",
         help="read the password from the first line of this file instead of asking for it",
     )
+    fetch_parser.add_argument(
+        "--cafile",
+        type=Path,
+        metavar="FILE",
+        help="a PEM file with a certificate authority to trust besides the system's, for a server "
+        "behind a private one; the certificate is still checked",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -283,7 +290,7 @@ def run_fetch(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
 
     Args:
         args (argparse.Namespace): The parsed arguments: ``host``, ``port``, ``user``, ``to``,
-            ``folder``, ``since``, ``limit``, ``password_file`` and ``lang``.
+            ``folder``, ``since``, ``limit``, ``password_file``, ``cafile`` and ``lang``.
         parser (argparse.ArgumentParser): Used to end the run with a usage error.
 
     Returns:
@@ -295,12 +302,16 @@ def run_fetch(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
     from mailvigil.fetch import imap
 
     try:
+        # Read the authority file first, so a bad one is told before the password is asked for.
+        imap.build_context(args.cafile)
         password = _password(args, parser)
         clock = time.monotonic
         deadline = clock() + DEADLINE_SECONDS
         try:
             # Looked up on the module at call time, so a test can replace it.
-            mailbox = imap.connect(args.host, args.port, args.user, password, clock, deadline)
+            mailbox = imap.connect(
+                args.host, args.port, args.user, password, clock, deadline, cafile=args.cafile
+            )
         except ValueError as error:
             parser.error(f"argument --user: {error}")
         try:

@@ -34,6 +34,7 @@ _REASONS = {
     "LOGIN_FAILED": "login_failed",
     "PASSWORD_UNUSABLE": "password_unusable",
     "PASSWORD_FILE": "password_file",
+    "CAFILE_UNUSABLE": "cafile_unusable",
     "FOLDER_NOT_FOUND": "folder_not_found",
     "PROTOCOL_ERROR": "protocol_error",
     "TOO_MANY_MATCHES": "too_many_matches",
@@ -41,7 +42,7 @@ _REASONS = {
 }
 
 
-def test_the_twelve_reasons_have_the_exact_keys() -> None:
+def test_the_thirteen_reasons_have_the_exact_keys() -> None:
     assert {member.name: member.value for member in FetchReason} == _REASONS
 
 

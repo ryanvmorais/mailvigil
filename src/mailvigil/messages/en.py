@@ -288,6 +288,9 @@ _FETCH = FetchMessages(
                 "characters outside ASCII that the server does not accept"
             ),
             FetchReason.PASSWORD_FILE: "could not read a password from the file",
+            FetchReason.CAFILE_UNUSABLE: (
+                "could not read a certificate authority from the --cafile file"
+            ),
             FetchReason.FOLDER_NOT_FOUND: "the folder was not found",
             FetchReason.PROTOCOL_ERROR: "the server sent an answer that could not be used",
             FetchReason.TOO_MANY_MATCHES: "too many messages matched; narrow it with --since",

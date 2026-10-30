@@ -25,7 +25,7 @@ from typing import Any
 
 import pytest
 
-from fetch_helpers import ManualClock
+from fetch_helpers import TEST_CA_PEM, TEST_CA_SUBJECT, ManualClock
 from imap_peer import (
     CANARY,
     Handler,
@@ -397,6 +397,72 @@ def test_a_stricter_minimum_version_is_kept(monkeypatch: pytest.MonkeyPatch) -> 
     assert build_context().minimum_version == ssl.TLSVersion.TLSv1_3
 
 
+def _cafile(tmp_path: Path, text: str = TEST_CA_PEM) -> Path:
+    """
+    Write an authority file.
+
+    Args:
+        tmp_path (Path): The test's own folder.
+        text (str, optional): The content. Default: the synthetic test authority.
+
+    Returns:
+        Path: The file.
+    """
+    path = tmp_path / "ca.pem"
+    path.write_text(text, encoding="ascii")
+    return path
+
+
+def test_a_cafile_adds_trust_and_takes_none_away(tmp_path: Path) -> None:
+    """The file's authority joins the system's; the checks stay exactly as strict (ADR-10)."""
+    plain = build_context()
+    extended = build_context(_cafile(tmp_path))
+
+    assert TEST_CA_SUBJECT not in [cert["subject"] for cert in plain.get_ca_certs()]
+    assert all(cert in extended.get_ca_certs() for cert in plain.get_ca_certs())
+    assert [cert["subject"] for cert in extended.get_ca_certs()].count(TEST_CA_SUBJECT) == 1
+    assert extended.verify_mode == ssl.CERT_REQUIRED
+    assert extended.check_hostname is True
+    assert extended.minimum_version >= ssl.TLSVersion.TLSv1_2
+
+
+@pytest.mark.parametrize("content", [None, "", "not a certificate\n", TEST_CA_PEM[:120]])
+def test_a_cafile_that_holds_no_certificate_is_refused(tmp_path: Path, content: str | None) -> None:
+    """A missing, empty, text or cut file is ``cafile_unusable``, with no detail."""
+    path = _cafile(tmp_path, content) if content is not None else tmp_path / "missing.pem"
+    with pytest.raises(FetchRefused) as refusal:
+        build_context(path)
+    assert refusal.value.reason is FetchReason.CAFILE_UNUSABLE
+    assert refusal.value.detail == ""
+
+
+def test_a_folder_is_not_a_cafile(tmp_path: Path) -> None:
+    """A folder is not a file of authorities: ``cafile_unusable``."""
+    with pytest.raises(FetchRefused) as refusal:
+        build_context(tmp_path)
+    assert refusal.value.reason is FetchReason.CAFILE_UNUSABLE
+
+
+def test_the_cafile_reaches_the_connection(fake_ssl: _Recorder, tmp_path: Path) -> None:
+    """The context given to the connection holds the file's authority and still verifies."""
+    _connect(cafile=_cafile(tmp_path))
+    ((_, _, options),) = fake_ssl.calls
+    context = options["ssl_context"]
+    assert TEST_CA_SUBJECT in [cert["subject"] for cert in context.get_ca_certs()]
+    assert context.verify_mode == ssl.CERT_REQUIRED
+    assert context.check_hostname is True
+
+
+def test_an_unusable_cafile_is_refused_before_anything_is_opened(
+    fake_ssl: _Recorder, tmp_path: Path
+) -> None:
+    """A bad authority file fails before any connection is opened."""
+    with pytest.raises(FetchRefused) as refusal:
+        _connect(cafile=tmp_path / "missing.pem")
+    assert refusal.value.reason is FetchReason.CAFILE_UNUSABLE
+    assert fake_ssl.calls == []
+
+
 def test_the_context_that_reaches_the_connection_is_the_verified_one(fake_ssl: _Recorder) -> None:
     _connect()
     ((_, _, options),) = fake_ssl.calls
@@ -426,6 +492,8 @@ def test_no_path_builds_an_unverified_context() -> None:
         assert forbidden not in source
     assert not re.search(r"check_hostname\s*=\s*False", source)
     assert not re.search(r"ssl_context\s*=\s*None", source)
+    # The library's own ``cafile`` argument would replace the system's trust, not add to it.
+    assert not re.search(r"create_default_context\([^)]", source)
 
 
 @pytest.mark.parametrize(

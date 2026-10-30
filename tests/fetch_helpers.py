@@ -200,6 +200,29 @@ class FakeMailbox:
 
 
 # ---------------------------------------------------------------------------
+# The certificate authority
+# ---------------------------------------------------------------------------
+
+# The subject of ``TEST_CA_PEM``, as ``SSLContext.get_ca_certs`` reports it.
+TEST_CA_SUBJECT = ((("commonName", "MailVigil test CA (synthetic)"),),)
+
+# A self-signed authority made for these tests alone, valid for a hundred years. Its private key was
+# thrown away when it was made, so it can sign nothing and nobody can pose as a server with it.
+TEST_CA_PEM = """-----BEGIN CERTIFICATE-----
+MIIBtzCCAV2gAwIBAgIUTe+8YiNzm1FHH7yrGU8FY4orZ6UwCgYIKoZIzj0EAwIw
+KDEmMCQGA1UEAwwdTWFpbFZpZ2lsIHRlc3QgQ0EgKHN5bnRoZXRpYykwIBcNMjYx
+MDMwMTg0MzQzWhgPMjEyNjEwMDYxODQzNDNaMCgxJjAkBgNVBAMMHU1haWxWaWdp
+bCB0ZXN0IENBIChzeW50aGV0aWMpMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE
+IMHZQPavayTvrcHXR3jSHtjUpxplUtSYkF4r5G+1Y8wlS0oHlIkL4hp0/D1P3PCf
+XhB2uhbm1rVvwioUyqSq+aNjMGEwHwYDVR0jBBgwFoAUKBXSi3RdZTWxTi7vXpNq
+NGTPAeswDwYDVR0TAQH/BAUwAwEB/zAOBgNVHQ8BAf8EBAMCAQYwHQYDVR0OBBYE
+FCgV0ot0XWU1sU4u716TajRkzwHrMAoGCCqGSM49BAMCA0gAMEUCIQCcXVIwven/
+pY05a3yF6V5psrSzTfK36GixJRaOOz96jQIgcBZ6eSqrBgbkQGlI+P9JPX5ub7N0
+gewgVhWCZoaO7sE=
+-----END CERTIFICATE-----
+"""
+
+# ---------------------------------------------------------------------------
 # The message
 # ---------------------------------------------------------------------------
 

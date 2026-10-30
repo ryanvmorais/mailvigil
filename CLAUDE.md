@@ -181,7 +181,8 @@ uv.lock              # never edit by hand (generated; a hook blocks it)
 
 > ⚠️ **`imaplib` and `ssl` are imported in `fetch/imap.py` only**, and that module is loaded inside
 > `cli_fetch.run_fetch`, never at import: `summary` and `verdict` never load the network code. The TLS
-> context always verifies the certificate (no `--insecure`, no plain IMAP, no STARTTLS); the
+> context always verifies the certificate (no `--insecure`, no plain IMAP, no STARTTLS; `--cafile`
+> only adds an authority to the system's, ADR-10); the
 > mailbox is only read (`BODY.PEEK`, no flag, no delete); the password is never an argument, an
 > environment variable or a log line. See spec 009, ADR-2 (the library's default context does not
 > verify) and ADR-3 (bounds live in the connection).

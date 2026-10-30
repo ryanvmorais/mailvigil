@@ -297,7 +297,9 @@ What it does not do:
 
 - It never changes the mailbox: no delete, move, flag, and the messages are not marked as read.
 - It never connects without TLS, and the certificate is always checked. There is no option to turn
-  that off, no plain IMAP and no STARTTLS (`--port` defaults to 993).
+  that off, no plain IMAP and no STARTTLS (`--port` defaults to 993). A server behind a private
+  certificate authority is trusted with `--cafile FILE` (a PEM file), which adds that authority to
+  the system's and still checks the certificate and the host name.
 - The password is asked for on the terminal, or read from the first line of `--password-file`. It is
   never an argument or an environment variable, and nothing stores it.
 - It does not parse the reports: it saves bytes, and the ingestion reads them.
