@@ -60,8 +60,8 @@ uv build
 
 ## Environment variables
 
-There are none. Configuration will be a TOML file passed to the CLI (see the specs); never commit a
-local one (`mailvigil.local.toml` is ignored).
+There are none. Configuration is a TOML file passed to the CLI with `--config` (see the README);
+never commit a local one (`mailvigil.local.toml` is ignored).
 
 ## Architecture
 
@@ -82,7 +82,8 @@ src/mailvigil/
                      # (the line of a refused configuration); shared by cli and cli_fetch, which may
                      # not import each other
   cli_fetch.py       # the `fetch` command (spec 009): option types (`--port`, `--limit`, `--since`,
-                     # `--folder`), the subparser (takes only `--lang` from the parents), the password
+                     # `--folder`), the subparser (takes only `--lang` from the parents and has its own
+                     # `--json`, the six numbers of a run), the password
                      # helpers, `_connection` (flag, else the [fetch] table of `--config`, else the
                      # default; the file is never searched for, ADR-12) and `run_fetch`, which loads `fetch.imap` (imaplib, ssl) inside the
                      # function, never at import (#82)
@@ -118,7 +119,7 @@ src/mailvigil/
                      # text module (spec 005)
   render_verdict.py  # render_verdict(verdict, messages) → 80-column ASCII text: reason, rules table,
                      # notes, what was left out, next step
-  render_json.py     # summary_document / verdict_document → dict, dumps → ASCII JSON, no language
+  render_json.py     # summary_document / verdict_document / fetch_document → dict, dumps → ASCII JSON, no language
                      # (spec 006); the schema is public contract, see docs/json-schema.md
   htmlkit.py         # the ONLY module that builds markup (spec 008): `text()` escapes a str into a `Safe`
                      # (a NewType), `el()` takes only `Safe` children and allowlisted tags
@@ -158,7 +159,7 @@ tests/               # pytest, one test file per module (test_reports_*.py incl.
                      # recorded --help texts) or tmp_path
 specs/               # spec-driven development: requirements → design → tasks per feature
 docs/stack.md        # each technology of the stack, why it was chosen, what to study first
-docs/json-schema.md  # every field of the two --json documents and the compatibility promise
+docs/json-schema.md  # every field of the three --json documents and the compatibility promise
 docs/stability.md    # what is public (commands, exit codes, JSON, config) and what is not; deprecation
 docs/releasing.md    # the maintainer's release steps (PyPI trusted publishing, TestPyPI dry run)
 CHANGELOG.md         # Keep a Changelog; a change a user would notice goes in [Unreleased] in the same PR
