@@ -184,6 +184,32 @@ def test_an_enormous_count_is_a_refused_report_not_a_traceback(
     assert code == 1
 
 
+@pytest.mark.parametrize(
+    "output",
+    [["summary"], ["summary", "--json"], ["verdict"], ["verdict", "--json"], ["verdict", "--html"]],
+    ids=" ".join,
+)
+def test_a_document_nested_too_deep_is_a_refused_report_not_a_crash(
+    output: list[str], tmp_path: Path
+) -> None:
+    """
+    A report nested past the limit is skipped like any refusal, and the run ends with code 1.
+
+    The only file is the nested one, so the run ends as "no report kept" (1), the code of a
+    refusal, and not as an uncaught error.
+    """
+    reports = tmp_path / "reports"
+    reports.mkdir()
+    (reports / "example.net!example.com!1790000000!1790086399.xml").write_bytes(
+        b"<a>" * 5000 + b"</a>" * 5000
+    )
+    config = write_config(tmp_path / "mailvigil.toml")
+
+    code = main([*output, str(reports), "--config", str(config)])
+
+    assert code == 1
+
+
 def test_an_unknown_option_is_a_usage_error_with_code_two(
     capsys: pytest.CaptureFixture[str],
 ) -> None:

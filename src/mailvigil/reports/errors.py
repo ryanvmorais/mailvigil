@@ -33,6 +33,7 @@ class Reason(StrEnum):
         MESSAGE_TOO_COMPLEX (str): A mail message with too many lines, parts or levels of parts.
         NO_REPORT_ATTACHMENT (str): A mail file the user named that holds no report attachment.
         MALFORMED_MESSAGE (str): The mail parser failed on a message in a way no other reason names.
+        XML_TOO_COMPLEX (str): The XML is nested too deep or holds too many elements.
     """
 
     UNSUPPORTED_EXTENSION = "unsupported_extension"
@@ -51,6 +52,7 @@ class Reason(StrEnum):
     MESSAGE_TOO_COMPLEX = "message_too_complex"
     NO_REPORT_ATTACHMENT = "no_report_attachment"
     MALFORMED_MESSAGE = "malformed_message"
+    XML_TOO_COMPLEX = "xml_too_complex"
 
 
 class ReportRefused(Exception):

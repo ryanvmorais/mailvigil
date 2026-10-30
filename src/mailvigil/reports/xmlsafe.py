@@ -27,6 +27,14 @@ from mailvigil.reports.errors import Reason, ReportRefused
 # generation is looked up the same way (ADR-5).
 _NAMESPACE_9990 = "urn:ietf:params:xml:ns:dmarc-2.0"
 
+# How deep and how wide a document may be. The cap in bytes stops a bomb but not a document built
+# to cost a lot for its size: measured at 5 MiB, nesting peaks at 213 MB and 1.3 million empty
+# elements at 108 MB, against 30 MB for a real report of the same size. A report has about six
+# levels and, at the byte cap, about 230,000 elements, so these are five times and twice that
+# (ADR-8). Past either the document is refused while it is read, before the rest of the tree.
+MAX_DEPTH = 32
+MAX_ELEMENTS = 500_000
+
 # Separates the namespace URI from the local name in what expat reports. "}" cannot appear in an
 # XML name, so the split is unambiguous and the result matches ElementTree's "{uri}local".
 _SEPARATOR = "}"
@@ -84,21 +92,40 @@ def parse_xml(xml: bytes) -> Element:
         Element: The root element, with names translated as described in ``_local_name``.
 
     Raises:
-        ReportRefused: ``FORBIDDEN_DECLARATION`` for a ``DOCTYPE`` or an ``ENTITY``, and
+        ReportRefused: ``FORBIDDEN_DECLARATION`` for a ``DOCTYPE`` or an ``ENTITY``,
+            ``XML_TOO_COMPLEX`` past ``MAX_DEPTH`` levels or ``MAX_ELEMENTS`` elements, and
             ``MALFORMED_XML`` (detail ``line L, column C``) for a document that is not well formed.
     """
     builder = TreeBuilder()
     parser = expat.ParserCreate(namespace_separator=_SEPARATOR)
+    # Counters the handlers share; one run of this function owns them, so nothing is global.
+    open_elements = 0
+    seen_elements = 0
+
+    def start(name: str, attrs: dict[str, str]) -> None:
+        """Count the element, refuse the document past a limit, and hand it to the builder."""
+        nonlocal open_elements, seen_elements
+        open_elements += 1
+        seen_elements += 1
+        if open_elements > MAX_DEPTH:
+            raise ReportRefused(Reason.XML_TOO_COMPLEX, f"deeper than {MAX_DEPTH} levels")
+        if seen_elements > MAX_ELEMENTS:
+            raise ReportRefused(Reason.XML_TOO_COMPLEX, f"more than {MAX_ELEMENTS} elements")
+        builder.start(_local_name(name), {_local_name(key): value for key, value in attrs.items()})
+
+    def end(name: str) -> None:
+        """Close the element in the builder and in the depth count."""
+        nonlocal open_elements
+        open_elements -= 1
+        builder.end(_local_name(name))
 
     # An exception raised inside a handler stops the parse and comes out of Parse unchanged.
     # The handler attributes are typed loosely by the stubs, so the lambdas need no cast.
     parser.StartDoctypeDeclHandler = lambda *_: _refuse("DOCTYPE")
     # Defense in depth: a DOCTYPE already refused the document, so this one is not expected to fire.
     parser.EntityDeclHandler = lambda *_: _refuse("ENTITY")
-    parser.StartElementHandler = lambda name, attrs: builder.start(
-        _local_name(name), {_local_name(key): value for key, value in attrs.items()}
-    )
-    parser.EndElementHandler = lambda name: builder.end(_local_name(name))
+    parser.StartElementHandler = start
+    parser.EndElementHandler = end
     parser.CharacterDataHandler = builder.data
     # Hands the builder whole text nodes instead of the pieces expat splits them into.
     parser.buffer_text = True

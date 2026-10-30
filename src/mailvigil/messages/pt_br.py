@@ -119,6 +119,7 @@ _SUMMARY = SummaryMessages(
             Reason.MESSAGE_TOO_COMPLEX: "mensagem complexa demais",
             Reason.NO_REPORT_ATTACHMENT: "nenhum relatorio anexado",
             Reason.MALFORMED_MESSAGE: "mensagem malformada",
+            Reason.XML_TOO_COMPLEX: "XML complexo demais",
         }
     ),
     skipped_more="... e mais {n}",

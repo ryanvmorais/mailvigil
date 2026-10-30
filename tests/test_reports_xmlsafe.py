@@ -14,7 +14,7 @@ from collections.abc import Callable
 import pytest
 
 from mailvigil.reports.errors import Reason, ReportRefused
-from mailvigil.reports.xmlsafe import parse_xml
+from mailvigil.reports.xmlsafe import MAX_DEPTH, MAX_ELEMENTS, parse_xml
 
 # The RFC 9990 namespace; parsed names in it lose the namespace (ADR-5).
 _NAMESPACE_9990 = "urn:ietf:params:xml:ns:dmarc-2.0"
@@ -168,3 +168,91 @@ def test_extension_element_in_a_foreign_namespace_is_set_apart() -> None:
 
     assert [child.tag for child in root] == ["{urn:example:ext}extra", "extra"]
     assert root.find("extra") is not None
+
+
+# ---------------------------------------------------------------------------
+# A document built to be expensive for its size (RF-03b, ADR-8)
+# ---------------------------------------------------------------------------
+
+
+def _nested(depth: int) -> bytes:
+    """
+    Build a well-formed document that is ``depth`` levels deep.
+
+    Args:
+        depth (int): How many elements are open at the deepest point.
+
+    Returns:
+        bytes: The document.
+    """
+    return b"<a>" * depth + b"</a>" * depth
+
+
+def _flat(elements: int) -> bytes:
+    """
+    Build a document of ``elements`` elements, the root included, all but the root empty.
+
+    Args:
+        elements (int): The total number of elements, at least one.
+
+    Returns:
+        bytes: The document.
+    """
+    return b"<f>" + b"<a/>" * (elements - 1) + b"</f>"
+
+
+def test_a_document_at_the_depth_limit_is_accepted() -> None:
+    """The limit itself is allowed; only a level more is refused."""
+    root = parse_xml(_nested(MAX_DEPTH))
+
+    assert root.tag == "a"
+
+
+def test_a_document_one_level_over_the_depth_limit_is_refused() -> None:
+    """The first element past ``MAX_DEPTH`` levels refuses the document."""
+    with pytest.raises(ReportRefused) as caught:
+        parse_xml(_nested(MAX_DEPTH + 1))
+
+    assert caught.value.reason is Reason.XML_TOO_COMPLEX
+    assert str(MAX_DEPTH) in caught.value.detail
+
+
+def test_depth_is_the_nesting_and_not_the_total_of_the_siblings() -> None:
+    """A long run of siblings is wide, not deep, so only the element count can stop it."""
+    document = b"<f>" + (b"<a><b/></a>" * 1000) + b"</f>"
+
+    assert len(parse_xml(document)) == 1000
+
+
+def test_a_five_mebibyte_nest_is_refused_while_it_is_read() -> None:
+    """The attack itself: the refusal comes at the 33rd element, not after a tree of 750,000."""
+    document = b"<a>" * (5 * 1024 * 1024 // 7)
+
+    with pytest.raises(ReportRefused) as caught:
+        parse_xml(document)
+
+    assert caught.value.reason is Reason.XML_TOO_COMPLEX
+
+
+def test_a_document_at_the_element_limit_is_accepted() -> None:
+    """``MAX_ELEMENTS`` elements, the root included, are allowed."""
+    root = parse_xml(_flat(MAX_ELEMENTS))
+
+    assert len(root) == MAX_ELEMENTS - 1
+
+
+def test_a_document_one_element_over_the_limit_is_refused() -> None:
+    """One element more than ``MAX_ELEMENTS`` refuses the document."""
+    with pytest.raises(ReportRefused) as caught:
+        parse_xml(_flat(MAX_ELEMENTS + 1))
+
+    assert caught.value.reason is Reason.XML_TOO_COMPLEX
+    assert str(MAX_ELEMENTS) in caught.value.detail
+
+
+def test_the_complexity_detail_does_not_echo_the_document() -> None:
+    """The detail names the limit only, never a name from the document."""
+    with pytest.raises(ReportRefused) as caught:
+        parse_xml(_nested(MAX_DEPTH + 1).replace(b"a", b"secret_tag"))
+
+    assert "secret_tag" not in caught.value.detail

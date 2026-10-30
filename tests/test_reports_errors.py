@@ -11,10 +11,10 @@ from enum import StrEnum
 from mailvigil.reports.errors import Reason, ReportRefused
 
 
-def test_reason_is_a_string_enum_with_the_sixteen_members() -> None:
-    """``Reason`` has exactly the sixteen refusals of the designs, each a string."""
+def test_reason_is_a_string_enum_with_the_seventeen_members() -> None:
+    """``Reason`` has exactly the seventeen refusals of the designs, each a string."""
     assert issubclass(Reason, StrEnum)
-    assert len(Reason) == 16
+    assert len(Reason) == 17
 
 
 def test_the_four_message_reasons_have_their_final_keys() -> None:
@@ -23,6 +23,11 @@ def test_the_four_message_reasons_have_their_final_keys() -> None:
     assert Reason.MESSAGE_TOO_COMPLEX == "message_too_complex"
     assert Reason.NO_REPORT_ATTACHMENT == "no_report_attachment"
     assert Reason.MALFORMED_MESSAGE == "malformed_message"
+
+
+def test_the_xml_complexity_reason_has_its_final_key() -> None:
+    """Issue #66 adds a key that ``--json`` can carry, so it is pinned."""
+    assert Reason.XML_TOO_COMPLEX == "xml_too_complex"
 
 
 def test_reason_values_are_unique_lower_snake_strings() -> None:
