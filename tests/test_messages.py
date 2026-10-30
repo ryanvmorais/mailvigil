@@ -75,6 +75,7 @@ _PLACEHOLDERS: dict[str, frozenset[str]] = {
     "refusals.no_domain": frozenset({"default"}),
     "refusals.domain_mismatch": frozenset({"wanted", "domain", "path"}),
     "refusals.no_reports": frozenset({"domain"}),
+    "refusals.output_failed": frozenset({"path", "reason"}),
 }
 
 

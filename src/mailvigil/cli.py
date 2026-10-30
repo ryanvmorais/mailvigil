@@ -21,9 +21,11 @@ load it (RF-09).
 from __future__ import annotations
 
 import argparse
+import contextlib
 import getpass
 import os
 import sys
+import tempfile
 import time
 import traceback
 from collections.abc import Sequence
@@ -246,6 +248,42 @@ def _write(stream: TextIO, text: str) -> None:
     stream.write(text.encode(encoding, errors="replace").decode(encoding) + "\n")
 
 
+def _write_page(path: Path, page: str) -> None:
+    """
+    Write the HTML page to a file as ASCII bytes, replacing what is there (spec 008, ADR-11).
+
+    The bytes go straight to the file, so no shell, console or code page sits in between. They are
+    written to a temporary file in the same folder and moved over ``path`` with ``os.replace``,
+    which is atomic: a failure never leaves half a page, and an old file survives it. The folder is
+    never created.
+
+    Args:
+        path (Path): The file to write.
+        page (str): The page; ``render_html`` makes it ASCII, and it ends in a newline.
+
+    Raises:
+        OSError: When the folder is missing, ``path`` is a folder or the disk refuses the write;
+            the temporary file is removed.
+    """
+    temporary: str | None = None
+    try:
+        fd, temporary = tempfile.mkstemp(prefix=".mailvigil-", suffix=".tmp", dir=path.parent)
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(page.encode("ascii"))
+        # ``mkstemp`` makes the file private (0600); a report is made to be read, like the file of
+        # a ``>`` redirect, so it gets the permission the umask allows. ``umask`` can only be read
+        # by setting it, so it is put back at once.
+        umask = os.umask(0)
+        os.umask(umask)
+        os.chmod(temporary, 0o666 & ~umask)
+        os.replace(temporary, path)
+        temporary = None
+    finally:
+        if temporary is not None:
+            with contextlib.suppress(OSError):
+                os.unlink(temporary)
+
+
 # ---------------------------------------------------------------------------
 # Parser and entry point
 # ---------------------------------------------------------------------------
@@ -442,8 +480,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--html",
         action="store_true",
         help="print one self-contained HTML page instead of the text; redirect it to a file "
-        "(mailvigil verdict ... --html > report.html; in Windows PowerShell 5.1 pipe it to "
-        "Out-File -Encoding ascii); not with --json",
+        "(mailvigil verdict ... --html > report.html) or write it with --output; not with --json",
+    )
+    verdict_parser.add_argument(
+        "--output",
+        type=Path,
+        metavar="FILE",
+        help="write the --html page to FILE as ASCII, replacing it, instead of printing it "
+        "(use it in Windows PowerShell 5.1, whose > writes UTF-16); requires --html",
     )
     fetch_parser = commands.add_parser(
         "fetch",
@@ -580,6 +624,16 @@ def _run_verdict(args: argparse.Namespace) -> int:
     verdict = judge(summary, _now())
     if args.json:
         _write(sys.stdout, dumps(verdict_document(verdict)))
+    elif args.html and args.output is not None:
+        try:
+            _write_page(args.output, render_html(summary, verdict, args.lang))
+        except OSError as error:
+            reason = error.strerror or type(error).__name__
+            line = args.lang.refusals.output_failed.format(
+                path=_echo(args.output), reason=_echo(reason)
+            )
+            _write(sys.stderr, f"mailvigil: {line}")
+            return EXIT_REFUSED
     elif args.html:
         # ``render_html`` ends in a newline already; ``_write`` adds one, so the last is cut.
         _write(sys.stdout, render_html(summary, verdict, args.lang).rstrip("\n"))
@@ -749,6 +803,9 @@ def _dispatch(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
     # own argument, so the pair is refused here, before any work (ADR-6).
     if args.command == "verdict" and args.json and args.html:
         parser.error("argument --html: not allowed with argument --json")
+    # The file is the page's: the text and the JSON stay redirects (spec 008, ADR-11).
+    if args.command == "verdict" and args.output is not None and not args.html:
+        parser.error("argument --output: requires --html")
     if args.command == "summary":
         return _run_summary(args)
     if args.command == "verdict":

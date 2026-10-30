@@ -33,6 +33,7 @@ uv run mailvigil verdict --domain example.com path/to/reports   # exit 0 ready, 
 uv run mailvigil verdict --config FILE path/to/reports --json   # one JSON document, same exit code
 uv run mailvigil summary --config FILE path/to/reports --lang pt-BR   # the text in Portuguese
 uv run mailvigil verdict --config FILE path/to/reports --html > report.html   # one static page (spec 008)
+uv run mailvigil verdict --config FILE path/to/reports --html --output report.html   # the same, written as ASCII by the tool
 uv run mailvigil fetch --host HOST --user NAME --to DIR   # saves the report mail as .eml (spec 009); asks for the password
 
 # Run the tests (one file, then one test)
@@ -72,6 +73,7 @@ src/mailvigil/
                      # the exit code is decided before the format; a parent parser shares
                      # paths/--config/--domain/--json/--lang (`--lang` is parsed to a Messages);
                      # `--html` exists on `verdict` only and is refused together with `--json`;
+                     # `--output FILE` (ADR-11) needs `--html` and `_write_page` writes it atomically;
                      # `fetch` (spec 009) takes only `--lang` from the parents and loads
                      # `fetch.imap` (imaplib, ssl) inside `_run_fetch`, never at import
   py.typed           # marks the package as typed (PEP 561)

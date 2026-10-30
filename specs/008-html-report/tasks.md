@@ -258,3 +258,22 @@ maintainer, not decided here.
 - [x] Final quality gate: the same four commands, plus `uv build` and the check that the wheel has
   no `Requires-Dist` (RNF-01). **Result:** ruff, black, mypy strict clean; 2231 tests pass,
   coverage 100%; `uv build` makes the sdist and the wheel and the wheel has 0 `Requires-Dist`.
+
+## Amendment (2026-10-30, issue #69) — `--output FILE` (RF-01, ADR-11)
+
+- [x] `tests/test_cli_html_output.py`, first, through `main(argv)`, `capsys` and `tmp_path`: the
+  file holds the same page as standard output would, ASCII, with `\n` and no `\r`; standard output
+  and error stay empty; the exit code is 0, 3 or 4 by the answer; a file already there is replaced
+  and a failed write leaves it as it was (and no temporary file behind); `--output` without
+  `--html`, with `--json` and on `summary` are exit 2; a missing folder and a folder as `FILE` are
+  exit 1 with one line, in both languages, nothing in standard output and no folder created; a
+  refusal before an answer creates no file; a new file is readable by others under a `022` umask
+  (POSIX only). — RF-01
+- [x] `src/mailvigil/cli.py` and the `messages/` catalog: the option, the check, `_write_page`,
+  `output_failed` in `RefusalMessages`, `ENGLISH` and `PORTUGUESE`; `tests/help_golden.py` and the
+  help test follow the new text. — RF-01, ADR-11
+- [x] `README.md` and `README.pt-BR.md`: `--output report.html` is the way to write the page, `>`
+  stays for the other shells, and the PowerShell note becomes "use `--output`"; `docs/stability.md`
+  lists `--output`; `CHANGELOG.md` `[Unreleased]`; `CLAUDE.md` (commands, the `cli.py` line);
+  `specs/README.md` if it lists the flags. — RF-01
+- [x] Quality gate. **Result:** ruff, black and mypy strict clean; `pytest --cov` green, 100% coverage (2026-10-30). Run by hand in Windows PowerShell 5.1: `>` wrote UTF-16 (BOM, 56 200 bytes), `--output` wrote 27 984 ASCII bytes and the exit code stayed 4.

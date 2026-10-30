@@ -176,5 +176,5 @@ def test_help_names_the_page_and_says_to_redirect_it(capsys: pytest.CaptureFixtu
     assert "--html" in help_text
     assert "HTML" in help_text
     assert "redirect" in help_text
-    # argparse may wrap the line at the hyphen of ``Out-File``, so the check skips that word.
-    assert "PowerShell 5.1" in help_text and "Encoding ascii" in help_text
+    # The PowerShell 5.1 caveat points at ``--output`` since ADR-11 (test_cli_html_output).
+    assert "PowerShell 5.1" in help_text and "--output" in help_text

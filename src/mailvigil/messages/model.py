@@ -286,6 +286,8 @@ class RefusalMessages:
         no_reports (str): The first line of the no-reports explanation; ``{domain}``.
         no_file_found (str): The line when no report file was found at all.
         no_file_hint (str): How a folder is searched, and how to read a renamed file.
+        output_failed (str): ``--output`` could not write the page; ``{path}`` and ``{reason}``,
+            the system's own words for it.
     """
 
     no_domain: str
@@ -295,6 +297,7 @@ class RefusalMessages:
     no_reports: str
     no_file_found: str
     no_file_hint: str
+    output_failed: str
 
 
 @dataclass(frozen=True, slots=True)

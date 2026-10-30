@@ -243,6 +243,7 @@ _REFUSALS = RefusalMessages(
     no_reports="No DMARC report for {domain} was kept.",
     no_file_found="No report file was found. A folder is searched only for names like",
     no_file_hint="provider!domain!begin!end.zip; or name the file itself to read it.",
+    output_failed="could not write {path}: {reason}",
 )
 
 # ---------------------------------------------------------------------------

@@ -12,6 +12,10 @@ All notable changes to MailVigil are written here. The format follows
 - **Portuguese README.** `README.pt-BR.md` is the whole README in Brazilian Portuguese, with the
   sample output of `--lang pt-BR`; the English README links to it.
 
+- **`verdict --html --output FILE`.** Writes the page to a file itself, as ASCII bytes, replacing a
+  file already there, so it no longer depends on the shell: Windows PowerShell 5.1 turns `>` into
+  UTF-16. It needs `--html`; without `--output` nothing changes.
+
 - **A logo for the tool.** An envelope with an open eye, `docs/images/mailvigil-dmarc-analyzer-logo.svg`,
   shown at the top of both READMEs.
 

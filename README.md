@@ -263,9 +263,11 @@ mailvigil verdict --config mailvigil.toml reports/ --html > report.html
   once you are happy to show the domain and the sending addresses in it.
 - **The exit code is the same** as without `--html` (`0`, `3`, `4`), and `--html` cannot be
   combined with `--json`. `summary` has no `--html`.
-- **Windows PowerShell 5.1** writes a redirect as UTF-16, which browsers do not read as the page
-  intends; use `mailvigil verdict ... --html | Out-File -Encoding ascii report.html` there. The
-  page is ASCII, so any other shell's `>` is fine.
+- **`--output FILE` writes the page itself**, as ASCII bytes, so no shell sits in between:
+  `mailvigil verdict --config mailvigil.toml reports/ --html --output report.html`. It replaces a
+  file already there, never creates the folder, prints nothing when it works and needs `--html`.
+  Use it in **Windows PowerShell 5.1**, whose `>` writes UTF-16, which browsers do not read as the
+  page intends. The page is ASCII, so any other shell's `>` is fine too.
 
 ### Fetch
 
