@@ -7,6 +7,8 @@ environment variable. The domains are invented (``example.com`` and friends).
 
 from __future__ import annotations
 
+import unicodedata
+
 import pytest
 
 from mailvigil.text import clean_text, has_dropped_characters, is_within_domain, normalize_domain
@@ -101,3 +103,44 @@ def test_is_within_domain_accepts_the_domain_and_its_subdomains(candidate: str) 
 def test_is_within_domain_refuses_everything_else(candidate: str) -> None:
     """A name that merely ends with the domain's letters is not a subdomain."""
     assert not is_within_domain(candidate, "example.com")
+
+
+# ---------------------------------------------------------------------------
+# clean_text fast path (issue #70)
+# ---------------------------------------------------------------------------
+
+
+def _clean_by_category(value: str, limit: int) -> str:
+    """
+    Clean a text the slow way: one category lookup per character, no shortcut.
+
+    Args:
+        value (str): The text to clean.
+        limit (int): The longest result, in characters.
+
+    Returns:
+        str: What ``clean_text`` returned before it had a fast path.
+    """
+    spaced = value.translate(str.maketrans({"\t": " ", "\r": " ", "\n": " "}))
+    kept = "".join(
+        char for char in spaced if unicodedata.category(char) not in {"Cc", "Cf", "Zl", "Zp"}
+    )
+    return kept.strip()[:limit]
+
+
+@pytest.mark.parametrize("code", range(128))
+def test_clean_text_agrees_with_the_slow_walk_on_every_ascii_character(code: int) -> None:
+    """The shortcut for printable ASCII changes nothing, whatever the one character is."""
+    value = f"a{chr(code)}b"
+    assert clean_text(value, 255) == _clean_by_category(value, 255)
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["  spaced  ", "x" * 300, " " * 10, "a b  c", "mail.example.net", "é plain", "tab\there"],
+    ids=["strip", "long", "blank", "inner-spaces", "domain", "non-ascii", "tab"],
+)
+def test_clean_text_fast_path_keeps_strip_and_cut(value: str) -> None:
+    """Printable ASCII is still stripped and cut to the limit, as the slow walk does."""
+    assert clean_text(value, 255) == _clean_by_category(value, 255)
+    assert clean_text(value, 5) == _clean_by_category(value, 5)

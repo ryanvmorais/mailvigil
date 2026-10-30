@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import UTC, datetime
+from xml.etree import ElementTree
 
 import pytest
 
@@ -23,7 +24,7 @@ from mailvigil.reports.model import (
     Report,
     SpfResult,
 )
-from mailvigil.reports.parser import MAX_COUNT, MAX_TEXT, _clean, parse_report
+from mailvigil.reports.parser import MAX_COUNT, MAX_TEXT, _clean, _find, _find_all, parse_report
 
 ReportBuilder = Callable[..., bytes]
 RecordBuilder = Callable[..., str]
@@ -613,3 +614,23 @@ def test_elements_in_a_foreign_namespace_are_ignored(
     assert report.records[0].count == 4
     assert report.policy.p == "none"
     assert report.reporter == "Example Mail"
+
+
+# ---------------------------------------------------------------------------
+# Lookups (issue #70)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "path",
+    ["row/count", "row/policy_evaluated/reason", "auth_results/dkim", "row", "missing", "row/x/y"],
+)
+def test_lookups_answer_like_element_tree_even_with_repeated_parents(path: str) -> None:
+    """``_find`` and ``_find_all`` match ``find`` and ``findall``, repeated parents included."""
+    node = ElementTree.fromstring(
+        "<record><row><source_ip>a</source_ip></row>"
+        "<row><count>1</count><policy_evaluated><reason/><reason/></policy_evaluated></row>"
+        "<row><count>2</count></row><auth_results><dkim/><dkim/></auth_results></record>"
+    )
+    assert _find(node, path) is node.find(path)
+    assert _find_all(node, path.split("/")) == node.findall(path)

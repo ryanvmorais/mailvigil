@@ -46,6 +46,11 @@ def clean_text(value: str, limit: int) -> str:
     Returns:
         str: The cleaned text, possibly empty.
     """
+    # Fast path: printable ASCII holds no tab, line break, control, format or separator character
+    # (those are not printable), so only the strip and the cut apply. Nearly every report field is
+    # such a text, and this skips the walk over each character.
+    if value.isascii() and value.isprintable():
+        return value.strip()[:limit]
     spaced = value.translate(_SPACING)
     kept = "".join(char for char in spaced if unicodedata.category(char) not in DROPPED_CATEGORIES)
     return kept.strip()[:limit]
