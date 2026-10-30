@@ -1,5 +1,6 @@
 """
-The ``--help`` texts of ``summary`` and ``verdict``, recorded before spec 009.
+The ``--help`` texts of ``summary`` and ``verdict``, recorded before spec 009 and amended for
+``--recursive`` (ADR-9 of 002).
 
 Spec 009 split the shared parent parser (ADR-7). A test compares the live text with these, byte for
 byte, at 80 columns: the split must not change what an existing command prints. The text is the
@@ -10,8 +11,8 @@ from __future__ import annotations
 
 # Recorded before the parent parser was split; test_cli_fetch compares it byte for byte.
 SUMMARY_HELP = (
-    "usage: mailvigil summary [-h] [--config FILE] [--domain DOMAIN] [--json]\n"
-    "                         [--lang {en,pt-BR}]\n"
+    "usage: mailvigil summary [-h] [--config FILE] [--domain DOMAIN] [--recursive]\n"
+    "                         [--json] [--lang {en,pt-BR}]\n"
     "                         PATH [PATH ...]\n"
     "\n"
     "Sum up DMARC aggregate reports per sender and per situation.\n"
@@ -26,6 +27,8 @@ SUMMARY_HELP = (
     "                     mailvigil.toml in the current folder, if there is one)\n"
     "  --domain DOMAIN    the domain the reports are about (required when there is\n"
     "                     no configuration file)\n"
+    "  --recursive        also search the subfolders of each folder (up to 8\n"
+    "                     levels, links not followed)\n"
     "  --json             print one JSON document instead of the text (see\n"
     "                     docs/json-schema.md)\n"
     "  --lang {en,pt-BR}  language of the text and of the refusal lines (default:\n"
@@ -34,8 +37,8 @@ SUMMARY_HELP = (
 
 # Same as above, for the command that also has --html.
 VERDICT_HELP = (
-    "usage: mailvigil verdict [-h] [--config FILE] [--domain DOMAIN] [--json]\n"
-    "                         [--lang {en,pt-BR}] [--html] [--output FILE]\n"
+    "usage: mailvigil verdict [-h] [--config FILE] [--domain DOMAIN] [--recursive]\n"
+    "                         [--json] [--lang {en,pt-BR}] [--html] [--output FILE]\n"
     "                         PATH [PATH ...]\n"
     "\n"
     "Say if the domain is ready for p=reject, from DMARC aggregate reports. The\n"
@@ -51,6 +54,8 @@ VERDICT_HELP = (
     "                     mailvigil.toml in the current folder, if there is one)\n"
     "  --domain DOMAIN    the domain the reports are about (required when there is\n"
     "                     no configuration file)\n"
+    "  --recursive        also search the subfolders of each folder (up to 8\n"
+    "                     levels, links not followed)\n"
     "  --json             print one JSON document instead of the text (see\n"
     "                     docs/json-schema.md)\n"
     "  --lang {en,pt-BR}  language of the text and of the refusal lines (default:\n"

@@ -698,7 +698,7 @@ def test_the_public_functions_work_together(tmp_path: Path, make_report_xml: _Ma
     # entry points as a caller would, without reaching into a submodule.
     path = _attachment(tmp_path, "a", make_report_xml())
 
-    (source,), skipped = discover([tmp_path])
+    (source,), skipped, _ = discover([tmp_path])
     found = source.path
     report = parse_report(read_xml(found), source=found.name)
 
@@ -713,3 +713,36 @@ def test_the_public_functions_work_together(tmp_path: Path, make_report_xml: _Ma
     assert MAX_TEXT == 255
     with pytest.raises(ReportRefused):
         parse_report(b"<other/>")
+
+
+# ---------------------------------------------------------------------------
+# Subfolders and the files passed over (ADR-9)
+# ---------------------------------------------------------------------------
+
+
+def test_recursive_reads_the_reports_in_subfolders(
+    tmp_path: Path, make_report_xml: _MakeReport
+) -> None:
+    month = tmp_path / "2026-09"
+    month.mkdir()
+    _attachment(tmp_path, "a", make_report_xml(report_id="top"))
+    _attachment(month, "b", make_report_xml(report_id="month"))
+
+    flat = ingest([tmp_path], "example.com")
+    deep = ingest([tmp_path], "example.com", recursive=True)
+
+    assert [report.report_id for report in flat.reports] == ["top"]
+    assert [report.report_id for report in deep.reports] == ["top", "month"]
+
+
+def test_the_files_passed_over_by_name_reach_the_result(
+    tmp_path: Path, make_report_xml: _MakeReport
+) -> None:
+    _attachment(tmp_path, "a", make_report_xml())
+    (tmp_path / "renamed.xml").write_bytes(make_report_xml(report_id="renamed"))
+
+    result = ingest([tmp_path], "example.com")
+
+    assert len(result.reports) == 1
+    assert result.passed_over == 1
+    assert ingest([tmp_path / "renamed.xml"], "example.com").passed_over == 0

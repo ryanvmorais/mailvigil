@@ -182,11 +182,13 @@ class LeftOut:
         skipped (int): Files that were refused (unsafe, too large, malformed, unreadable...).
         duplicates (int): Reports dropped as already seen.
         other_domain (int): Reports that belong to another domain.
+        passed_over (int): Files a folder search did not read, for their name.
     """
 
     skipped: int = 0
     duplicates: int = 0
     other_domain: int = 0
+    passed_over: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -406,5 +408,6 @@ def judge(summary: Summary, now: datetime | None = None) -> Verdict:
             skipped=len(summary.skipped),
             duplicates=summary.duplicates,
             other_domain=summary.other_domain,
+            passed_over=summary.passed_over,
         ),
     )

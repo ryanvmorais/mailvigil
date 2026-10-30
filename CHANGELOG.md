@@ -9,6 +9,15 @@ All notable changes to MailVigil are written here. The format follows
 
 ### Added
 
+- **`--recursive` searches the subfolders of a folder, and a report renamed on download is no longer
+  silent.** `summary` and `verdict` read a folder one level deep, only for the providers' names, so
+  reports kept in a folder per month were not found. `--recursive` goes down up to 8 levels, in name
+  order, and never enters a linked folder. A `.zip`, `.gz` or `.xml` file that a folder search did
+  not read because of its name is now counted: "passed over by name" in the left-out block of the
+  summary (only when there is one), in the left-out sentence of the verdict and the HTML page, and
+  as the new `passed_over` integer in the two `--json` documents (`left_out.passed_over` in the
+  verdict). The "no report found" message names the option.
+
 - **`fetch --cafile FILE` trusts a private certificate authority.** A mail server behind a company
   or home-lab authority was refused with `certificate_invalid`, and the only way out was to change
   the machine's trust store. The PEM file now adds its authorities to the system's, and the

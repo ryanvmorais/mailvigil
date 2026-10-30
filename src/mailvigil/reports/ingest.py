@@ -165,7 +165,12 @@ def _documents(source: Source) -> Iterator[_Document | SkippedFile]:
 # ---------------------------------------------------------------------------
 
 
-def ingest(paths: Sequence[Path], domain: str, now: datetime | None = None) -> IngestionResult:
+def ingest(
+    paths: Sequence[Path],
+    domain: str,
+    now: datetime | None = None,
+    recursive: bool = False,
+) -> IngestionResult:
     """
     Read every report under the given paths that belongs to a domain.
 
@@ -178,11 +183,14 @@ def ingest(paths: Sequence[Path], domain: str, now: datetime | None = None) -> I
             ends more than ``FUTURE_TOLERANCE`` after it is refused (``INVALID_FIELD``), so a
             report cannot claim to be the latest policy by dating itself ahead. ``None`` skips the
             check, which keeps the function free of a clock. Default: ``None``.
+        recursive (bool, optional): ``True`` to search the subfolders of each folder too.
+            Default: ``False``.
 
     Returns:
         IngestionResult: The reports kept in discovery order, the files refused with their reasons,
-            how many reports were dropped as duplicates and how many belonged to another domain.
-            Returned even when nothing was kept.
+            how many reports were dropped as duplicates, how many belonged to another domain and
+            how many files the folder search passed over by name. Returned even when nothing was
+            kept.
 
     Raises:
         ValueError: When ``domain`` is empty. That is a mistake in the caller, not a bad input file.
@@ -191,7 +199,7 @@ def ingest(paths: Sequence[Path], domain: str, now: datetime | None = None) -> I
     if not wanted:
         raise ValueError("domain must not be empty")
 
-    sources, discovery_skipped = discover(paths)
+    sources, discovery_skipped, passed_over = discover(paths, recursive)
     skipped = list(discovery_skipped)
     reports: list[Report] = []
     seen: set[tuple[str, str]] = set()
@@ -233,4 +241,4 @@ def ingest(paths: Sequence[Path], domain: str, now: datetime | None = None) -> I
             seen.add(key)
             reports.append(report)
 
-    return IngestionResult(tuple(reports), tuple(skipped), duplicates, other_domain)
+    return IngestionResult(tuple(reports), tuple(skipped), duplicates, other_domain, passed_over)

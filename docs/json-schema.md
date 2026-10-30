@@ -59,6 +59,7 @@ The keys, in order.
 | `skipped_by_reason` | list of `skipped_by_reason` | The refusals per reason, the most frequent first |
 | `duplicates` | integer | Reports dropped as already seen |
 | `other_domain` | integer | Reports dropped for belonging to another domain |
+| `passed_over` | integer | Files a folder search did not read because the name is not a provider's, although the suffix is `.zip`, `.gz` or `.xml` |
 
 ### `summary.config`
 
@@ -212,6 +213,7 @@ What the summary did not count. It never changes the answer.
 | `skipped` | integer | Files that were refused |
 | `duplicates` | integer | Reports dropped as already seen |
 | `other_domain` | integer | Reports that belong to another domain |
+| `passed_over` | integer | Files a folder search did not read because of their name |
 
 ## Examples
 
@@ -368,7 +370,8 @@ Both use invented data: `example.com`, a made-up service and the documentation a
     }
   ],
   "duplicates": 1,
-  "other_domain": 0
+  "other_domain": 0,
+  "passed_over": 0
 }
 ```
 
@@ -480,7 +483,8 @@ Both use invented data: `example.com`, a made-up service and the documentation a
   "left_out": {
     "skipped": 0,
     "duplicates": 0,
-    "other_domain": 2
+    "other_domain": 2,
+    "passed_over": 0
   }
 }
 ```

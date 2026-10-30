@@ -161,7 +161,10 @@ rede. Só o `fetch` se conecta a um servidor (veja [Fetch](#fetch)).
 Uma pasta é vasculhada, um nível de profundidade, apenas atrás dos nomes que os provedores usam nos
 anexos (`provedor!dominio!inicio!fim.zip`, também `.gz` e `.xml`) e dos arquivos `.eml` e `.mbox`,
 cujos anexos de relatório são extraídos das mensagens em memória. Um arquivo nomeado na linha de
-comando é lido seja qual for o nome.
+comando é lido seja qual for o nome. Acrescente `--recursive` para vasculhar também as subpastas
+(até 8 níveis; uma pasta que é link não é percorrida). Um arquivo `.zip`, `.gz` ou `.xml` com outro
+nome não é lido, mas o bloco "left out" o conta como "passed over by name" (ignorado pelo nome), e
+um relatório renomeado não passa em silêncio: nomeie o arquivo para lê-lo.
 
 Os textos de exemplo abaixo estão em português porque levam `--lang pt-BR`. Sem essa opção, o
 texto sai em inglês, com as mesmas linhas e os mesmos números.

@@ -226,7 +226,13 @@ adds the reading layer; it does not add a command (Resolved decision 5).
   **When** paths are discovered
   **Then** only regular files whose name follows the providers' attachment pattern
   (`provider!domain!begin!end….zip|gz|xml`, with a possible `(1)` suffix) are read; everything else
-  in the folder is ignored silently.
+  in the folder is ignored silently, except that the files with a report's suffix (`.zip`, `.gz`,
+  `.xml`) whose name did not qualify are counted.
+- **Given** a folder and the `--recursive` option (ADR-9, issue #80)
+  **When** paths are discovered
+  **Then** the subfolders are searched too, down to 8 levels below the folder named, by the same
+  rules; a subfolder that is a link or a junction is not entered, and one that cannot be listed is
+  skipped as `UNREADABLE` while the rest is still read.
 - **Given** the same file reachable through two of the given paths
   **When** paths are discovered
   **Then** it is read once.
@@ -355,7 +361,7 @@ and are Resolved decisions 5 to 10.
    and adding a field after the model is in use ripples through every caller.
 7. **A zip with more than one `.xml` member is refused.** A report zip has one; more is suspicious.
 8. **No recursion into subfolders.** A `--recursive` flag can come with the command (spec `004`)
-   if someone asks.
+   if someone asks. Someone did (issue #80): ADR-9 of the design adds it, opt-in.
 9. **The domain filter is an exact, case-insensitive match.** `mail.example.com` is not
    `example.com`. Revisit with the configuration (spec `003`) if a real case appears.
 10. **Both report generations are read.** RFC 9990 (published, obsoletes RFC 7489) puts `feedback`

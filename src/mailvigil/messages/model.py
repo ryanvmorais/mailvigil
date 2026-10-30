@@ -137,6 +137,7 @@ class SummaryMessages:
         key_skipped (str): The label of the skipped files.
         key_duplicates (str): The label of the duplicates.
         key_other_domains (str): The label of the reports of other domains.
+        key_passed_over (str): The label of the files a folder search passed over by name.
         reasons (Mapping[Reason, str]): One phrase per refusal of a file.
         skipped_more (str): The line that counts the files a list left out; ``{n}``.
     """
@@ -179,6 +180,7 @@ class SummaryMessages:
     key_skipped: str
     key_duplicates: str
     key_other_domains: str
+    key_passed_over: str
     reasons: Mapping[Reason, str]
     skipped_more: str
 
@@ -227,6 +229,7 @@ class VerdictMessages:
         skipped_file (Plural): ``{n}`` files skipped.
         duplicate (Plural): ``{n}`` duplicates.
         other_domain (Plural): ``{n}`` reports of another domain.
+        passed_over (Plural): ``{n}`` files passed over by name.
         left_out (str): The sentence about what was not counted; ``{parts}``.
         caveat (str): The sentence that closes every verdict.
     """
@@ -266,6 +269,7 @@ class VerdictMessages:
     skipped_file: Plural
     duplicate: Plural
     other_domain: Plural
+    passed_over: Plural
     left_out: str
     caveat: str
 
@@ -285,7 +289,7 @@ class RefusalMessages:
             writes in English, is kept after the phrase and the key.
         no_reports (str): The first line of the no-reports explanation; ``{domain}``.
         no_file_found (str): The line when no report file was found at all.
-        no_file_hint (str): How a folder is searched, and how to read a renamed file.
+        no_file_hint (str): How a folder is searched, and how to read a renamed file or a subfolder.
         output_failed (str): ``--output`` could not write the page; ``{path}`` and ``{reason}``,
             the system's own words for it.
     """

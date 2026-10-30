@@ -865,6 +865,10 @@ def test_nothing_left_out_prints_no_line_and_no_section() -> None:
             "Left out of this verdict: 3 reports of other domains. mailvigil summary shows why.",
         ),
         (
+            LeftOut(passed_over=1),
+            "Left out of this verdict: 1 file passed over by name. mailvigil summary shows why.",
+        ),
+        (
             LeftOut(skipped=2, duplicates=1, other_domain=3),
             "Left out of this verdict: 2 files skipped, 1 duplicate, 3 reports of other domains. "
             "mailvigil summary shows why.",

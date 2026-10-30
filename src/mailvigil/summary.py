@@ -214,6 +214,8 @@ class Summary:
             most frequent first. Default: none.
         duplicates (int): Reports dropped as already seen. Default: 0.
         other_domain (int): Reports dropped for belonging to another domain. Default: 0.
+        passed_over (int): Files a folder search did not read for a name that is not the
+            providers', although the suffix is a report's. Default: 0.
         days (tuple[DayCounts, ...]): The messages per UTC day a report begins on, sorted by day,
             only the days on which a report begins; internal, the ``--json`` documents do not carry
             it. Default: none.
@@ -239,6 +241,7 @@ class Summary:
     skipped_by_reason: tuple[tuple[Reason, int], ...] = ()
     duplicates: int = 0
     other_domain: int = 0
+    passed_over: int = 0
     days: tuple[DayCounts, ...] = ()
     covered: tuple[tuple[date, date], ...] = ()
     reporter_activity: tuple[ReporterActivity, ...] = ()
@@ -689,6 +692,7 @@ def summarize(result: IngestionResult, config: Config) -> Summary:
         ),
         duplicates=result.duplicates,
         other_domain=result.other_domain,
+        passed_over=result.passed_over,
         days=tuple(
             DayCounts(day, day_reports[day], day_tallies[day].freeze())
             for day in sorted(day_tallies)
