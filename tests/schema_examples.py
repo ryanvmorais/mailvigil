@@ -1,7 +1,7 @@
 """
 The values behind the examples of ``docs/json-schema.md`` (spec 006, RF-03).
 
-The page shows the real output for these two values, and ``test_json_schema_doc.py`` rebuilds it
+The page shows the real output for these three values, and ``test_json_schema_doc.py`` rebuilds it
 from here and compares it field by field. Everything is invented: ``example.com``, the service
 ``Example Mailer`` and the documentation addresses (RNF-06).
 """
@@ -12,6 +12,7 @@ from pathlib import Path
 
 from tests.test_render_json import make_summary
 
+from mailvigil.fetch.model import FetchOutcome
 from mailvigil.reports import Reason, SkippedFile
 from mailvigil.senders import Outcome
 from mailvigil.summary import Counts, FailingSource, SenderRow, Summary
@@ -84,3 +85,13 @@ def example_verdict() -> Verdict:
     return judge(
         make_summary(days=29, ok=6000, dkim_only=950, failing=failing, sp="reject", other_domain=2)
     )
+
+
+def example_fetch() -> FetchOutcome:
+    """
+    Build the outcome of the example: nine saved, two already on disk and one left for later.
+
+    Returns:
+        FetchOutcome: The six numbers.
+    """
+    return FetchOutcome(matched=12, saved=9, already=2, too_large=0, skipped=0, left=1)

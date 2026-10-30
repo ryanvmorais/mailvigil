@@ -1,13 +1,14 @@
 # JSON output reference
 
-`mailvigil summary --json` and `mailvigil verdict --json` print one JSON document on standard
-output, a newline, and nothing on standard error. This page lists every field, the promise about
-how the fields may change, and one example per command. The examples are the real output for
-invented data, and a test compares them with the code, so this page cannot drift from it.
+`mailvigil summary --json`, `mailvigil verdict --json` and `mailvigil fetch --json` print one JSON
+document on standard output, a newline, and nothing on standard error. This page lists every field,
+the promise about how the fields may change, and one example per command. The examples are the real
+output for invented data, and a test compares them with the code, so this page cannot drift from it.
 
 ## The promise
 
-- Every document starts with `schema_version` (an integer, `1` today), `command` and `domain`.
+- Every document starts with `schema_version` (an integer, `1` today) and `command`. The `summary`
+  and `verdict` documents go on with `domain`; the `fetch` document is about a mailbox and has none.
 - A field is only **added** inside a `schema_version`; a consumer must ignore keys it does not know.
 - A field is **renamed, removed or given another type** only with a new `schema_version`.
 - Keys come in a fixed order, and lists come in the order stated below; the same reports give the
@@ -23,14 +24,14 @@ invented data, and a test compares them with the code, so this page cannot drift
 
 | Code | Meaning | Commands |
 |---|---|---|
-| `0` | An answer was printed; for `verdict`, the answer is `ready` | both |
-| `1` | The run was refused: invalid configuration or domain, or no report kept | both |
-| `2` | Usage error | both |
+| `0` | An answer was printed; for `verdict`, the answer is `ready`; for `fetch`, the run finished, even with nothing new | all |
+| `1` | The run was refused: invalid configuration or domain, no report kept, or (for `fetch`) a connection or login refusal | all |
+| `2` | Usage error | all |
 | `3` | `verdict` printed `too early` | `verdict` |
 | `4` | `verdict` printed `not ready` | `verdict` |
-| `70` | Internal error (a bug); one line on standard error, no document | both |
-| `130` | Interrupted with Ctrl+C; no document | both |
-| `141` | The output pipe was closed | both |
+| `70` | Internal error (a bug); one line on standard error, no document | all |
+| `130` | Interrupted with Ctrl+C; no document | all |
+| `141` | The output pipe was closed | all |
 
 A refused run (`1`) prints no document: standard output is empty and the one line goes to standard
 error. A `too early` or `not ready` verdict still prints the full document.
@@ -215,9 +216,31 @@ What the summary did not count. It never changes the answer.
 | `other_domain` | integer | Reports that belong to another domain |
 | `passed_over` | integer | Files a folder search did not read because of their name |
 
+## The `fetch` document
+
+`mailvigil fetch --json` replaces the text of a finished run with this document. A refused run
+prints no document, as above; the files it had already saved are valid, and the one line on
+standard error says how many there are. The document holds no host, user, folder or path.
+
+### `fetch`
+
+The keys, in order. The six numbers always add up: `matched` equals `saved + already + too_large +
+skipped + left`.
+
+| Key | Type | Meaning |
+|---|---|---|
+| `schema_version` | integer | `1` |
+| `command` | string | `"fetch"` |
+| `matched` | integer | Messages the server listed for the search, plus the tokens it sent that were not valid UIDs |
+| `saved` | integer | Messages written in this run |
+| `already` | integer | Messages found on disk by name and so not downloaded |
+| `too_large` | integer | Messages over the size cap, announced or cut while arriving |
+| `skipped` | integer | A UID that could not be used, or a message the server would not give |
+| `left` | integer | New messages beyond `--limit` or the deadline, for a later run |
+
 ## Examples
 
-Both use invented data: `example.com`, a made-up service and the documentation address ranges.
+All three use invented data: `example.com`, a made-up service and the documentation address ranges.
 
 ### A summary
 
@@ -486,5 +509,20 @@ Both use invented data: `example.com`, a made-up service and the documentation a
     "other_domain": 2,
     "passed_over": 0
   }
+}
+```
+
+### A fetch
+
+```json
+{
+  "schema_version": 1,
+  "command": "fetch",
+  "matched": 12,
+  "saved": 9,
+  "already": 2,
+  "too_large": 0,
+  "skipped": 0,
+  "left": 1
 }
 ```

@@ -21,7 +21,8 @@ from types import MappingProxyType
 import pytest
 
 from mailvigil.config import Config
-from mailvigil.render_json import dumps, summary_document, verdict_document
+from mailvigil.fetch.model import FetchOutcome
+from mailvigil.render_json import dumps, fetch_document, summary_document, verdict_document
 from mailvigil.reports import (
     DkimResult,
     IngestionResult,
@@ -680,3 +681,39 @@ def test_dumps_refuses_a_value_that_is_not_json() -> None:
     """``NaN`` would be invalid JSON; it must be an error, not output."""
     with pytest.raises(ValueError, match="Out of range float"):
         dumps({"value": float("nan")})
+
+
+# ---------------------------------------------------------------------------
+# The fetch document (spec 009, ADR-11)
+# ---------------------------------------------------------------------------
+
+
+def test_the_fetch_document_is_the_six_numbers_in_the_documented_order() -> None:
+    """``schema_version`` and ``command`` lead, there is no ``domain`` and no path."""
+    outcome = FetchOutcome(matched=12, saved=9, already=2, too_large=0, skipped=0, left=1)
+
+    document = fetch_document(outcome)
+
+    assert list(document) == [
+        "schema_version",
+        "command",
+        "matched",
+        "saved",
+        "already",
+        "too_large",
+        "skipped",
+        "left",
+    ]
+    assert document["schema_version"] == 1
+    assert document["command"] == "fetch"
+    assert [document[key] for key in list(document)[2:]] == [12, 9, 2, 0, 0, 1]
+
+
+def test_the_fetch_document_is_ascii_json_that_dumps_cleanly() -> None:
+    """The same writer as the other documents: ASCII, parseable, the numbers as integers."""
+    outcome = FetchOutcome(matched=3, saved=1, already=1, too_large=0, skipped=0, left=1)
+
+    text = dumps(fetch_document(outcome))
+
+    assert text.isascii()
+    assert json.loads(text)["saved"] == 1

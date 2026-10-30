@@ -13,9 +13,9 @@ import json
 import re
 from pathlib import Path
 
-from tests.schema_examples import CONFIG_SOURCE, example_summary, example_verdict
+from tests.schema_examples import CONFIG_SOURCE, example_fetch, example_summary, example_verdict
 
-from mailvigil.render_json import summary_document, verdict_document
+from mailvigil.render_json import fetch_document, summary_document, verdict_document
 
 _PAGE = Path(__file__).resolve().parent.parent / "docs" / "json-schema.md"
 
@@ -122,6 +122,13 @@ def test_the_verdict_example_is_the_real_output() -> None:
     assert _example("A verdict") == json.loads(json.dumps(real))
 
 
+def test_the_fetch_example_is_the_real_output() -> None:
+    """The page shows what ``fetch_document`` writes for the example values."""
+    real = fetch_document(example_fetch())
+
+    assert _example("A fetch") == json.loads(json.dumps(real))
+
+
 def test_every_key_of_the_summary_document_is_documented_in_order() -> None:
     """No key can reach the summary document, at any level, without a row on the page."""
     documented = _documented_keys()
@@ -153,6 +160,16 @@ def test_every_key_of_the_verdict_document_is_documented_in_order() -> None:
     assert seen == {"verdict", "rule", "source", "note", "left_out"}
 
 
+def test_every_key_of_the_fetch_document_is_documented_in_order() -> None:
+    """No key can reach the fetch document without a row on the page."""
+    documented = _documented_keys()
+    seen: set[str] = set()
+
+    _walk(fetch_document(example_fetch()), "fetch", documented, seen)
+
+    assert seen == {"fetch"}
+
+
 def test_the_page_documents_nothing_the_documents_do_not_use() -> None:
     """Every table of the page describes an object that exists; none is left over."""
     documented = set(_documented_keys())
@@ -172,6 +189,7 @@ def test_the_page_documents_nothing_the_documents_do_not_use() -> None:
         "rule",
         "note",
         "left_out",
+        "fetch",
     }
 
 

@@ -1,13 +1,13 @@
 """
-The JSON documents: ``Summary`` and ``Verdict`` as data a script can rely on.
+The JSON documents: ``Summary``, ``Verdict`` and ``FetchOutcome`` as data a script can rely on.
 
-``summary_document`` and ``verdict_document`` turn the frozen values into plain ``dict``s, key by
-key, and ``dumps`` writes one as JSON. The mapping is written by hand, type by type, so the public
-shape is a decision and not a by-product of the field names of the model (ADR-2): a field renamed
-inside ``summary.py`` does not change the contract. Nothing is computed here: every number is read
-from the value it came from, a share is never a field (RF-02), and a value the model may not have
-is ``null``, never missing and never an empty string (RF-03). There is no sentence and no language
-in a document, so nothing in this module imports a text module.
+``summary_document``, ``verdict_document`` and ``fetch_document`` turn the frozen values into plain
+``dict``s, key by key, and ``dumps`` writes one as JSON. The mapping is written by hand, type by
+type, so the public shape is a decision and not a by-product of the field names of the model
+(ADR-2): a field renamed inside ``summary.py`` does not change the contract. Nothing is computed
+here: every number is read from the value it came from, a share is never a field (RF-02), and a
+value the model may not have is ``null``, never missing and never an empty string (RF-03). There is
+no sentence and no language in a document, so nothing in this module imports a text module.
 """
 
 from __future__ import annotations
@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 from typing import Final
 
+from mailvigil.fetch.model import FetchOutcome
 from mailvigil.reports import PolicyPublished, SkippedFile
 from mailvigil.summary import Counts, FailingSource, Period, SenderRow, Summary
 from mailvigil.verdict import LeftOut, Note, Rule, RuleId, Verdict
@@ -302,6 +303,32 @@ def verdict_document(verdict: Verdict) -> dict[str, object]:
         "unrecognized_failing": [_source(source) for source in verdict.unrecognized_failing],
         "notes": [_note(note) for note in verdict.notes],
         "left_out": _left_out(verdict.left_out),
+    }
+
+
+def fetch_document(outcome: FetchOutcome) -> dict[str, object]:
+    """
+    Write what a finished ``fetch`` run did as data: the six numbers and nothing else.
+
+    The document has no ``domain`` (the command is about a mailbox, not a domain) and no folder,
+    host or user: those are the caller's own words and a path of the machine is not part of a
+    document. A refused run has no document (spec 009, ADR-11).
+
+    Args:
+        outcome (FetchOutcome): The six numbers of the run.
+
+    Returns:
+        dict[str, object]: The document, its keys in the order of ``docs/json-schema.md``.
+    """
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "command": "fetch",
+        "matched": outcome.matched,
+        "saved": outcome.saved,
+        "already": outcome.already,
+        "too_large": outcome.too_large,
+        "skipped": outcome.skipped,
+        "left": outcome.left,
     }
 
 

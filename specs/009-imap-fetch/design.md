@@ -39,7 +39,8 @@ mailvigil fetch ─▶ cli_fetch.run_fetch (lazy import) ─▶ password (getpas
 - **`cli_fetch.py`** holds the `fetch` subcommand (in `cli.py` until #82). `imaplib` is imported
   inside `run_fetch`, never at the top of the module, so `summary` and `verdict` cannot load it
   (ADR-7, RF-09).
-- **Output:** a `FetchMessages` block in the catalog, one text renderer, no JSON (open question 4).
+- **Output:** a `FetchMessages` block in the catalog and one text renderer; `--json` was added
+  later by ADR-11.
 
 ## Module layout
 
@@ -252,7 +253,8 @@ mailvigil fetch --host HOST --user NAME --to DIR
 | `--lang` | the same parent parser as `summary` and `verdict` (ADR-7) |
 
 Exit codes are the existing contract, no new code: `0` completed (even with nothing new), `1`
-refused (any `FetchRefused`), `2` usage. There is no `--json` and no `--insecure`.
+refused (any `FetchRefused`), `2` usage. `--json` (ADR-11) prints the outcome as data; there is no
+`--insecure`.
 
 The help of `fetch` says: it connects to a server; it only reads (it never changes, moves or
 deletes mail and does not mark it read); the password is asked for or read from a file and is never
@@ -430,12 +432,41 @@ an argument, a variable or a stored value; the certificate is always checked.
   authority is the library's, so the tests pin the contents and the checks of the context rather
   than a handshake.
 
+### ADR-11 — `fetch --json` prints the six numbers and nothing else (amendment of 2026-10-30, issue #75)
+
+- **Decision:** `fetch --json` replaces the text of a finished run with one document, written by
+  `render_json.fetch_document` and `dumps` like the other two: `schema_version`, `command`
+  (`"fetch"`) and the six integers of `FetchOutcome` in the order `matched`, `saved`, `already`,
+  `too_large`, `skipped`, `left`. The document has no `domain` (the command is about a mailbox),
+  and no host, user or folder: those are what the caller typed, a path of the machine is not part
+  of a document (006, RF-03), and the caller has them already. A refused run prints no document,
+  exactly as for `summary` and `verdict`: standard output is empty, one line goes to standard
+  error and the exit is `1`. `--lang` is accepted and changes nothing, as with the other
+  documents (006, ADR-6). No exit code is new. The shared promise of `docs/json-schema.md` stops
+  saying that every document has `domain`; it says `schema_version` and `command`, and that
+  `summary` and `verdict` go on with `domain`.
+- **Alternatives:** put `host`, `folder` and `since` in the document, which helps a log that
+  collects several runs but copies the user's words into a contract and tempts a consumer to key
+  on them; a document for a refused run (`{"refused": reason}`), which would be the first document
+  on a non-zero exit and so a different promise from the other two commands; the files saved before
+  a refusal as a field, which needs that document.
+- **Why:** open question 4 said "revisit if someone needs it". A scheduled job reads the numbers
+  to decide what to do next (nothing new, a backlog in `left`), and parsing a translated text for
+  that is what `--json` exists to avoid. Six integers that always add up are the whole outcome, so
+  the document is small and a field added later (`schema_version` stays `1`) breaks nobody.
+- **Trade-off:** a script cannot read how many files a refused run had saved before it stopped; the
+  second line on standard error says it for a person, and the next successful run counts those
+  files as `already`. If a consumer needs it, a refusal document is a new decision with a new
+  field, not a change of this one. The `[fetch]` configuration table of the same issue is a
+  separate step and does not change this document.
+
 ## Impact
 
 - **New:** the `fetch/` package, `render_fetch.py`, the `fetch` subcommand, twelve reason sentences
   and the outcome texts in two languages. `[project].dependencies` stays empty.
 - **Changed:** `cli.py` (subcommand, split parent parser, lazy import), `messages/`, `.gitignore`.
-  The `--json` documents, `docs/json-schema.md` and the exit codes do not change.
+  The `--json` documents of `summary` and `verdict` and the exit codes do not change (`fetch --json`
+  and its page in `docs/json-schema.md` came later, ADR-11).
 - **Docs:** README gets a `fetch` section with the provider limits (Gmail with an app password,
   Microsoft 365 not supported, no OAuth); CLAUDE.md gets the architecture lines and the
   ⚠️ "`imaplib` only in `fetch/imap.py`; never an unverified context"; `docs/stack.md` gets
