@@ -7,7 +7,7 @@ This file guides Claude Code (claude.ai/code) when working in this repository.
 MailVigil is an open-source command-line tool that reads DMARC aggregate reports (RUA, usually
 `.zip`, `.gz` or `.xml`, or still attached to the mail in an `.eml` or `.mbox`) and says, in plain
 language, who is sending mail as a domain and whether it is safe to move the policy to `p=reject`. Python `>=3.12`, standard library only (zero runtime
-dependencies), offline. Version 1.1.2 is on PyPI (1.0.0 was published by the maintainer on 2026-10-29, 1.1.0, 1.1.1 and 1.1.2 on 2026-10-30; `v0.1` to `v0.9` are the milestones of the build, see the README): the CLI answers `mailvigil --version`, `mailvigil summary`
+dependencies), offline. Version 1.2.0 is on PyPI (1.0.0 was published by the maintainer on 2026-10-29, 1.1.0, 1.1.1, 1.1.2 and 1.2.0 on 2026-10-30; `v0.1` to `v0.9` are the milestones of the build, see the README): the CLI answers `mailvigil --version`, `mailvigil summary`
 and `mailvigil verdict` (report ingestion, configuration, sender identification, the summary, the
 verdict on `p=reject` and their texts are built and wired); `--json`, `--lang en|pt-BR` and the stable
 exit codes (a public contract, `docs/json-schema.md`) are built (spec 006 is done), and so is the
@@ -71,7 +71,7 @@ src/mailvigil/
                      # (resolve_config, ingest → summarize → render, exit 0/1/2) and `verdict` (same
                      # load, then judge → render_verdict; exit 0 ready, 3 too early, 4 not ready);
                      # the exit code is decided before the format; a parent parser shares
-                     # paths/--config/--domain/--json/--lang (`--lang` is parsed to a Messages);
+                     # paths/--config/--domain/--recursive/--json/--lang (`--lang` is parsed to a Messages);
                      # `--html` exists on `verdict` only and is refused together with `--json`;
                      # `--output FILE` (ADR-11) needs `--html` and `_write_page` writes it atomically;
                      # `fetch` (spec 009) is added by `cli_fetch.add_fetch_parser` and run by
