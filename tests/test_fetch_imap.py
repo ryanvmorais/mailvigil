@@ -653,7 +653,9 @@ def test_plain_sends_one_base64_response_with_the_utf8_credentials(
     imap._sign_in(connection, "usér", "sénha")
     peer.close()
 
-    assert base64.b64decode(peer.received[-1]) == "\0usér\0sénha".encode()
+    # Newer ``imaplib`` asks for ``CAPABILITY`` again after the login, so the response is not last.
+    start = next(i for i, line in enumerate(peer.received) if line.endswith(b"AUTHENTICATE PLAIN"))
+    assert base64.b64decode(peer.received[start + 1]) == "\0usér\0sénha".encode()
     assert not any(line.startswith(b"LOGIN") for line in peer.commands())
 
 
