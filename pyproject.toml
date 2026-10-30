@@ -96,8 +96,19 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 # pycodestyle, pyflakes, isort, pyupgrade, bugbear, flake8-simplify,
-# flake8-comprehensions, ruff-native.
-select = ["E", "F", "I", "UP", "B", "SIM", "C4", "RUF"]
+# flake8-comprehensions, ruff-native, flake8-bandit (security).
+select = ["E", "F", "I", "UP", "B", "SIM", "C4", "RUF", "S"]
+
+[tool.ruff.lint.per-file-ignores]
+# The names say "password", the values are never one: an enum member, a message key.
+"src/mailvigil/fetch/errors.py" = ["S105"]  # FetchReason members: PASSWORD_FILE, PASSWORD_UNUSABLE
+"src/mailvigil/messages/*.py" = ["S106"]  # Messages fields: result_pass, password_file_exposed
+# Our own hooks and demo script run fixed commands (`git`, the venv's tools, this interpreter).
+".claude/hooks/*.py" = ["S603", "S607"]
+"docs/demo/*.py" = ["S603"]
+# Pytest: `assert` is the idiom, the secrets are invented, the subprocesses run this interpreter or
+# `git` on fixtures, and the XML parsed is the repository's own synthetic reports.
+"tests/**/*.py" = ["S101", "S105", "S106", "S314", "S603"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["mailvigil"]
@@ -112,7 +123,10 @@ target-version = ["py312"]
 python_version = "3.12"
 strict = true
 warn_unreachable = true
-# Type-checking covers the shipped package only; `tests/` is exercised by pytest.
+# Type-checking covers the shipped package only; `tests/` is exercised by pytest. Strict over the
+# tests reports about a hundred errors (helpers that build frozen dataclasses from `**fields`, spies
+# that replace methods), none of them a bug the suite would miss. The `# type: ignore[...]` comments
+# in the tests are therefore for the editor's checker (Pylance), not for mypy; keep them as they are.
 files = ["src"]
 
 # --- Coverage (pytest-cov) -------------------------------------------------
