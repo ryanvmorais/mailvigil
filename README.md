@@ -396,7 +396,7 @@ change), `--help` stays in English, and neither the language nor `--json` change
 
 ## Development
 
-Python 3.12 is the floor (CI tests 3.12 and the newest stable release). The quality gate runs
+Python 3.12 is the floor (CI tests 3.12 to 3.15, on Linux and on Windows). The quality gate runs
 before every commit through a versioned hook:
 
 ```bash

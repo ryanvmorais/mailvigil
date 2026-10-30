@@ -7,7 +7,7 @@ This file guides Claude Code (claude.ai/code) when working in this repository.
 MailVigil is an open-source command-line tool that reads DMARC aggregate reports (RUA, usually
 `.zip`, `.gz` or `.xml`, or still attached to the mail in an `.eml` or `.mbox`) and says, in plain
 language, who is sending mail as a domain and whether it is safe to move the policy to `p=reject`. Python `>=3.12`, standard library only (zero runtime
-dependencies), offline. Version 1.0.0 is on PyPI (published by the maintainer on 2026-10-29; `v0.1` to `v0.9` are the milestones of the build, see the README): the CLI answers `mailvigil --version`, `mailvigil summary`
+dependencies), offline. Version 1.1.0 is on PyPI (1.0.0 was published by the maintainer on 2026-10-29, 1.1.0 on 2026-10-30; `v0.1` to `v0.9` are the milestones of the build, see the README): the CLI answers `mailvigil --version`, `mailvigil summary`
 and `mailvigil verdict` (report ingestion, configuration, sender identification, the summary, the
 verdict on `p=reject` and their texts are built and wired); `--json`, `--lang en|pt-BR` and the stable
 exit codes (a public contract, `docs/json-schema.md`) are built (spec 006 is done), and so is the
@@ -133,8 +133,9 @@ tests/               # pytest, one test file per module (test_reports_*.py incl.
                      # test_cli_verdict.py, test_cli_json.py, test_cli_lang.py,
                      # test_cli_exit_codes.py, test_cli_mail.py, test_htmlkit.py, test_html_style.py,
                      # test_html_charts.py, test_render_html.py, test_render_html_hostile.py,
-                     # test_cli_html.py, test_fetch_*.py, test_render_fetch.py,
-                     # test_cli_fetch.py, test_smoke.py, test_gitignore.py, test_readme_pt_br.py and
+                     # test_cli_html.py, test_cli_html_output.py, test_fetch_*.py,
+                     # test_render_fetch.py, test_cli_fetch.py, test_smoke.py, test_gitignore.py,
+                     # test_readme_pt_br.py, test_readme_links.py and
                      # test_offline_isolation.py, which runs fresh interpreters to prove that
                      # summary and verdict never load the network code); fixtures are synthetic,
                      # built in conftest.py, cli_helpers.py, mail_helpers.py, schema_examples.py,
@@ -145,6 +146,7 @@ specs/               # spec-driven development: requirements → design → task
 docs/stack.md        # each technology of the stack, why it was chosen, what to study first
 docs/json-schema.md  # every field of the two --json documents and the compatibility promise
 docs/stability.md    # what is public (commands, exit codes, JSON, config) and what is not; deprecation
+docs/releasing.md    # the maintainer's release steps (PyPI trusted publishing, TestPyPI dry run)
 CHANGELOG.md         # Keep a Changelog; a change a user would notice goes in [Unreleased] in the same PR
 scripts/             # benchmark_ingest.py: times the reading of synthetic reports (not a test; issue #70)
 docs/demo/           # build_demo.py makes the invented reports and runs the CLI to write verdict.cast,
@@ -153,7 +155,8 @@ docs/demo/           # build_demo.py makes the invented reports and runs the CLI
                      # docs/images/ holds the README pictures
 .githooks/           # versioned pre-commit hook (core.hooksPath)
 .claude/             # Claude Code hooks: format on edit, validate at turn end, guard uv.lock
-.github/             # CI, CodeQL, dependency review, weekly pip-audit, Dependabot, issue/PR templates
+.github/             # CI, CodeQL, dependency review, weekly pip-audit, the release workflow (release.yml),
+                     # Dependabot, issue/PR templates
 uv.lock              # never edit by hand (generated; a hook blocks it)
 ```
 
