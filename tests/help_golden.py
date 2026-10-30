@@ -35,7 +35,7 @@ SUMMARY_HELP = (
 # Same as above, for the command that also has --html.
 VERDICT_HELP = (
     "usage: mailvigil verdict [-h] [--config FILE] [--domain DOMAIN] [--json]\n"
-    "                         [--lang {en,pt-BR}] [--html]\n"
+    "                         [--lang {en,pt-BR}] [--html] [--output FILE]\n"
     "                         PATH [PATH ...]\n"
     "\n"
     "Say if the domain is ready for p=reject, from DMARC aggregate reports. The\n"
@@ -57,6 +57,8 @@ VERDICT_HELP = (
     "                     en); the JSON has none\n"
     "  --html             print one self-contained HTML page instead of the text;\n"
     "                     redirect it to a file (mailvigil verdict ... --html >\n"
-    "                     report.html; in Windows PowerShell 5.1 pipe it to Out-\n"
-    "                     File -Encoding ascii); not with --json\n"
+    "                     report.html) or write it with --output; not with --json\n"
+    "  --output FILE      write the --html page to FILE as ASCII, replacing it,\n"
+    "                     instead of printing it (use it in Windows PowerShell 5.1,\n"
+    "                     whose > writes UTF-16); requires --html\n"
 )

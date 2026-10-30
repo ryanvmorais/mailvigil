@@ -258,6 +258,7 @@ _REFUSALS = RefusalMessages(
     no_file_found="Nenhum arquivo de relatorio foi achado. Uma pasta so le nomes como",
     # The pattern is the one the providers use (RFC 7489), so its words stay as they are.
     no_file_hint="provider!domain!begin!end.zip; ou informe o proprio arquivo para le-lo.",
+    output_failed="nao foi possivel gravar {path}: {reason}",
 )
 
 # ---------------------------------------------------------------------------
