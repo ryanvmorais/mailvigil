@@ -363,6 +363,23 @@ coverage on) but has no numeric target.
 
 **Docs:** [docs.pytest.org](https://docs.pytest.org/)
 
+### Hypothesis
+
+Property-based testing, in the `dev` group only (it never reaches the wheel, so the zero-dependency
+promise holds). `tests/test_properties.py` states invariants instead of one answer: whatever bytes a
+report, a message or a configuration file holds, the reading raises only its typed refusal, and a
+report that gets through reaches every output without raising (issue #67). The suite runs a small,
+derandomized profile; the `thorough` profile (`HYPOTHESIS_PROFILE=thorough`) is for a long hunt.
+
+**Why this:** the hand-written hostile tests feed the attacks someone thought of, and 100% coverage
+cannot show what nobody thought of. A plain `random` loop has no shrinking, so a failure is hard to
+read; Hypothesis reduces it to the smallest input that still fails.
+
+**Learn:** `@given` and the strategies (`st.binary`, `st.text`, `st.composite`), shrinking, profiles
+(`settings.register_profile`), and why a function-scoped fixture needs a suppressed health check.
+
+**Docs:** [hypothesis.readthedocs.io](https://hypothesis.readthedocs.io/)
+
 ---
 
 ## Automation and supply chain

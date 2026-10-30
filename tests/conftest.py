@@ -11,11 +11,20 @@ from __future__ import annotations
 
 import gzip
 import io
+import os
 import zipfile
 from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, datetime
 
 import pytest
+from hypothesis import settings
+
+# The property tests (``test_properties.py``) draw their examples from the profile named here. The
+# default is small and derandomized, so the suite stays fast and a red run can be reproduced; the
+# ``thorough`` profile is for a long hunt (set HYPOTHESIS_PROFILE=thorough, then run the file).
+settings.register_profile("default", max_examples=60, derandomize=True, deadline=None)
+settings.register_profile("thorough", max_examples=3000, deadline=None)
+settings.load_profile(os.environ.get("HYPOTHESIS_PROFILE", "default"))
 
 # The RFC 9990 namespace; an RFC 7489 report has no namespace at all.
 _NAMESPACE_9990 = "urn:ietf:params:xml:ns:dmarc-2.0"
