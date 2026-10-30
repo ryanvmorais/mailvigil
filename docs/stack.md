@@ -427,7 +427,7 @@ hands anything back.
 |---|---|
 | `twine` (via `uvx`) | `twine check --strict` in CI: the README renders on PyPI |
 | `coverage` | the engine under pytest-cov; settings in `[tool.coverage.*]` |
-| `json` | `render_json.py` turns the frozen summary and verdict into a `dict` and `json.dumps` writes it with `ensure_ascii=True` (so no console encoding can corrupt it) and `allow_nan=False`. The key order is the order the dict is built in, and it is part of the contract documented in `docs/json-schema.md` (spec 006) |
+| `json` | `render_json.py` turns the frozen summary, verdict and fetch outcome into a `dict` and `json.dumps` writes it with `ensure_ascii=True` (so no console encoding can corrupt it) and `allow_nan=False`. The key order is the order the dict is built in, and it is part of the contract documented in `docs/json-schema.md` (spec 006) |
 | message catalog | `messages/` holds every sentence as frozen dataclasses, one `Messages` per language (`ENGLISH`, `PORTUGUESE`); the renderers take it as a last parameter and read every sentence from it. `Plural` stores the whole phrase for 1 and for any other count, so Portuguese agreement needs no rule. Tests check that both languages have the same fields and placeholders (ADR-3 and ADR-4 of spec 006) |
 | `unicodedata` | drops control, format and line-separator characters from every text of a report, by Unicode category (ADR-6 of spec 002) |
 | `dataclasses`, `enum.StrEnum` | the immutable report model (`frozen=True, slots=True`), the refusal reasons and the verdict's answers, which are plain strings a later spec can translate |

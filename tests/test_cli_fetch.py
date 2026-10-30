@@ -11,6 +11,7 @@ synthetic ones of ``tests/fetch_helpers.py`` (RNF-06).
 from __future__ import annotations
 
 import getpass
+import json
 import os
 import re
 import sys
@@ -384,6 +385,84 @@ def test_the_text_in_portuguese_is_ascii(
     assert code == EXIT_OK
     assert "Salvas:" in out
     assert out.isascii()
+
+
+def test_json_prints_the_six_numbers_as_one_document(
+    tmp_path: Path, password_file: Path, connect: _Connect, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """``--json``: exit 0, one ASCII document and a newline on standard output, nothing else."""
+    code, out, err = _run(_args(tmp_path, password_file, "--json"), capsys)
+
+    assert code == EXIT_OK
+    assert err == ""
+    assert out.isascii()
+    assert out.endswith("}\n")
+    assert json.loads(out) == {
+        "schema_version": 1,
+        "command": "fetch",
+        "matched": 2,
+        "saved": 2,
+        "already": 0,
+        "too_large": 0,
+        "skipped": 0,
+        "left": 0,
+    }
+    assert len(_saved(tmp_path)) == 2
+
+
+def test_json_holds_no_folder_host_or_user(
+    tmp_path: Path, password_file: Path, connect: _Connect, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The document is numbers: what the user typed is not echoed into it."""
+    _code, out, _err = _run(_args(tmp_path, password_file, "--json"), capsys)
+
+    assert str(tmp_path) not in out
+    assert _HOST not in out
+    assert "reports" not in json.loads(out)
+
+
+def test_json_and_the_text_report_the_same_numbers(
+    tmp_path: Path, password_file: Path, connect: _Connect, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A second run, once as text and once as JSON: both say two messages were already saved."""
+    _run(_args(tmp_path, password_file), capsys)
+
+    _code, text, _err = _run(_args(tmp_path, password_file), capsys)
+    _code, out, _err = _run(_args(tmp_path, password_file, "--json"), capsys)
+
+    assert _numbers(text)["Already saved"] == json.loads(out)["already"] == 2
+
+
+def test_json_does_not_depend_on_the_language(
+    tmp_path: Path, password_file: Path, connect: _Connect, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """``--lang`` is accepted with ``--json`` and changes nothing (006, ADR-6)."""
+    _code, english, _err = _run(_args(tmp_path, password_file, "--json"), capsys)
+    arguments = _args(tmp_path, password_file, "--json", "--lang", "pt-BR")
+    _code, portuguese, _err = _run(arguments, capsys)
+
+    assert json.loads(english)["saved"] == 2
+    assert json.loads(portuguese) == {**json.loads(english), "saved": 0, "already": 2}
+
+
+@pytest.mark.parametrize("reason", list(FetchReason))
+def test_json_does_not_change_a_refusal(
+    reason: FetchReason,
+    tmp_path: Path,
+    password_file: Path,
+    connect: _Connect,
+    mailbox: FakeMailbox,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A refused run prints no document: standard output is empty and the one line is on stderr."""
+    mailbox.failures["search"] = FetchRefused(reason)
+
+    code, out, err = _run(_args(tmp_path, password_file, "--json"), capsys)
+
+    assert code == EXIT_REFUSED
+    assert out == ""
+    assert err.startswith("mailvigil: ")
+    assert len(err.splitlines()) == 1
 
 
 # ---------------------------------------------------------------------------

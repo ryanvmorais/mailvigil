@@ -7,6 +7,16 @@ All notable changes to MailVigil are written here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **`fetch --json` prints the outcome of a run as one JSON document.** A script that runs `fetch`
+  from `cron` had to parse the text to read the six numbers. With `--json`, a finished run prints
+  `schema_version`, `command` and the six numbers (`matched`, `saved`, `already`, `too_large`,
+  `skipped`, `left`) and nothing else: no folder, host or user. A refused run still prints no
+  document, one line goes to standard error and the exit code is `1`. `--lang` is accepted and
+  changes nothing. The `domain` key is no longer promised in every document: `summary` and
+  `verdict` keep it, `fetch` has none (`docs/json-schema.md`).
+
 ## [1.2.0] - 2026-10-30
 
 ### Added

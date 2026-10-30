@@ -305,7 +305,8 @@ O que ele faz:
 - É incremental: rode de novo e só as mensagens novas são salvas, então ele pode rodar pelo `cron`.
   O `--limit` (padrão 500, no máximo 10000) limita uma execução e pega as mais novas primeiro.
 - Imprime seis números (encontradas, salvas, já salvas, grandes demais, ignoradas, deixadas para a
-  próxima execução) e a pasta, nunca um assunto, remetente ou endereço.
+  próxima execução) e a pasta, nunca um assunto, remetente ou endereço. Com `--json` os seis
+  números saem como um documento JSON (sem a pasta), para um script que roda o `fetch` pelo `cron`.
 
 O que ele não faz:
 
@@ -367,14 +368,14 @@ que mais é público e o que não é.
 
 ### JSON
 
-O `--json` no `summary` ou no `verdict` imprime um documento JSON e uma quebra de linha na saída
-padrão, e nada na saída de erro. O documento é dado, não texto: inteiros, booleanos, identificadores
+O `--json` no `summary`, no `verdict` ou no `fetch` imprime um documento JSON e uma quebra de linha
+na saída padrão, e nada na saída de erro. O documento é dado, não texto: inteiros, booleanos, identificadores
 e os valores dos relatórios, sem frase e sem porcentagem arredondada. Ele traz todos os remetentes
 e todas as origens que falham, sem os limites que o texto mantém, e um valor que pode não existir
 (ainda sem período, sem `sp`) é `null`. Uma execução recusada não imprime documento: a linha única
 vai para a saída de erro, como sem `--json`, e o código de saída é `1`. O
 [docs/json-schema.md](docs/json-schema.md) lista cada campo e a promessa de compatibilidade (em
-inglês).
+inglês). O documento do `fetch` são só os seis números da execução.
 
 ### Idioma
 

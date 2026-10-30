@@ -294,7 +294,8 @@ What it does:
 - Is incremental: run it again and only the new messages are saved, so it can run from `cron`.
   `--limit` (default 500, at most 10000) caps one run and takes the newest first.
 - Prints six numbers (matched, saved, already saved, too large, skipped, left for the next run)
-  and the folder, never a subject, sender or address.
+  and the folder, never a subject, sender or address. With `--json` the six numbers come as one
+  JSON document instead (no folder in it), for a script that runs `fetch` from `cron`.
 
 What it does not do:
 
@@ -355,13 +356,13 @@ is public and what is not.
 
 ### JSON
 
-`--json` on `summary` or `verdict` prints one JSON document and a newline on standard output,
-and nothing on standard error. The document is data, not text: integers, booleans, identifiers and
+`--json` on `summary`, `verdict` or `fetch` prints one JSON document and a newline on standard
+output, and nothing on standard error. The document is data, not text: integers, booleans, identifiers and
 the report values, with no sentence and no rounded percentage. It carries every sender and every
 failing source, without the limits the text keeps, and a value that may not exist (no period yet,
 no `sp`) is `null`. A refused run prints no document: the one line goes to standard error, as
 without `--json`, and the exit code is `1`. `docs/json-schema.md` lists every field and the
-compatibility promise.
+compatibility promise. The `fetch` document is only the six numbers of the run.
 
 ### Language
 

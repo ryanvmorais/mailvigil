@@ -358,7 +358,8 @@ recommendation; none was a guess to be left as is.
    mail and is rejected here.
 4. **A `--json` outcome for `fetch` (RF-08).** Recommended: no. The outcome is five numbers for a
    person, the exit code is the signal for a script, and every field added to `--json` is a public
-   contract (006). Revisit if someone needs it.
+   contract (006). Revisit if someone needs it. *Reopened on 2026-10-30 (issue #75) and answered
+   yes: the design adds it in ADR-11.*
 5. **Order and default of `--limit` (RF-05).** Recommended: newest first, default 500. The newest
    reports matter most for the verdict, and 500 messages of at most a few hundred KB is bounded
    disk and time; the values are closed in the design.

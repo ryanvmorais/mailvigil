@@ -26,6 +26,7 @@ from mailvigil.fetch.run import fetch_reports
 from mailvigil.fetch.store import Store, tag_of
 from mailvigil.messages import Messages
 from mailvigil.render_fetch import refusal_line, render_fetch
+from mailvigil.render_json import dumps, fetch_document
 
 # The most a password file is read for: the first line of a file longer than this is not a password.
 _PASSWORD_FILE_MAX = 4096
@@ -206,6 +207,12 @@ def add_fetch_parser(
         help="read the password from the first line of this file instead of asking for it",
     )
     fetch_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="print the six numbers of the run as one JSON document instead of the text "
+        "(see docs/json-schema.md)",
+    )
+    fetch_parser.add_argument(
         "--cafile",
         type=Path,
         metavar="FILE",
@@ -290,7 +297,7 @@ def run_fetch(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
 
     Args:
         args (argparse.Namespace): The parsed arguments: ``host``, ``port``, ``user``, ``to``,
-            ``folder``, ``since``, ``limit``, ``password_file``, ``cafile`` and ``lang``.
+            ``folder``, ``since``, ``limit``, ``password_file``, ``cafile``, ``json`` and ``lang``.
         parser (argparse.ArgumentParser): Used to end the run with a usage error.
 
     Returns:
@@ -324,5 +331,8 @@ def run_fetch(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
     except FetchRefused as refusal:
         write(sys.stderr, refusal_line(refusal, args.lang))
         return EXIT_REFUSED
-    write(sys.stdout, render_fetch(outcome, str(args.to), args.lang))
+    if args.json:
+        write(sys.stdout, dumps(fetch_document(outcome)))
+    else:
+        write(sys.stdout, render_fetch(outcome, str(args.to), args.lang))
     return EXIT_OK
