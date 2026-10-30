@@ -51,8 +51,8 @@ report files (.zip, .gz, .xml)        mail files (.eml, .mbox)
 ### Python 3.12+
 
 The whole tool. 3.12 is the floor so that anyone still on it can install MailVigil; it is tested
-in CI together with the newest stable release (3.15 today), and reaches end of life on
-2028-10-31, when the floor gets reviewed.
+in CI on 3.12 to 3.15 (the newest stable release today), on Linux and on Windows, and reaches end
+of life on 2028-10-31, when the floor gets reviewed.
 
 **Why this:** a compiled language would add a build and a binary per platform for a tool that
 reads a few small XML files. The standard library already has everything the job needs (zip, gzip,
@@ -93,10 +93,12 @@ contains only `src/mailvigil`; the sdist adds the README and the license.
 
 **Docs:** [hatch.pypa.io](https://hatch.pypa.io/latest/)
 
-### PyPI trusted publishing — OIDC **(planned)**
+### PyPI trusted publishing — OIDC
 
-How the package will reach PyPI without a stored token: the release workflow proves its identity
-to PyPI with a short-lived OIDC token. Publishing itself is always the maintainer's act.
+How the package reaches PyPI without a stored token: the release workflow (`release.yml`) proves
+its identity to PyPI with a short-lived OIDC token. Publishing itself is always the maintainer's
+act: a GitHub Release runs the workflow, and a manual run does the dry run on TestPyPI
+(`docs/releasing.md`).
 
 **Why this:** against an API token in a repository secret, there is nothing to leak or rotate.
 
@@ -253,8 +255,9 @@ quoted), and validating the shape of the loaded dict before using it.
 
 ### `argparse`
 
-The command line: `--version`, the `summary` and `verdict` subcommands, which share `PATH...`,
-`--config`, `--domain`, `--json` and `--lang`. `--lang` is parsed by a `type=` function that returns
+The command line: `--version` and the `summary`, `verdict` and `fetch` subcommands. `summary` and
+`verdict` share `PATH...`, `--config`, `--domain`, `--json` and `--lang`; `--html` and `--output FILE`
+exist on `verdict` only, and `fetch` takes only `--lang` from the shared ones. `--lang` is parsed by a `type=` function that returns
 the language's message catalog, so a code that does not exist is argparse's own usage error (exit
 `2`) and the command never sees a string.
 
@@ -302,8 +305,8 @@ printable-ASCII name and password, because OAuth needs an application registered
 
 ### Ruff
 
-The linter, and the import sorter (it replaces flake8 and isort). Rules `E F I UP B SIM C4 RUF`,
-line length 100, `target-version = "py312"`.
+The linter, and the import sorter (it replaces flake8 and isort). Rules `E F I UP B SIM C4 RUF S`
+(`S` is the security family, from flake8-bandit), line length 100, `target-version = "py312"`.
 
 **Why this:** against flake8 plus a pile of plugins, one fast tool configured in `pyproject.toml`.
 Targeting `py312` makes the lint reject syntax newer than the floor, so it fails on your machine
@@ -366,7 +369,8 @@ wheel must declare no runtime dependency, it must install and run in a clean env
 fixed `ubuntu-26.04` runner.
 
 Two more workflows cover the supply chain: CodeQL (code scanning, run as a workflow rather than the
-default setup) and dependency review on pull requests.
+default setup) and dependency review on pull requests. A last one, `release.yml`, builds and
+publishes to PyPI when the maintainer publishes a GitHub Release (see PyPI trusted publishing).
 
 **Why this:** it is where the repository lives. The repository is public, so Actions minutes are
 free and the CI runs on pull requests, on pushes to `main` and by hand. A `proteger-main` ruleset
