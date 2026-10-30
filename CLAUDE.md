@@ -74,8 +74,15 @@ src/mailvigil/
                      # paths/--config/--domain/--json/--lang (`--lang` is parsed to a Messages);
                      # `--html` exists on `verdict` only and is refused together with `--json`;
                      # `--output FILE` (ADR-11) needs `--html` and `_write_page` writes it atomically;
-                     # `fetch` (spec 009) takes only `--lang` from the parents and loads
-                     # `fetch.imap` (imaplib, ssl) inside `_run_fetch`, never at import
+                     # `fetch` (spec 009) is added by `cli_fetch.add_fetch_parser` and run by
+                     # `cli_fetch.run_fetch`
+  cli_common.py      # the eight EXIT_* codes (the one table), `echo` (a command-line value made safe to
+                     # print) and `write` (a line to a stream, whatever it can encode); shared by cli
+                     # and cli_fetch, which may not import each other
+  cli_fetch.py       # the `fetch` command (spec 009): option types (`--port`, `--limit`, `--since`,
+                     # `--folder`), the subparser (takes only `--lang` from the parents), the password
+                     # helpers and `run_fetch`, which loads `fetch.imap` (imaplib, ssl) inside the
+                     # function, never at import (#82)
   py.typed           # marks the package as typed (PEP 561)
   reports/           # report ingestion (spec 002); public API re-exported by __init__.py
     errors.py        #   Reason (StrEnum) and ReportRefused: every refusal is typed
@@ -173,7 +180,7 @@ uv.lock              # never edit by hand (generated; a hook blocks it)
 > the attacks).
 
 > ⚠️ **`imaplib` and `ssl` are imported in `fetch/imap.py` only**, and that module is loaded inside
-> `_run_fetch`, never at import: `summary` and `verdict` never load the network code. The TLS
+> `cli_fetch.run_fetch`, never at import: `summary` and `verdict` never load the network code. The TLS
 > context always verifies the certificate (no `--insecure`, no plain IMAP, no STARTTLS); the
 > mailbox is only read (`BODY.PEEK`, no flag, no delete); the password is never an argument, an
 > environment variable or a log line. See spec 009, ADR-2 (the library's default context does not

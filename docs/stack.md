@@ -278,7 +278,7 @@ paths"), `add_subparsers(dest="command")` for a command with its own flags, a pa
 ### `imaplib` and `ssl`
 
 Talk to the mailbox for `mailvigil fetch`. `mailvigil/fetch/imap.py` is the only module that imports
-them, and `cli.py` loads it inside `_run_fetch`, so `summary` and `verdict` never load the network
+them, and `cli_fetch.py` loads it inside `run_fetch`, so `summary` and `verdict` never load the network
 code. It opens `IMAP4_SSL` on port 993 with `ssl.create_default_context()`, searches by subject (and
 `SINCE`) and reads each message with `BODY.PEEK[]<0.N>`, so the message is not marked as read and a
 server that sends more than announced is cut at the cap.

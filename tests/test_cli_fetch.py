@@ -23,7 +23,7 @@ import pytest
 from tests.fetch_helpers import FakeMailbox, build_message
 from tests.help_golden import SUMMARY_HELP, VERDICT_HELP
 
-from mailvigil import cli
+from mailvigil import cli_fetch
 from mailvigil.cli import EXIT_INTERNAL, EXIT_OK, EXIT_REFUSED, EXIT_USAGE, main
 from mailvigil.fetch import imap as fetch_imap
 from mailvigil.fetch.errors import FetchReason, FetchRefused
@@ -747,7 +747,7 @@ def test_a_file_others_can_read_adds_a_warning_and_still_works(
 ) -> None:
     """Group or other permission bits: one warning line on standard error, the run goes on."""
     # Windows reports 0o666 for every file; saying "posix" lets the check run there too.
-    monkeypatch.setattr(cli, "os", SimpleNamespace(name="posix"))
+    monkeypatch.setattr(cli_fetch, "os", SimpleNamespace(name="posix"))
     password_file.chmod(0o644)
 
     code, out, err = _run(_args(tmp_path, password_file), capsys)
