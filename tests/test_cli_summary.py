@@ -490,7 +490,7 @@ def test_recursive_reads_a_report_kept_in_a_subfolder(
     code = main(["summary", str(tmp_path / "reports"), "--domain", "example.com", "--recursive"])
 
     assert code == 0
-    assert "example.com" in capsys.readouterr().out
+    assert capsys.readouterr().out.splitlines()[0] == "MailVigil summary for example.com"
 
 
 def test_a_renamed_report_is_counted_and_the_hint_names_the_flag(
