@@ -6,7 +6,7 @@ and the handful of concepts worth learning first if it is new to you.
 This is not exhaustive: the full version graph is pinned in `uv.lock`, and per-feature decisions
 live in the `### ADR-N` blocks of `specs/*/design.md`. This page is the map: the *shape* of the
 project and the reasoning behind each piece. Entries marked **(planned)** are decided but not
-built yet. The project is released (1.1.0, on PyPI): the report-ingestion layer (`mailvigil.reports`), the
+built yet. The project is released (1.1.1, on PyPI): the report-ingestion layer (`mailvigil.reports`), the
 configuration loader, the sender identification, the summary, the verdict and their texts are built
 and tested (it reads `.eml` and `.mbox` too, spec 007), and `mailvigil summary` and `mailvigil
 verdict` run them end to end, in English or Portuguese (`--lang`), as text or as one JSON document
@@ -286,11 +286,13 @@ The work is in what the library does not do for you. Given no context, `IMAP4_SS
 *unverified* one, so a tool that asks for a password and says "TLS" would be open to anyone on the
 path; `fetch` always passes `ssl.create_default_context()` and has no switch to relax it (ADR-2 of
 spec 009). `imaplib` also reads a literal of any announced size, so a mixin refuses it by its
-announced size and reads in chunks under a deadline (ADR-3). The login is `LOGIN` with a
-printable-ASCII name and password, because OAuth needs an application registered with the provider
-(ADR-5). Every library failure becomes a typed `FetchReason`, never a traceback.
+announced size and reads in chunks under a deadline (ADR-3). The login is `LOGIN` for a
+printable-ASCII name and password, and `AUTHENTICATE PLAIN` in UTF-8 when either has a character
+outside ASCII and the server offers it (ADR-5, ADR-9); OAuth stays out because it needs an
+application registered with the provider. Every library failure becomes a typed `FetchReason`,
+never a traceback.
 
-**Learn:** the IMAP commands `LOGIN`, `SELECT` (read-only), `UID SEARCH` and `UID FETCH`; what
+**Learn:** the IMAP commands `LOGIN`, `AUTHENTICATE PLAIN`, `SELECT` (read-only), `UID SEARCH` and `UID FETCH`; what
 `UIDVALIDITY` is and why a saved name carries it; `BODY.PEEK` against `BODY`;
 `ssl.create_default_context()` against the unverified context `IMAP4_SSL` falls back to, and what
 `check_hostname` does; why a timeout on a socket is not a deadline on a run.
