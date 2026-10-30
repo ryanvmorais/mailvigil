@@ -7,6 +7,8 @@ All notable changes to MailVigil are written here. The format follows
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-10-30
+
 ### Changed
 
 - **`fetch` accepts a user name or password outside ASCII.** It was refused before. Such a login now
@@ -74,6 +76,7 @@ The first release. It gathers the milestones `v0.1` to `v0.9` described in the R
   certificate checked, read-only (it changes, moves and deletes nothing and does not mark mail as
   read), with the password asked on the terminal or read from a file.
 
-[Unreleased]: https://github.com/ryanvmorais/mailvigil/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/ryanvmorais/mailvigil/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/ryanvmorais/mailvigil/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/ryanvmorais/mailvigil/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/ryanvmorais/mailvigil/releases/tag/v1.0.0
