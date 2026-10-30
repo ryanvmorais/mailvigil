@@ -83,9 +83,9 @@ many modules and public contracts at once (010) or opens a new security surface 
 else is **an amendment**: an ADR and a stage in the spec that already owns the contract, as 002 did
 for the XML ceiling (ADR-8) and for `--recursive` (ADR-9). The amendments planned from the open
 issues are the `fetch` subject criterion (#77, spec 009), the OAuth token read from a file (#73, spec
-009), `[fetch]` in the configuration and `fetch --json` (#75, specs 003 and 009), the size of the HTML
-page and the JSON top-N (#71, specs 006 and 008) and the sender by SPF domain or address range (#78,
-spec 003). A bug fix, a refactor, a test or a documentation change gets no spec at all.
+009), the size of the HTML page and the JSON top-N (#71, specs 006 and 008) and the sender by SPF
+domain or address range (#78, spec 003). `[fetch]` in the configuration and `fetch --json` (#75,
+specs 003 and 009) are built and shipped in 1.3.0. A bug fix, a refactor, a test or a documentation change gets no spec at all.
 
 ## Permanent non-goals
 
