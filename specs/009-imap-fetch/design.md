@@ -17,7 +17,7 @@ Nothing that reads reports changes. `fetch` is a new package next to `reports/`,
 a new subcommand, and it ends where `007` begins: with `.eml` files in a folder.
 
 ```text
-mailvigil fetch ─▶ cli._run_fetch (lazy import) ─▶ password (getpass | --password-file)
+mailvigil fetch ─▶ cli_fetch.run_fetch (lazy import) ─▶ password (getpass | --password-file)
                                                        │
                        fetch/imap.py  ImapMailbox ◀────┘      the ONLY module that imports imaplib/ssl
                               │  (Mailbox protocol)
@@ -36,8 +36,9 @@ mailvigil fetch ─▶ cli._run_fetch (lazy import) ─▶ password (getpass | -
 - **`fetch/run.py`** is the whole fetch logic and knows nothing about IMAP: it drives a `Mailbox`
   and a `Store`, so the tests run it with a fake and no socket (ADR-1, RNF-03, RNF-06).
 - **`fetch/store.py`** names, checks and writes files; it knows nothing about the network (ADR-6).
-- **`cli.py`** gains the `fetch` subcommand. `imaplib` is imported inside `_run_fetch`, never at the
-  top of the module, so `summary` and `verdict` cannot load it (ADR-7, RF-09).
+- **`cli_fetch.py`** holds the `fetch` subcommand (in `cli.py` until #82). `imaplib` is imported
+  inside `run_fetch`, never at the top of the module, so `summary` and `verdict` cannot load it
+  (ADR-7, RF-09).
 - **Output:** a `FetchMessages` block in the catalog, one text renderer, no JSON (open question 4).
 
 ## Module layout
@@ -213,7 +214,7 @@ like every echoed path). A refusal line is
 `mailvigil: <phrase of the reason>[: <detail>]` on standard error, as `summary` does, followed on a
 second line by `N message(s) were saved before it stopped` when the partial outcome has `saved > 0`.
 
-`cli._run_fetch(args)`:
+`cli_fetch.run_fetch(args)`:
 
 1. Lazy `from mailvigil.fetch import …` (ADR-7).
 2. The password: `--password-file` → read at most 4 KiB, first line, trailing `\r\n` removed
@@ -354,6 +355,10 @@ an argument, a variable or a stored value; the certificate is always checked.
   fresh-interpreter test checks it. `messages/` imports `fetch.errors`, which is why
   `fetch/__init__.py` imports nothing.
 - **Trade-off:** an import inside a function against the usual style; one comment says why.
+- **Amendment (2026-10-30, #82):** the `fetch` option types, the subparser, the password helpers and the
+  function (now `run_fetch`) moved to `cli_fetch.py`; the exit codes and the two printing helpers to
+  `cli_common.py`, so the two never import each other. The lazy import and the isolation test are
+  unchanged; the `--help` text is byte for byte the same.
 
 ### ADR-8 — Newest first, and a limit on new messages
 

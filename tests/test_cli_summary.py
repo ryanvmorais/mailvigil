@@ -20,7 +20,8 @@ from typing import TextIO, cast
 import pytest
 
 from mailvigil import __version__
-from mailvigil.cli import _write, main
+from mailvigil.cli import main
+from mailvigil.cli_common import write as _write
 
 # ---------------------------------------------------------------------------
 # Builders
