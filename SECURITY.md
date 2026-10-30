@@ -2,12 +2,10 @@
 
 ## Supported Versions
 
-MailVigil is pre-1.0 and has no release yet, so only `main` receives security fixes. Once the first
-version is published, only the latest release will.
+Only the latest release receives security fixes. A fix comes out as a patch release.
 
 | Version | Supported |
 |---|---|
-| `main` (until the first release) | yes |
 | latest release (from `1.0.0`) | yes |
 | older releases | no |
 
@@ -45,6 +43,8 @@ tool against its user, or that breaks one of its safety guarantees. For example:
 - an XML report that gets past the refusal of `DOCTYPE` and `ENTITY` declarations (entity
   expansion);
 - a path inside an archive that makes the tool read or write outside the files it was given;
+- a report, archive or message that stops the whole run instead of being refused as one skipped
+  file (an unhandled exception), or that costs far more time or memory than its size;
 - a configuration file or report that makes the tool run code or open a network connection;
 - anything from a report or a configuration file reaching a place it should not (a log line, a
   file other than the requested output);

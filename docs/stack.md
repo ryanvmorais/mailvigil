@@ -6,7 +6,7 @@ and the handful of concepts worth learning first if it is new to you.
 This is not exhaustive: the full version graph is pinned in `uv.lock`, and per-feature decisions
 live in the `### ADR-N` blocks of `specs/*/design.md`. This page is the map: the *shape* of the
 project and the reasoning behind each piece. Entries marked **(planned)** are decided but not
-built yet. The project is released (1.3.0, on PyPI): the report-ingestion layer (`mailvigil.reports`), the
+built yet. The project is released (1.3.1, on PyPI): the report-ingestion layer (`mailvigil.reports`), the
 configuration loader, the sender identification, the summary, the verdict and their texts are built
 and tested (it reads `.eml` and `.mbox` too, spec 007), and `mailvigil summary` and `mailvigil
 verdict` run them end to end, in English or Portuguese (`--lang`), as text or as one JSON document

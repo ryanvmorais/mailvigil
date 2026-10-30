@@ -52,6 +52,25 @@ A pending publisher creates the project on the first upload and becomes a normal
 6. **Afterwards.** Delete the merged branches, and update the project notes and `CLAUDE.md` with the
    new version.
 
+## A security fix
+
+A vulnerability in a published version does not go through a public issue or pull request: it is
+reported privately and the fix is prepared in the advisory's temporary private fork (see
+[SECURITY.md](../SECURITY.md)). The release follows the steps above, with four differences:
+
+1. **The merge is made from the advisory page.** The ruleset `proteger-main` blocks it (the fork
+   has no CI, so the required checks never report), so for that one merge the bypass of the
+   *Repository admin* role is set to always and the box *Merge and bypass branch protections* is
+   ticked. Put the bypass back to *pull requests only* right after.
+2. **The suite runs on the maintainer's machine** before the merge, since the fork has no CI. The
+   version pull request is prepared beforehand and merged right after the fix, so the time the fix
+   is public before the tag stays short.
+3. **`Patched versions` stays empty** in the advisory until the release is on PyPI; then it is
+   filled in and the advisory is published.
+4. **The release notes do not mention the advisory while it is a draft.** After it is published,
+   the notes get one line, `Security advisory: [GHSA-…](…)`, between the scope line and the last
+   line, and the CHANGELOG entry gets the id in parentheses.
+
 ## Release notes template
 
 The body of a GitHub Release is short: it says what the version is and where the detail lives, and
@@ -64,6 +83,8 @@ is the model):
   guarantee, how to install). No file names, no internal changes.
 - **A scope line** that sets expectations in neutral words: the verdict is only as good as the
   reports it receives. No attack steps, payloads, real domains or numbers that work as a recipe.
+- **For a security fix, one line with the advisory** between the scope line and the last line, added
+  once the advisory is published.
 - **The last line links the CHANGELOG section** of the version, with the anchor GitHub makes from
   the heading (`## [1.0.0] - 2026-10-29` becomes `#100---2026-10-29`).
 
