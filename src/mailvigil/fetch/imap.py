@@ -6,9 +6,10 @@ bounded (spec 009, ADR-1, ADR-3): a literal the server announces over the curren
 before one byte of it is read, every read waits at most ``SOCKET_TIMEOUT`` or the time left to the
 run, and a line over ``LINE_LIMIT`` ends the run. The TLS context is built here and always verifies
 the certificate and the host name (ADR-2). The only commands the module can send are ``CAPABILITY``,
-``LOGIN``, ``EXAMINE``, ``UID SEARCH``, ``UID FETCH`` and ``LOGOUT``, and the message is fetched
-with ``BODY.PEEK`` so it is not marked read. Every failure of the library becomes a
-``FetchRefused``, with the password scrubbed out of whatever text it carries.
+``LOGIN`` (or ``AUTHENTICATE PLAIN`` for a login outside ASCII, ADR-9), ``EXAMINE``,
+``UID SEARCH``, ``UID FETCH`` and ``LOGOUT``, and the message is fetched with ``BODY.PEEK`` so it is
+not marked read. Every failure of the library becomes a ``FetchRefused``, with the password
+scrubbed out of whatever text it carries.
 """
 
 from __future__ import annotations
@@ -58,8 +59,15 @@ _SUBJECT = '"Report Domain:"'
 # A literal is read in slices of this size, so the deadline is looked at between slices.
 _CHUNK = 64 * 1024
 
-# What a login or a user name may hold: printable ASCII, no control character (ADR-5).
+# What ``LOGIN`` can carry: printable ASCII, no control character (ADR-5).
 _CREDENTIAL = re.compile(r"[\x20-\x7e]+")
+
+# What a credential may hold at all (ADR-9): any text but a control character of C0, DEL or C1.
+# NUL is the separator of ``PLAIN`` and a line break has no business in a password.
+_USABLE = re.compile(r"[^\x00-\x1f\x7f-\x9f]+")
+
+# The capability that lets a credential outside ASCII be sent as UTF-8 (RFC 4616).
+_PLAIN = "AUTH=PLAIN"
 
 # UIDs, validity numbers and sizes have at most ten digits (``UID_MAX``); the cap on the length
 # keeps a hostile ten-thousand-digit token away from ``int``.
@@ -263,9 +271,39 @@ def _scrub(text: str, secret: str) -> str:
         str: The text with every occurrence replaced by ``***``.
     """
     escaped = secret.replace("\\", "\\\\")
-    for form in (secret, escaped, escaped.replace('"', '\\"'), repr(secret)[1:-1]):
+    utf8 = secret.encode("utf-8", "replace")
+    forms = (
+        secret,
+        escaped,
+        escaped.replace('"', '\\"'),
+        repr(secret)[1:-1],
+        # A server that echoes the UTF-8 bytes is read as ASCII with a replacement per byte.
+        utf8.decode("ascii", "replace"),
+        base64.b64encode(utf8).decode("ascii"),
+    )
+    for form in forms:
         text = text.replace(form, "***")
     return text
+
+
+def _is_usable(text: str) -> bool:
+    """
+    Tell whether a credential can be sent at all.
+
+    Args:
+        text (str): The user name or the password.
+
+    Returns:
+        bool: ``True`` when it is not empty, has no control character and encodes as UTF-8 (a lone
+            surrogate, which a command line can carry, does not).
+    """
+    if _USABLE.fullmatch(text) is None:
+        return False
+    try:
+        text.encode("utf-8")
+    except UnicodeEncodeError:
+        return False
+    return True
 
 
 def _server_text(data: Sequence[object] | None) -> str:
@@ -647,6 +685,30 @@ def build_context() -> ssl.SSLContext:
     return context
 
 
+def _sign_in(connection: imaplib.IMAP4, user: str, password: str) -> None:
+    """
+    Log in with ``LOGIN``, or with ``AUTHENTICATE PLAIN`` when a credential is outside ASCII.
+
+    Args:
+        connection (imaplib.IMAP4): The connection, past the greeting; the caller has verified TLS.
+        user (str): The login, with no control character.
+        password (str): The password, with no control character.
+
+    Raises:
+        FetchRefused: ``password_unusable`` when a credential is outside ASCII and the server does
+            not advertise ``AUTH=PLAIN``, before anything secret is sent.
+        imaplib.IMAP4.error: The server said ``NO`` or ``BAD``.
+    """
+    if _CREDENTIAL.fullmatch(user) and _CREDENTIAL.fullmatch(password):
+        connection.login(quote(user), password)
+        return
+    # ``LOGIN`` has no encoding for these (RFC 3501); ``PLAIN`` is UTF-8 by definition (RFC 4616).
+    if _PLAIN not in connection.capabilities:
+        raise FetchRefused(FetchReason.PASSWORD_UNUSABLE)
+    response = f"\0{user}\0{password}".encode()
+    connection.authenticate("PLAIN", lambda _challenge: response)
+
+
 def connect(
     host: str,
     port: int,
@@ -664,8 +726,9 @@ def connect(
     Args:
         host (str): The server.
         port (int): The port; it only changes where to connect, the connection is always TLS.
-        user (str): The login, printable ASCII (the command checks it as a usage error).
-        password (str): The password, printable ASCII.
+        user (str): The login, with no control character (the command checks it as a usage error).
+        password (str): The password, with no control character; outside ASCII it needs a server
+            that advertises ``AUTH=PLAIN`` (ADR-9).
         clock (Callable[[], float]): Reads the time, in the unit of ``deadline``.
         deadline (float): The reading of ``clock`` past which nothing more is read.
 
@@ -673,13 +736,14 @@ def connect(
         ImapMailbox: The mailbox, logged in.
 
     Raises:
-        ValueError: When ``user`` is empty or not printable ASCII.
-        FetchRefused: ``password_unusable`` before any connection is opened; otherwise the reason
-            that matches what failed (certificate, TLS, host, timeout, login, protocol).
+        ValueError: When ``user`` is empty or has a control character.
+        FetchRefused: ``password_unusable`` before any connection is opened, or after the handshake
+            when a credential is outside ASCII and the server has no ``AUTH=PLAIN``; otherwise the
+            reason that matches what failed (certificate, TLS, host, timeout, login, protocol).
     """
-    if _CREDENTIAL.fullmatch(user) is None:
-        raise ValueError("the user name must be printable ASCII")
-    if _CREDENTIAL.fullmatch(password) is None:
+    if not _is_usable(user):
+        raise ValueError("the user name is empty or has a control character")
+    if not _is_usable(password):
         raise FetchRefused(FetchReason.PASSWORD_UNUSABLE)
     try:
         connection = _BoundedSsl(
@@ -693,7 +757,7 @@ def connect(
     except _LIBRARY_ERRORS as exc:
         raise _refusal_for(exc, password, expired=clock() >= deadline) from None
     try:
-        connection.login(quote(user), password)
+        _sign_in(connection, user, password)
     except _LIBRARY_ERRORS as exc:
         _drop(connection)
         # What the server says about a refused login is not shown: it may echo the credentials.

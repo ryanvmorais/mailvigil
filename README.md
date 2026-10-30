@@ -310,7 +310,8 @@ refused or the server cannot be reached, the message says so.
 Provider limits: it logs in with a name and a password (`LOGIN`), with no OAuth. Gmail works with
 an [app password](https://support.google.com/accounts/answer/185833) (two-step verification on).
 Microsoft 365 and Google accounts without an app password are not supported in this version. A
-password with a character outside ASCII is refused in this version.
+name or password with a character outside ASCII is sent with `AUTHENTICATE PLAIN` in UTF-8, and
+only if the server offers it; otherwise the run is refused.
 
 Exit codes: `0` when the run finished, even with nothing new; `1` when it was refused (the one-line
 reason is printed); `2` for a usage error; `70` for a bug (see below).

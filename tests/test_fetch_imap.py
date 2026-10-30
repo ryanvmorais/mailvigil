@@ -11,6 +11,7 @@ output (RNF-06, RNF-02).
 
 from __future__ import annotations
 
+import base64
 import imaplib
 import locale
 import re
@@ -302,6 +303,8 @@ class _Recorder:
     def __init__(self) -> None:
         self.calls: list[tuple[str, int, dict[str, Any]]] = []
         self.logins: list[tuple[str, str]] = []
+        self.plain_responses: list[bytes] = []
+        self.capabilities: tuple[str, ...] = ("IMAP4REV1", "AUTH=PLAIN")
         self.shutdowns = 0
         self.raises: BaseException | None = None
         self.login_raises: BaseException | None = None
@@ -323,11 +326,18 @@ def fake_ssl(monkeypatch: pytest.MonkeyPatch) -> _Recorder:
     class Fake:
         def __init__(self, host: str, port: int, **options: Any) -> None:
             recorder.calls.append((host, port, options))
+            self.capabilities = recorder.capabilities
             if recorder.raises is not None:
                 raise recorder.raises
 
         def login(self, user: str, password: str) -> None:
             recorder.logins.append((user, password))
+            if recorder.login_raises is not None:
+                raise recorder.login_raises
+
+        def authenticate(self, mechanism: str, authobject: Callable[[bytes], bytes]) -> None:
+            assert mechanism == "PLAIN"
+            recorder.plain_responses.append(authobject(b""))
             if recorder.login_raises is not None:
                 raise recorder.login_raises
 
@@ -482,7 +492,9 @@ def test_the_user_is_quoted_in_the_login(fake_ssl: _Recorder) -> None:
 
 
 @pytest.mark.parametrize(
-    "password", ["", "sénha", "pass\nword", "pass\rword", "a\x00b", "pa\x7fss", "日本"]
+    "password",
+    ["", "pass\nword", "pass\rword", "a\x00b", "pa\x7fss", "pa\x85ss", "a\udcffb"],
+    ids=["empty", "lf", "cr", "nul", "del", "c1", "lone-surrogate"],
 )
 def test_an_unusable_password_is_refused_before_the_connection_opens(
     fake_ssl: _Recorder, password: str
@@ -492,11 +504,53 @@ def test_an_unusable_password_is_refused_before_the_connection_opens(
     assert fake_ssl.calls == []
 
 
-@pytest.mark.parametrize("user", ["", "usér", "a\nb", "a\x00b"])
+@pytest.mark.parametrize("user", ["", "a\nb", "a\x00b", "a\udcffb"])
 def test_an_unusable_user_is_a_programming_error(fake_ssl: _Recorder, user: str) -> None:
     with pytest.raises(ValueError, match="user name"):
         _connect(user=user)
     assert fake_ssl.calls == []
+
+
+@pytest.mark.parametrize(
+    ("user", "password", "expected"),
+    [
+        ("reader", "sénha", "\0reader\0sénha".encode()),
+        ("usér", CANARY, f"\0usér\0{CANARY}".encode()),
+        ("日本", "パス", "\0日本\0パス".encode()),
+    ],
+    ids=["password", "user", "both"],
+)
+def test_a_credential_outside_ascii_goes_by_plain_in_utf8(
+    fake_ssl: _Recorder, user: str, password: str, expected: bytes
+) -> None:
+    _connect(user=user, password=password)
+    assert fake_ssl.plain_responses == [expected]
+    assert fake_ssl.logins == []  # LOGIN has no encoding for it
+
+
+def test_an_ascii_credential_still_goes_by_login_whatever_the_server_offers(
+    fake_ssl: _Recorder,
+) -> None:
+    _connect()
+    assert fake_ssl.logins == [('"reader"', CANARY)]
+    assert fake_ssl.plain_responses == []
+
+
+def test_a_credential_outside_ascii_needs_plain_advertised(fake_ssl: _Recorder) -> None:
+    fake_ssl.capabilities = ("IMAP4REV1", "LOGINDISABLED")
+    refused = _refused(lambda: _connect(password="sénha"))
+    assert refused.reason is FetchReason.PASSWORD_UNUSABLE
+    assert fake_ssl.plain_responses == []  # the secret was never built, let alone sent
+    assert fake_ssl.logins == []
+    assert fake_ssl.shutdowns == 1
+
+
+def test_a_rejected_plain_login_is_login_failed_with_no_detail(fake_ssl: _Recorder) -> None:
+    fake_ssl.login_raises = imaplib.IMAP4.error(f"AUTHENTICATE failed: bad sénha {CANARY}".encode())
+    refused = _refused(lambda: _connect(password="sénha"))
+    assert refused.reason is FetchReason.LOGIN_FAILED
+    assert refused.detail == ""
+    assert fake_ssl.shutdowns == 1
 
 
 def test_a_password_with_a_space_and_punctuation_is_usable(fake_ssl: _Recorder) -> None:
@@ -580,6 +634,41 @@ def test_only_the_closed_set_of_commands_is_sent(peers: Callable[..., ScriptedPe
     assert names == {"CAPABILITY", "LOGIN", "EXAMINE", "UID SEARCH", "UID FETCH", "LOGOUT"}
     assert commands[-1].startswith(b"LOGOUT")
     assert not any(b"BODY[]" in line for line in commands)
+
+
+def test_plain_sends_one_base64_response_with_the_utf8_credentials(
+    peers: Callable[..., ScriptedPeer],
+) -> None:
+    """PLAIN is a continuation: the response is a line of its own, not a tagged command."""
+    tags: list[bytes] = []
+
+    def handler(tag: bytes, line: bytes, peer: ScriptedPeer) -> bytes | None:
+        if line.endswith(b"AUTHENTICATE PLAIN"):
+            tags.append(tag)
+            return b"+ \r\n"
+        return ok(tags[0])  # the next line is the response, not a command
+
+    peer = peers(handler, capabilities=b"IMAP4rev1 AUTH=PLAIN")
+    connection = PairedImap(peer.client, clock=ManualClock(), deadline=_FAR)
+    imap._sign_in(connection, "usér", "sénha")
+    peer.close()
+
+    # Newer ``imaplib`` asks for ``CAPABILITY`` again after the login, so the response is not last.
+    start = next(i for i, line in enumerate(peer.received) if line.endswith(b"AUTHENTICATE PLAIN"))
+    assert base64.b64decode(peer.received[start + 1]) == "\0usér\0sénha".encode()
+    assert not any(line.startswith(b"LOGIN") for line in peer.commands())
+
+
+def test_the_password_is_scrubbed_in_the_forms_a_utf8_echo_takes() -> None:
+    """A server may echo the password as typed, as its bytes read as ASCII, or in base64."""
+    secret = "sénha"
+    forms = [
+        secret,
+        secret.encode().decode("ascii", "replace"),  # the bytes of an echo, read as ASCII
+        base64.b64encode(secret.encode()).decode(),
+    ]
+    for form in forms:
+        assert imap._scrub(f"bad {form} here", secret) == "bad *** here"
 
 
 def test_the_message_is_fetched_with_peek_and_the_cap_plus_one(

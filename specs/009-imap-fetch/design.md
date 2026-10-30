@@ -314,7 +314,7 @@ an argument, a variable or a stored value; the certificate is always checked.
 - **Trade-off:** the decoder is not written (the tool never lists folders), so a folder the user
   mistypes shows the server's refusal instead of a suggestion.
 
-### ADR-5 — `LOGIN`, ASCII credentials
+### ADR-5 — `LOGIN`, ASCII credentials (the ASCII limit is lifted by ADR-9)
 
 - **Decision:** the login uses the `LOGIN` command through the library. A user name or password
   that is empty, has a control character or is not ASCII is `password_unusable` before the
@@ -365,6 +365,34 @@ an argument, a variable or a stored value; the certificate is always checked.
   a rerun with the same limit do nothing once the folder holds that many.
 - **Trade-off:** after an interrupted first run the folder has a recent window and a gap behind it,
   and the verdict's "too early" rule says so honestly until a later run fills it.
+
+### ADR-9 — A login outside ASCII goes by `AUTHENTICATE PLAIN` (amendment of 2026-10-30, issue #74)
+
+- **Decision:** the login is chosen from the credentials. A user name and a password that are both
+  printable ASCII keep using `LOGIN`, exactly as in ADR-5. When either has a character outside
+  ASCII, the adapter looks at the `CAPABILITY` the library already read at the greeting: with
+  `AUTH=PLAIN` it sends `AUTHENTICATE PLAIN`, whose one response is the base64 of
+  `NUL user NUL password` encoded as UTF-8 (RFC 4616); without it the run ends in
+  `password_unusable`. This happens after the handshake, so the certificate was verified and no
+  secret has been sent. The rule on what is usable at all changes from "printable ASCII" to "not
+  empty, no control character of C0, DEL or C1 (NUL is the `PLAIN` separator), and encodable as
+  UTF-8"; a user name that fails it is still a usage error (exit 2). No new flag, no new reason,
+  no new state; only the text of `password_unusable` changes, in both languages.
+- **Alternatives:** `ENABLE UTF8=ACCEPT` and then `LOGIN` (RFC 6855), chosen by capability, which
+  adds a command to the closed set and another path to test for the same reach, since a server that
+  takes UTF-8 over TLS advertises `AUTH=PLAIN`; `PLAIN` for every login, which changes what works
+  today for ASCII passwords; keeping the refusal (ADR-5).
+- **Why:** `LOGIN` has no defined encoding outside ASCII, while `PLAIN` is UTF-8 by definition. The
+  verified TLS of ADR-2 is what makes sending a password in `PLAIN` acceptable, and `AUTHENTICATE`
+  is the one command added to the closed set of ADR-1. The `imaplib` call takes a function for the
+  response, so the secret is built in the adapter and never reaches a command line or a log. The
+  scrubbing of server text also covers the password as its UTF-8 bytes read as ASCII (one
+  replacement character per byte) and in base64, next to the forms of ADR-5; a refused login still
+  shows no server text at all.
+- **Trade-off:** the text is sent as typed, with no SASLprep (RFC 4013) normalisation, so a
+  password typed as a composed letter on one keyboard and a decomposed one on another does not
+  match on a server that normalises. A server without `AUTH=PLAIN` (or with `LOGINDISABLED`) still
+  refuses a non-ASCII login.
 
 ## Impact
 
@@ -439,6 +467,7 @@ The design closes these points the requirements left to it; none changes a requi
    read, and the ones older than a day are removed (RF-06).
 3. **The deadline** is checked between commands and between chunks of a literal, not inside one
    line (ADR-3, RF-05).
-4. **Non-ASCII passwords** are refused in this version (ADR-5, RF-02).
+4. **Non-ASCII passwords** were refused in 1.0 (ADR-5, RF-02); since the amendment they go by
+   `AUTHENTICATE PLAIN` when the server offers it (ADR-9).
 5. **The subject criterion** is closed as `SUBJECT "Report Domain:"` and verified by the
    maintainer's first real run (open question 3, Risks).

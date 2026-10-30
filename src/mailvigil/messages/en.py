@@ -283,7 +283,8 @@ _FETCH = FetchMessages(
                 f"the server refused the user name or the password{_IMAP_HINT}"
             ),
             FetchReason.PASSWORD_UNUSABLE: (
-                "the password is empty, has a line break or has characters outside ASCII"
+                "the password is empty, has a line break or a control character, or the login has "
+                "characters outside ASCII that the server does not accept"
             ),
             FetchReason.PASSWORD_FILE: "could not read a password from the file",
             FetchReason.FOLDER_NOT_FOUND: "the folder was not found",

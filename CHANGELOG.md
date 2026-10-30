@@ -7,6 +7,13 @@ All notable changes to MailVigil are written here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **`fetch` accepts a user name or password outside ASCII.** It was refused before. Such a login now
+  goes by `AUTHENTICATE PLAIN` in UTF-8, only when the server offers it (`AUTH=PLAIN`); otherwise
+  the run is refused as before. A login in plain ASCII still uses `LOGIN`, and nothing else
+  changes. A control character in the password is still refused.
+
 ## [1.1.0] - 2026-10-30
 
 ### Added
