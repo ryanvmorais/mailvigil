@@ -2,10 +2,10 @@
 Turns the bytes of one aggregate report into an immutable ``Report``.
 
 The XML is parsed by ``xmlsafe.parse_xml``, so a document that declares a ``DOCTYPE`` or an
-``ENTITY`` never gets here. This module reads the tree by local name with ``find`` / ``findall``, so
-the order of elements does not matter, unknown elements and extensions in a foreign namespace are
-ignored, and a report in the RFC 7489 form and one in the RFC 9990 namespace give the same model
-(ADR-5).
+``ENTITY`` never gets here. This module reads the tree by local name with ``_find`` and
+``_find_all``, so the order of elements does not matter, unknown elements and extensions in a
+foreign namespace are ignored, and a report in the RFC 7489 form and one in the RFC 9990 namespace
+give the same model (ADR-5).
 
 Only what the verdict cannot do without is strict: the period, ``pct`` and every ``count`` refuse
 the whole report when they cannot be trusted. Every other optional element takes the default of the
@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import ipaddress
 import re
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from xml.etree.ElementTree import Element
 
@@ -50,6 +51,53 @@ MAX_COUNT = 10**12
 # reporters that batch. Without a ceiling, one report with a long window would satisfy the rules
 # about the period and its coverage by itself.
 MAX_PERIOD = timedelta(days=7)
+
+# ---------------------------------------------------------------------------
+# Lookups
+# ---------------------------------------------------------------------------
+
+
+def _find_all(node: Element, names: Sequence[str]) -> list[Element]:
+    """
+    List the elements at the end of a path of local names, in document order.
+
+    The same answer as ``Element.findall`` for a path of plain names, without the path engine of
+    ``ElementTree``: it compiles and walks a selector chain for every call, which was the largest
+    cost of reading a record after the XML parser itself (issue #70). A name matches the children
+    one level down, so ``("row", "count")`` finds a ``count`` under any ``row``, not only the first.
+
+    Args:
+        node (Element): The element to search from.
+        names (Sequence[str]): The local names of each level, such as ``("row", "count")``.
+
+    Returns:
+        list[Element]: Every element the path reaches; empty when none does.
+    """
+    level = [node]
+    for name in names:
+        level = [child for parent in level for child in parent.findall(name)]
+        if not level:
+            break
+    return level
+
+
+def _find(node: Element, path: str) -> Element | None:
+    """
+    Find the first element at the end of a path of local names.
+
+    Args:
+        node (Element): The element to search from.
+        path (str): A path of local names, such as ``row/count``.
+
+    Returns:
+        Element | None: The first element in document order, or ``None`` when there is none.
+    """
+    names = path.split("/")
+    if len(names) == 1:
+        return node.find(path)
+    found = _find_all(node, names)
+    return found[0] if found else None
+
 
 # ---------------------------------------------------------------------------
 # Text
@@ -87,7 +135,7 @@ def _raw_text(node: Element, path: str) -> str | None:
         str | None: The stripped text (empty when the element holds none), or ``None`` when the
             element is absent.
     """
-    found = node.find(path)
+    found = _find(node, path)
     return None if found is None else (found.text or "").strip()
 
 
@@ -263,7 +311,7 @@ def _parse_record(node: Element) -> Record:
         spf_evaluated=_text(node, f"{evaluated}/spf"),
         override_reasons=tuple(
             OverrideReason(type=_text(reason, "type"), comment=_text(reason, "comment"))
-            for reason in node.findall(f"{evaluated}/reason")
+            for reason in _find_all(node, ("row", "policy_evaluated", "reason"))
         ),
         header_from=_text(node, "identifiers/header_from", lower=True),
         dkim=tuple(
@@ -272,11 +320,11 @@ def _parse_record(node: Element) -> Record:
                 selector=_text(block, "selector"),
                 result=_text(block, "result"),
             )
-            for block in node.findall("auth_results/dkim")
+            for block in _find_all(node, ("auth_results", "dkim"))
         ),
         spf=tuple(
             SpfResult(domain=_text(block, "domain", lower=True), result=_text(block, "result"))
-            for block in node.findall("auth_results/spf")
+            for block in _find_all(node, ("auth_results", "spf"))
         ),
     )
 
