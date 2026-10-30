@@ -236,16 +236,18 @@ the CLI test opens no socket.
 ## Interfaces
 
 ```text
-mailvigil fetch --host HOST --user NAME --to DIR
+mailvigil fetch [--config FILE] [--host HOST] [--user NAME] --to DIR
                 [--port N] [--folder NAME] [--since YYYY-MM-DD] [--limit N]
-                [--password-file FILE] [--cafile FILE] [--lang {en,pt-BR}]
+                [--password-file FILE] [--cafile FILE] [--json] [--lang {en,pt-BR}]
 ```
 
 | Option | Rule |
 |---|---|
-| `--host`, `--user`, `--to` | required |
-| `--port` | integer 1..65535, default 993; always implicit TLS (RF-01) |
-| `--folder` | default `INBOX`; no control characters |
+| `--config` | a file whose `[fetch]` table gives host, user, port and folder (ADR-12); never searched for |
+| `--host`, `--user` | required, from the flag or from `[fetch]` (ADR-12); neither is exit 2 |
+| `--to` | required |
+| `--port` | integer 1..65535, default 993 (flag, else `[fetch]`, else the default); always implicit TLS (RF-01) |
+| `--folder` | default `INBOX` (flag, else `[fetch]`, else the default); no control characters |
 | `--since` | `date.fromisoformat`; an invalid value is argparse's usage error (exit 2) |
 | `--limit` | integer 1..`MAX_LIMIT`, default `DEFAULT_LIMIT` |
 | `--password-file` | see the command, step 2 |
@@ -459,6 +461,36 @@ an argument, a variable or a stored value; the certificate is always checked.
   files as `already`. If a consumer needs it, a refusal document is a new decision with a new
   field, not a change of this one. The `[fetch]` configuration table of the same issue is a
   separate step and does not change this document.
+
+### ADR-12 — `fetch --config` reads the `[fetch]` table, only when it is named (amendment of 2026-10-30, issue #75)
+
+- **Decision:** `fetch` takes `--config FILE`. When it is given, the file is loaded by `load_config`
+  (003, ADR-7) and its `[fetch]` table fills what the flags leave out: for each of `host`, `user`,
+  `port` and `folder`, the flag wins, then the file, then the default (993 and `INBOX`; there is none
+  for host and user). `--host` and `--user` are no longer `required` in the parser; a run where
+  neither the flag nor the table gives one ends with a usage error (exit `2`) that names the flag and
+  the table, so the exit code of a forgotten option is the one it always was. The file is read only
+  when `--config` names it: unlike `summary` and `verdict`, `fetch` does not look for a
+  `mailvigil.toml` in the current folder. A refused file is one line on standard error, the path
+  first and then the line `summary` writes for the same reason (`mailvigil: PATH: reason [key]`), in
+  the language of `--lang`, exit `1`, with nothing on standard output; it ends the run before the
+  authority file is read and before the password is asked for. `to`, `since`, `limit`, `cafile`,
+  `password-file`, `json` and `lang` stay flags. The key tag of the file names (ADR-6) is made from
+  the resolved host, user and folder, so the same mailbox gives the same names whether it was given
+  by flags or by the table.
+- **Alternatives:** search the current folder for `mailvigil.toml`, as the other two commands do,
+  which is the shortest command line but lets a file made for `summary` start steering (and
+  refusing) a `fetch` that worked yesterday; make a difference between flag and file an error, which
+  forbids the ordinary use of overriding one value for one run; keep `--host` and `--user` required
+  and let the table only add `port` and `folder`, which would give the issue's convenience for the two
+  settings that matter least.
+- **Why:** open question 2 said "flags only in this version" and asked to reopen it with use. A job
+  from `cron` repeated the server in each line while the rest of the workflow reads one file, and the
+  password still comes from the prompt or `--password-file` (RF-02): nothing about secrets changes.
+- **Trade-off:** the file needs its `domain` (003, ADR-7), so a file for `fetch` alone has one line
+  it does not use; the help of `--host` and `--user` says "required unless `[fetch]` gives it"
+  instead of argparse's own marker; and `--config` on `fetch` does not behave like on `summary` when
+  it is left out. The help says so, and so does the README.
 
 ## Impact
 

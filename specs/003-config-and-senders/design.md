@@ -72,6 +72,8 @@ class ConfigReason(StrEnum):
     DUPLICATE_SELECTOR = "duplicate_selector"  # two keys differing only by case
     INVALID_SERVICE_NAME = "invalid_service_name"   # not a string, blank, too long, nested value
     FORBIDDEN_CHARACTER = "forbidden_character"     # control, format or separator in a name
+    INVALID_FETCH_VALUE = "invalid_fetch_value"     # a [fetch] value of the wrong type or range (ADR-7)
+    PASSWORD_NOT_ALLOWED = "password_not_allowed"   # a [fetch] key that would hold a password (ADR-7)
 
 class ConfigError(Exception):
     reason: ConfigReason
@@ -81,6 +83,7 @@ class ConfigError(Exception):
 class Config:
     domain: str                     # normalized: lower case, no trailing dot
     senders: Mapping[str, str]      # selector (lower case) -> service name; a read-only view
+    fetch: FetchSettings            # [fetch]: host, user, port, folder; None for a missing key (ADR-7)
 
 class Outcome(StrEnum):
     KNOWN = "known"                         # a configured selector, passing, under the owner's domain
@@ -193,7 +196,7 @@ does not read `dkim_evaluated`, `header_from` or the IP (ADR-3).
 | Contract | Shape |
 |---|---|
 | `mailvigil.config.load_config(path)` | `Path -> Config`; raises `ConfigError` |
-| `mailvigil.config.Config` | `domain: str`, `senders: Mapping[str, str]` |
+| `mailvigil.config.Config` | `domain: str`, `senders: Mapping[str, str]`, `fetch: FetchSettings` |
 | `mailvigil.config.ConfigError.reason` | a `ConfigReason`; the stable key spec `006` translates |
 | `mailvigil.config.MAX_CONFIG_BYTES`, `MAX_SERVICE_NAME` | module constants (64 KiB, 100) |
 | `mailvigil.senders.identify_sender(record, config)` | `Record, Config -> Identification` |
@@ -291,6 +294,36 @@ exactly what the owner means; no PSL is needed to know that.
 **Trade-off.** If the owner configures a subdomain (`mail.example.com`) and a service signs with the
 parent (`example.com`), which relaxed alignment would accept, the result is `FOREIGN_DOMAIN`. That
 reads as a false alarm, the safe direction, and the fix is to configure the parent domain. (RF-06)
+
+### ADR-7 — A `[fetch]` table for the mailbox, and no key for the password (amendment of 2026-10-30, issue #75)
+
+**Decision.** `fetch` becomes the third top-level key of the file: a table with four optional keys,
+`host`, `user`, `port` and `folder`. `load_config` returns them as `Config.fetch`, a frozen
+`FetchSettings` whose fields are `None` for a key the file does not give, so a file without the
+table (every file written before this amendment) loads exactly as before. The values go through the
+rules of the flags of `fetch` (009): `host` and `user` are one word, `folder` may hold a space, none
+holds a control or format character, `port` is a whole number from 1 to 65535 (a boolean is not
+one). The check runs last, after the selector map, so the order of the loader grows by one step.
+Two reasons are new, `INVALID_FETCH_VALUE` (`invalid_fetch_value`: a value of the wrong type or out
+of its range) and `PASSWORD_NOT_ALLOWED` (`password_not_allowed`); `WRONG_TYPE` (`fetch` is not a
+table), `UNKNOWN_KEY` (with the suggestion, for a key such as `hots`) and `FORBIDDEN_CHARACTER` are
+reused, and the `key` of a refusal inside the table is `fetch.<name>`. A key of the table whose
+name holds `pass`, `secret` or `token` is `PASSWORD_NOT_ALLOWED`, and its detail says the password
+comes from the prompt or `--password-file`; the value is never copied into the error.
+**Alternatives.** Put `to`, `since`, `limit` and `cafile` in the table too: a path in a shared file
+needs a rule (relative to the file or to the folder the command runs in), `since` changes at every
+run, and `cafile` decides who is trusted, which should stay visible on the command line (009,
+ADR-10). Allow a `password` key and warn when the file is readable by others: it breaks the line of
+009 RF-02 that nothing stores the password, and a warning is not a refusal. A second file only for
+`fetch`: the issue asks for one `mailvigil.toml` for the whole workflow.
+**Why.** A scheduled job repeated host, user, port and folder in every command line while the rest
+of the workflow reads one file. The strict reading of ADR-1 reaches the new table, so a typo in
+`[fetch]` is an error instead of a run against the default port or folder.
+**Trade-off.** The file still needs its `domain` even for a run that only fetches, because one
+loader serves all three commands and a loader that depended on its caller would make `MISSING_DOMAIN`
+mean different things; the cost is one line in the file. A file shared with `summary` now stops
+`fetch` too when `[fetch]` is wrong, which is what strict means. `ConfigReason` goes from thirteen
+members to fifteen: adding one is a minor change (`docs/stability.md`). (RF-04)
 
 ## Impact on existing code
 

@@ -19,7 +19,7 @@ from string import Formatter
 
 import pytest
 
-from mailvigil.cli import _config_line
+from mailvigil.cli_common import config_line
 from mailvigil.config import ConfigError, ConfigReason
 from mailvigil.fetch.errors import FetchReason
 from mailvigil.messages import ENGLISH, PORTUGUESE, Messages, Plural, language_by_code
@@ -389,7 +389,7 @@ def test_the_english_line_is_what_the_error_has_always_said(
     reason: ConfigReason, key: str, detail: str
 ) -> None:
     error = ConfigError(reason, key, detail)
-    assert _config_line(error, ENGLISH) == str(error)
+    assert config_line(error, ENGLISH) == str(error)
 
 
 def test_a_language_can_drop_the_detail_of_a_reason() -> None:
@@ -401,15 +401,15 @@ def test_a_language_can_drop_the_detail_of_a_reason() -> None:
     )
     kept = ConfigError(ConfigReason.UNKNOWN_KEY, "sender", 'did you mean "senders"?')
     dropped = ConfigError(ConfigReason.NOT_UTF8, "", "the file is not valid UTF-8")
-    assert _config_line(kept, quiet) == str(kept)
-    assert _config_line(dropped, quiet) == "not_utf8"
+    assert config_line(kept, quiet) == str(kept)
+    assert config_line(dropped, quiet) == "not_utf8"
 
 
 @pytest.mark.parametrize("reason", list(ConfigReason))
 def test_the_portuguese_line_is_the_phrase_then_the_key(reason: ConfigReason) -> None:
     error = ConfigError(reason, "senders")
     assert (
-        _config_line(error, PORTUGUESE) == f"{PORTUGUESE.refusals.config_reasons[reason]} [senders]"
+        config_line(error, PORTUGUESE) == f"{PORTUGUESE.refusals.config_reasons[reason]} [senders]"
     )
 
 
@@ -418,10 +418,10 @@ def test_the_portuguese_line_keeps_the_detail_only_where_the_language_says(
     reason: ConfigReason,
 ) -> None:
     error = ConfigError(reason, "k", "an English detail")
-    line = _config_line(error, PORTUGUESE)
+    line = config_line(error, PORTUGUESE)
     assert ("an English detail" in line) is (reason in PORTUGUESE.refusals.config_detail)
 
 
 def test_the_portuguese_line_without_a_key_is_the_bare_phrase() -> None:
     error = ConfigError(ConfigReason.MISSING_DOMAIN)
-    assert _config_line(error, PORTUGUESE) == PORTUGUESE.refusals.config_reasons[error.reason]
+    assert config_line(error, PORTUGUESE) == PORTUGUESE.refusals.config_reasons[error.reason]

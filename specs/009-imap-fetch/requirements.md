@@ -350,7 +350,8 @@ recommendation; none was a guess to be left as is.
 2. **Connection settings in the config file.** Recommended: flags only in this version. A `[fetch]`
    table (host, user, folder, never the password) would let one `mailvigil.toml` serve the whole
    workflow, but it changes the config contract of 003 and the schema of its errors for a
-   convenience a shell alias also gives.
+   convenience a shell alias also gives. *Reopened on 2026-10-30 (issue #75) and answered yes:
+   003 ADR-7 adds the table and 009 ADR-12 the option.*
 3. **The subject criterion (RF-04).** Recommended: server-side `SUBJECT "Report Domain:"`, then
    check against the subjects of Google, Microsoft, Yahoo and others in the design. The risk is a
    provider that writes the subject differently and is silently missed; the alternative is to fetch

@@ -13,7 +13,7 @@ These are the contract. Each item says where it is specified.
 | Commands | The names `summary`, `verdict` and `fetch`, and the arguments and options each has today (`--config`, `--domain`, `--recursive`, `--json`, `--lang`, `--html`, `--output`, `--host`, `--user`, `--to`, `--port`, `--folder`, `--since`, `--limit`, `--password-file`, `--cafile`) keep their meaning. `--version` prints the version. | `mailvigil --help` and the [README](../README.md) |
 | Exit codes | `0`, `1`, `2`, `3`, `4`, `70`, `130` and `141` keep their meaning. A new code is never reused for an old one. | [Exit codes](../README.md#exit-codes) |
 | JSON | The three documents of `--json` (`summary`, `verdict`, `fetch`) follow `schema_version`: a field is only added inside a version, and renamed, removed or retyped only with a new one. | [json-schema.md](json-schema.md) |
-| Configuration | The keys `domain` and `[senders]`, and the strict reading of the file: an unknown key is an error. | [Configuration](../README.md#configuration) |
+| Configuration | The keys `domain`, `[senders]` and `[fetch]` (`host`, `user`, `port`, `folder`; never a password), and the strict reading of the file: an unknown key is an error. | [Configuration](../README.md#configuration) |
 | Safety of the input | A report is hostile input: the size cap, the refusal of `DOCTYPE` and `ENTITY`, and `fetch` reading a mailbox without changing it, over verified TLS, never take a weaker form. | [SECURITY.md](../SECURITY.md) |
 | Python | The versions in `requires-python`. | `pyproject.toml` |
 

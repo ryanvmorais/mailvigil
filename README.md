@@ -89,6 +89,9 @@ mailbox = "Example Mail (staff mailboxes)"
 `mailvigil summary --config FILE` reads it. Without `--config` the command reads `mailvigil.toml`
 in the current folder, if there is one; with neither a file nor `--domain` it asks for one.
 
+The same file can also hold the mailbox settings of `mailvigil fetch`, in a `[fetch]` table
+(see [Fetch](#fetch)); the password is never one of its keys.
+
 ## MailVigil vs. other tools
 
 | | MailVigil | [parsedmarc](https://github.com/domainaware/parsedmarc) | Hosted services (dmarcian, EasyDMARC, Postmark) |
@@ -286,6 +289,29 @@ mailvigil fetch --host imap.example.com --user me@example.com --to reports/
 mailvigil fetch --host imap.example.com --user me@example.com --to reports/ \
   --since 2026-10-01 --limit 200 --password-file ~/.mailvigil-password
 ```
+
+To stop repeating the server in every command, put it in the configuration file and pass
+`--config FILE`:
+
+```toml
+domain = "example.com"
+
+[fetch]
+host = "imap.example.com"
+user = "me@example.com"
+port = 993        # optional, 993 is the default
+folder = "INBOX"   # optional, INBOX is the default
+```
+
+```bash
+mailvigil fetch --config mailvigil.toml --to reports/ --password-file ~/.mailvigil-password
+```
+
+Only `host`, `user`, `port` and `folder` can be there. A flag wins over the file, and `fetch`
+reads a file only when you name it with `--config` (it never looks for a `mailvigil.toml` by
+itself). The file still needs its `domain`, like for the other commands. The password is not a key:
+`password = "..."` is refused, and the password keeps coming from the terminal or
+`--password-file`. `--to`, `--since`, `--limit` and `--cafile` stay flags.
 
 What it does:
 

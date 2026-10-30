@@ -254,6 +254,10 @@ _REFUSALS = RefusalMessages(
             ConfigReason.DUPLICATE_SELECTOR: "seletor repetido",
             ConfigReason.INVALID_SERVICE_NAME: "nome de servico invalido",
             ConfigReason.FORBIDDEN_CHARACTER: "caractere proibido",
+            ConfigReason.INVALID_FETCH_VALUE: "valor invalido em [fetch]",
+            ConfigReason.PASSWORD_NOT_ALLOWED: (
+                "a senha nunca fica no arquivo: use o prompt ou --password-file"
+            ),
         }
     ),
     config_detail=frozenset({ConfigReason.MALFORMED_TOML, ConfigReason.UNKNOWN_KEY}),

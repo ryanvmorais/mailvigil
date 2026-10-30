@@ -1018,3 +1018,234 @@ def test_the_offline_commands_have_no_network_option(
 
     for word in ("--host", "--user", "--password", "--port", "--to", "--since", "--folder"):
         assert word not in text
+
+
+# ---------------------------------------------------------------------------
+# The [fetch] table of --config (spec 009 ADR-12)
+# ---------------------------------------------------------------------------
+
+_FILE_FETCH = (
+    'domain = "example.com"\n'
+    "[fetch]\n"
+    'host = "imap.file.invalid"\n'
+    'user = "from-file"\n'
+    "port = 143\n"
+    'folder = "Reports"\n'
+)
+
+
+def _config(tmp_path: Path, text: str = _FILE_FETCH) -> Path:
+    """
+    Write a configuration file next to the test's other files.
+
+    Args:
+        tmp_path (Path): The test's own folder.
+        text (str, optional): The content. Default: a ``[fetch]`` table with the four keys.
+
+    Returns:
+        Path: The file.
+    """
+    path = tmp_path / "mailvigil.toml"
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+def _only_to(tmp_path: Path, password: Path, *extra: str) -> list[str]:
+    """
+    Build the arguments of a run that leaves the server settings to the file.
+
+    Args:
+        tmp_path (Path): The test's own folder.
+        password (Path): The password file.
+        *extra (str): More arguments.
+
+    Returns:
+        list[str]: ``fetch`` with ``--to`` and ``--password-file`` only, then ``extra``.
+    """
+    return [
+        "fetch",
+        "--to",
+        str(tmp_path / "mail"),
+        "--password-file",
+        str(password),
+        *extra,
+    ]
+
+
+def test_the_table_gives_the_connection_and_the_folder(
+    tmp_path: Path,
+    password_file: Path,
+    connect: _Connect,
+    mailbox: FakeMailbox,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """With no flag for them, host, user, port and folder come from ``[fetch]``."""
+    argv = _only_to(tmp_path, password_file, "--config", str(_config(tmp_path)))
+
+    code, _out, _err = _run(argv, capsys)
+
+    assert code == EXIT_OK
+    (call,) = connect.calls
+    assert (call["host"], call["user"], call["port"]) == ("imap.file.invalid", "from-file", 143)
+    assert mailbox.called("select") == [("select", "Reports")]
+    assert len(_saved(tmp_path)) == 2
+
+
+def test_a_flag_wins_over_the_table(
+    tmp_path: Path,
+    password_file: Path,
+    connect: _Connect,
+    mailbox: FakeMailbox,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Each flag replaces only its own key; the others still come from the file."""
+    flags = ["--host", _HOST, "--port", "10993"]
+    argv = _only_to(tmp_path, password_file, "--config", str(_config(tmp_path)), *flags)
+
+    _run(argv, capsys)
+
+    (call,) = connect.calls
+    assert (call["host"], call["user"], call["port"]) == (_HOST, "from-file", 10993)
+    assert mailbox.called("select") == [("select", "Reports")]
+
+
+def test_the_defaults_fill_what_neither_gives(
+    tmp_path: Path,
+    password_file: Path,
+    connect: _Connect,
+    mailbox: FakeMailbox,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A table with only a host and a user leaves port 993 and ``INBOX``."""
+    text = 'domain = "example.com"\n[fetch]\nhost = "h.invalid"\nuser = "u"\n'
+    argv = _only_to(tmp_path, password_file, "--config", str(_config(tmp_path, text)))
+
+    _run(argv, capsys)
+
+    assert connect.calls[0]["port"] == 993
+    assert mailbox.called("select") == [("select", "INBOX")]
+
+
+def test_the_messages_of_the_same_mailbox_get_the_same_names_from_flag_or_file(
+    tmp_path: Path, password_file: Path, connect: _Connect, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The file name tag comes from host, user and folder, wherever they were written."""
+    from_flags = ["--host", "imap.file.invalid", "--user", "from-file", "--folder", "Reports"]
+    _run(_only_to(tmp_path, password_file, *from_flags), capsys)
+    first = [path.name for path in _saved(tmp_path)]
+
+    _run(_only_to(tmp_path, password_file, "--config", str(_config(tmp_path))), capsys)
+
+    assert [path.name for path in _saved(tmp_path)] == first
+    assert len(first) == 2
+
+
+@pytest.mark.parametrize("missing", ["host", "user"])
+def test_a_host_or_user_that_nothing_gives_is_a_usage_error(
+    missing: str,
+    tmp_path: Path,
+    password_file: Path,
+    connect: _Connect,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Neither the flag nor the table: exit 2, and the message says where it can go."""
+    kept = "user" if missing == "host" else "host"
+    text = f'domain = "example.com"\n[fetch]\n{kept} = "x.invalid"\n'
+    argv = _only_to(tmp_path, password_file, "--config", str(_config(tmp_path, text)))
+
+    err = _usage_error(argv, capsys)
+
+    assert f"--{missing} is required" in err
+    assert "[fetch]" in err
+    assert connect.calls == []
+
+
+def test_a_file_in_the_current_folder_is_not_searched_for(
+    tmp_path: Path,
+    empty_cwd: Path,
+    password_file: Path,
+    connect: _Connect,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Unlike ``summary``, ``fetch`` reads a file only when ``--config`` names it (ADR-12)."""
+    (empty_cwd / "mailvigil.toml").write_text(_FILE_FETCH, encoding="utf-8")
+
+    err = _usage_error(_only_to(tmp_path, password_file), capsys)
+
+    assert "--host is required" in err
+    assert connect.calls == []
+
+
+def test_a_file_without_a_table_leaves_the_flags_in_charge(
+    tmp_path: Path, password_file: Path, connect: _Connect, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A file made for ``summary`` may be passed to ``fetch``; the table is optional."""
+    config = _config(tmp_path, 'domain = "example.com"\n')
+
+    code, _out, _err = _run(_args(tmp_path, password_file, "--config", str(config)), capsys)
+
+    assert code == EXIT_OK
+    assert connect.calls[0]["host"] == _HOST
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        (
+            'domain = "example.com"\n[fetch]\npassword = "x"\n',
+            "password_not_allowed [fetch.password]",
+        ),
+        ('domain = "example.com"\n[fetch]\nport = 0\n', "invalid_fetch_value [fetch.port]"),
+        ('domain = "example.com"\n[fetch]\nhots = "x"\n', "unknown_key [fetch.hots]"),
+        ('[fetch]\nhost = "x"\n', "missing_domain [domain]"),
+    ],
+)
+def test_a_refused_file_is_one_line_and_exit_one_before_the_password(
+    text: str,
+    expected: str,
+    tmp_path: Path,
+    connect: _Connect,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The reason and the key, the path first, no prompt and no connection."""
+    monkeypatch.setattr(sys.stdin, "isatty", lambda: True)
+    monkeypatch.setattr(getpass, "getpass", _forbidden)
+    path = _config(tmp_path, text)
+
+    code, out, err = _run(_only_to(tmp_path, tmp_path / "unused", "--config", str(path)), capsys)
+
+    assert code == EXIT_REFUSED
+    assert out == ""
+    assert err.startswith(f"mailvigil: {path}: {expected}")
+    assert len(err.splitlines()) == 1
+    assert connect.calls == []
+
+
+def test_a_refused_file_in_portuguese_is_ascii(
+    tmp_path: Path, connect: _Connect, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The refusal of the table follows ``--lang`` like any other."""
+    text = 'domain = "example.com"\n[fetch]\npassword = "x"\n'
+    argv = _only_to(tmp_path, tmp_path / "unused", "--config", str(_config(tmp_path, text)))
+
+    code, _out, err = _run([*argv, "--lang", "pt-BR"], capsys)
+
+    assert code == EXIT_REFUSED
+    assert "a senha nunca fica no arquivo" in err
+    assert err.isascii()
+
+
+def test_a_missing_config_file_is_one_line_and_exit_one(
+    tmp_path: Path, connect: _Connect, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """An unreadable path is a refusal like for ``summary``, not a traceback."""
+    missing = tmp_path / "absent.toml"
+
+    code, _out, err = _run(
+        _only_to(tmp_path, tmp_path / "unused", "--config", str(missing)), capsys
+    )
+
+    assert code == EXIT_REFUSED
+    assert err.startswith(f"mailvigil: {missing}: unreadable")
+    assert connect.calls == []
