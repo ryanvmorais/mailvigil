@@ -69,6 +69,24 @@ its own: it amends 002, 004, 005, 006 and 009.
 Specs 007 to 009 were planned on 2026-10-28, after the first six were done. 009 depends on 007: the
 fetch only saves raw messages and leaves the reading to the ingestion.
 
+Planned after the first release (2026-10-30), each one opened only when its turn comes:
+
+| Spec | Scope | Delivery | Status |
+|---|---|---|---|
+| `010-multiple-domains` | more than one domain per run, one summary and one verdict per domain, what the `verdict` exit code means for several answers, and internationalized domains typed as written (issue #79) | after 1.2.0 | **planned** |
+| `011-oauth-login` | the full OAuth 2 flow of `fetch` (XOAUTH2) for providers that turned passwords off, with its own secrets model and `/auditoria-seguranca` (issue #73); the first step, a token read from a file, is an amendment of 009, not this spec | after 1.2.0 | **planned** |
+
+### When an issue gets a spec
+
+A spec is for a feature, or for several changes that together are significant: here, one that crosses
+many modules and public contracts at once (010) or opens a new security surface (011). Everything
+else is **an amendment**: an ADR and a stage in the spec that already owns the contract, as 002 did
+for the XML ceiling (ADR-8) and for `--recursive` (ADR-9). The amendments planned from the open
+issues are the `fetch` subject criterion (#77, spec 009), the OAuth token read from a file (#73, spec
+009), `[fetch]` in the configuration and `fetch --json` (#75, specs 003 and 009), the size of the HTML
+page and the JSON top-N (#71, specs 006 and 008) and the sender by SPF domain or address range (#78,
+spec 003). A bug fix, a refactor, a test or a documentation change gets no spec at all.
+
 ## Permanent non-goals
 
 These are decisions, not a backlog. Each one has a reason that the product depends on, so reopening
