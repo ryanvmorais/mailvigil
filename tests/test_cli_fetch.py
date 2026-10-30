@@ -20,7 +20,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from tests.fetch_helpers import FakeMailbox, build_message
+from tests.fetch_helpers import TEST_CA_PEM, FakeMailbox, build_message
 from tests.help_golden import SUMMARY_HELP, VERDICT_HELP
 
 from mailvigil import cli_fetch
@@ -70,6 +70,7 @@ class _Connect:
         password: str,
         clock: Callable[[], float],
         deadline: float,
+        cafile: Path | None = None,
     ) -> FakeMailbox:
         """
         Record the call and answer as scripted.
@@ -81,6 +82,7 @@ class _Connect:
             password (str): The password.
             clock (Callable[[], float]): The clock.
             deadline (float): The deadline.
+            cafile (Path | None, optional): The authority file. Default: ``None``.
 
         Returns:
             FakeMailbox: The scripted mailbox.
@@ -97,6 +99,7 @@ class _Connect:
                 "password": password,
                 "clock": clock,
                 "deadline": deadline,
+                "cafile": cafile,
             }
         )
         if self.refusal is not None:
@@ -300,6 +303,37 @@ def test_the_connection_gets_the_arguments_the_user_gave(
     assert isinstance(call["deadline"], float)
     # A tolerance for float rounding: with a coarse clock, (x + 1800) - x is a few ulps over 1800.
     assert 0 < call["deadline"] - clock() <= DEADLINE_SECONDS + 1e-6
+
+
+def test_the_cafile_reaches_the_connection(
+    tmp_path: Path, password_file: Path, connect: _Connect, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """``--cafile`` is passed on; without it the connection gets none."""
+    authority = tmp_path / "ca.pem"
+    authority.write_text(TEST_CA_PEM, encoding="ascii")
+
+    assert _run(_args(tmp_path, password_file, "--cafile", str(authority)), capsys)[0] == EXIT_OK
+    assert _run(_args(tmp_path, password_file), capsys)[0] == EXIT_OK
+
+    assert [call["cafile"] for call in connect.calls] == [authority, None]
+
+
+def test_an_unusable_cafile_is_told_before_the_password_is_asked_for(
+    tmp_path: Path,
+    connect: _Connect,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A missing authority file is a refusal (exit 1) with no prompt and no connection."""
+    monkeypatch.setattr(sys.stdin, "isatty", lambda: True)
+    monkeypatch.setattr(getpass, "getpass", _forbidden)
+
+    code, out, err = _run(_args(tmp_path, None, "--cafile", str(tmp_path / "missing.pem")), capsys)
+
+    assert code == EXIT_REFUSED
+    assert out == ""
+    assert err == "mailvigil: could not read a certificate authority from the --cafile file\n"
+    assert connect.calls == []
 
 
 def test_the_options_reach_the_mailbox(

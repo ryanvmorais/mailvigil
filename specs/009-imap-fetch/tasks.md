@@ -196,3 +196,20 @@ signature changed (the parent parser split); if any other one fails, the code is
   both languages. — RF-08
 - [x] Quality gate. — result recorded when run: ruff, black and mypy clean; pytest passed with
   coverage 100% (Python 3.12, 2026-10-29).
+
+## Stage 8 — A private certificate authority (RF-01, ADR-10; issue #76)
+
+- [x] `FetchReason.CAFILE_UNUSABLE` (`cafile_unusable`) and its sentence in both languages. Test:
+  the thirteen keys are pinned and both catalogs cover them. — RF-08
+- [x] `imap.build_context(cafile)` adds the file with `load_verify_locations`; `connect(cafile=)`
+  builds the context before it opens anything. Tests: the system's authorities are all still there
+  and the file's is added once; the verify mode, the host name check and the TLS floor are as
+  before; a missing file, an empty one, text, a cut PEM and a folder are `cafile_unusable`; the
+  source never passes an argument to `create_default_context`. — RF-01
+- [x] `fetch --cafile FILE` in `cli_fetch.py`: checked before the password is asked for; the
+  connection gets it. Tests: the argument reaches `connect` (and is `None` without the flag); an
+  unusable file ends in exit 1 with no prompt and no connection. — RF-01, RF-08
+- [x] Docs: README in both languages, SECURITY, `docs/stability.md`, `docs/stack.md`, `CLAUDE.md`,
+  CHANGELOG `[Unreleased]`.
+- [x] Quality gate. — **Result:** 2026-10-30: ruff, black and mypy (36 source files) clean; pytest passed
+  at 100% coverage (Python 3.12, Windows).

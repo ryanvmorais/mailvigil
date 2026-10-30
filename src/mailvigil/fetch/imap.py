@@ -21,6 +21,7 @@ import re
 import ssl
 from collections.abc import Callable, Iterator, Sequence
 from datetime import date
+from pathlib import Path
 from typing import Any
 
 from mailvigil.fetch.errors import FetchReason, FetchRefused
@@ -669,19 +670,35 @@ def _drop(connection: imaplib.IMAP4) -> None:
         connection.shutdown()
 
 
-def build_context() -> ssl.SSLContext:
+def build_context(cafile: Path | None = None) -> ssl.SSLContext:
     """
     Build the TLS context of every connection: verified certificate, verified host name, TLS 1.2+.
 
     ``imaplib`` would build an unverified one when given none (spec 009, ADR-2), so this is the
-    only context the module ever uses.
+    only context the module ever uses. A ``cafile`` adds trust to the system's and takes none away,
+    and never loosens a check (ADR-10).
+
+    Args:
+        cafile (Path | None, optional): A PEM file with the certificate authorities to trust besides
+            the system's. Default: ``None``.
 
     Returns:
         ssl.SSLContext: A context from ``ssl.create_default_context``.
+
+    Raises:
+        FetchRefused: ``cafile_unusable``, when the file is missing, cannot be read or holds no
+            certificate.
     """
     context = ssl.create_default_context()
     # The default is already 1.2 on current releases; an older build or a loosened one is raised.
     context.minimum_version = max(context.minimum_version, ssl.TLSVersion.TLSv1_2)
+    if cafile is not None:
+        # Not the ``cafile`` argument of ``create_default_context``: it replaces the system's trust.
+        try:
+            context.load_verify_locations(cafile=str(cafile))
+        except OSError:
+            # ``ssl.SSLError`` is an ``OSError``, so this covers a file that is no PEM as well.
+            raise FetchRefused(FetchReason.CAFILE_UNUSABLE) from None
     return context
 
 
@@ -716,6 +733,7 @@ def connect(
     password: str,
     clock: Callable[[], float],
     deadline: float,
+    cafile: Path | None = None,
 ) -> ImapMailbox:
     """
     Open a verified TLS connection to a server and log in.
@@ -731,27 +749,31 @@ def connect(
             that advertises ``AUTH=PLAIN`` (ADR-9).
         clock (Callable[[], float]): Reads the time, in the unit of ``deadline``.
         deadline (float): The reading of ``clock`` past which nothing more is read.
+        cafile (Path | None, optional): Certificate authorities to trust besides the system's
+            (ADR-10). Default: ``None``.
 
     Returns:
         ImapMailbox: The mailbox, logged in.
 
     Raises:
         ValueError: When ``user`` is empty or has a control character.
-        FetchRefused: ``password_unusable`` before any connection is opened, or after the handshake
-            when a credential is outside ASCII and the server has no ``AUTH=PLAIN``; otherwise the
-            reason that matches what failed (certificate, TLS, host, timeout, login, protocol).
+        FetchRefused: ``password_unusable`` or ``cafile_unusable`` before any connection is opened,
+            or ``password_unusable`` after the handshake when a credential is outside ASCII and the
+            server has no ``AUTH=PLAIN``; otherwise the reason that matches what failed
+            (certificate, TLS, host, timeout, login, protocol).
     """
     if not _is_usable(user):
         raise ValueError("the user name is empty or has a control character")
     if not _is_usable(password):
         raise FetchRefused(FetchReason.PASSWORD_UNUSABLE)
+    context = build_context(cafile)
     try:
         connection = _BoundedSsl(
             host,
             port,
             clock=clock,
             deadline=deadline,
-            ssl_context=build_context(),
+            ssl_context=context,
             timeout=SOCKET_TIMEOUT,
         )
     except _LIBRARY_ERRORS as exc:

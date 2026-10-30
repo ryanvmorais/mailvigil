@@ -46,6 +46,7 @@ class FetchReason(StrEnum):
         PASSWORD_UNUSABLE (str): The password is empty or has a control character, or a login
             outside ASCII meets a server without ``AUTH=PLAIN``.
         PASSWORD_FILE (str): The password file is missing, unreadable or empty.
+        CAFILE_UNUSABLE (str): The ``--cafile`` file is missing, unreadable or holds no certificate.
         FOLDER_NOT_FOUND (str): The server has no such folder.
         PROTOCOL_ERROR (str): An answer the bounds or the parsers refuse.
         TOO_MANY_MATCHES (str): The search answer passed the line limit.
@@ -60,6 +61,7 @@ class FetchReason(StrEnum):
     LOGIN_FAILED = "login_failed"
     PASSWORD_UNUSABLE = "password_unusable"
     PASSWORD_FILE = "password_file"
+    CAFILE_UNUSABLE = "cafile_unusable"
     FOLDER_NOT_FOUND = "folder_not_found"
     PROTOCOL_ERROR = "protocol_error"
     TOO_MANY_MATCHES = "too_many_matches"

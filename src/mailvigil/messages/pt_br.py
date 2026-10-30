@@ -298,6 +298,9 @@ _FETCH = FetchMessages(
                 "caracteres fora do ASCII que o servidor nao aceita"
             ),
             FetchReason.PASSWORD_FILE: "nao foi possivel ler a senha do arquivo",
+            FetchReason.CAFILE_UNUSABLE: (
+                "nao foi possivel ler uma autoridade certificadora do arquivo de --cafile"
+            ),
             FetchReason.FOLDER_NOT_FOUND: "a pasta nao foi encontrada",
             FetchReason.PROTOCOL_ERROR: "o servidor enviou uma resposta que nao deu para usar",
             FetchReason.TOO_MANY_MATCHES: "mensagens demais; restrinja com --since",

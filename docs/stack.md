@@ -287,11 +287,12 @@ server that sends more than announced is cut at the cap.
 The work is in what the library does not do for you. Given no context, `IMAP4_SSL` builds an
 *unverified* one, so a tool that asks for a password and says "TLS" would be open to anyone on the
 path; `fetch` always passes `ssl.create_default_context()` and has no switch to relax it (ADR-2 of
-spec 009). `imaplib` also reads a literal of any announced size, so a mixin refuses it by its
-announced size and reads in chunks under a deadline (ADR-3). The login is `LOGIN` for a
-printable-ASCII name and password, and `AUTHENTICATE PLAIN` in UTF-8 when either has a character
-outside ASCII and the server offers it (ADR-5, ADR-9); OAuth stays out because it needs an
-application registered with the provider. Every library failure becomes a typed `FetchReason`,
+spec 009). `--cafile` only adds an authority with `load_verify_locations`; passing the file as
+`create_default_context(cafile=...)` would drop the system's trust instead (ADR-10). `imaplib`
+also reads a literal of any announced size, so a mixin refuses it by its announced size and reads
+in chunks under a deadline (ADR-3). The login is `LOGIN` for a printable-ASCII name and password,
+and `AUTHENTICATE PLAIN` in UTF-8 when either has a character outside ASCII and the server offers
+it (ADR-5, ADR-9); OAuth stays out because it needs an application registered with the provider. Every library failure becomes a typed `FetchReason`,
 never a traceback.
 
 **Learn:** the IMAP commands `LOGIN`, `AUTHENTICATE PLAIN`, `SELECT` (read-only), `UID SEARCH` and `UID FETCH`; what

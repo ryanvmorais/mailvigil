@@ -91,6 +91,14 @@ every defense has a test that feeds it the attack.
   **Then** it stops before sending any credential, prints a message that names the cause in plain
   language, and exits with the code of a refusal (RF-08). There is no flag, option or environment
   variable that skips the check.
+- **Given** `--cafile FILE` with a PEM file that holds a private certificate authority
+  **When** `fetch` connects to a server whose certificate that authority signed
+  **Then** the certificate is accepted, because the authority is trusted in addition to the system's;
+  the chain and the host name are still checked, and a server signed by neither is still refused.
+  The file can only add trust (ADR-10).
+- **Given** a `--cafile` that is missing, cannot be read or holds no certificate
+  **When** `fetch` starts
+  **Then** it ends in `cafile_unusable` before the password is asked for and before any connection.
 - **Given** a `--port` other than 993
   **When** `fetch` connects
   **Then** it is still implicit TLS; the port is only where to connect, never a switch to plain text.

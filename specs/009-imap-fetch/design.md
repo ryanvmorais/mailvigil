@@ -77,6 +77,7 @@ class FetchReason(StrEnum):                    # errors.py: the key is the contr
     LOGIN_FAILED = "login_failed"              # the server said NO/BAD to the login
     PASSWORD_UNUSABLE = "password_unusable"    # non-ASCII, empty or with a line break (ADR-5)
     PASSWORD_FILE = "password_file"            # missing, unreadable or empty
+    CAFILE_UNUSABLE = "cafile_unusable"        # --cafile missing, unreadable or no certificate (ADR-10)
     FOLDER_NOT_FOUND = "folder_not_found"
     PROTOCOL_ERROR = "protocol_error"          # a response the bounds or the parser refuse
     TOO_MANY_MATCHES = "too_many_matches"      # the SEARCH line passed the library's line limit
@@ -236,7 +237,7 @@ the CLI test opens no socket.
 ```text
 mailvigil fetch --host HOST --user NAME --to DIR
                 [--port N] [--folder NAME] [--since YYYY-MM-DD] [--limit N]
-                [--password-file FILE] [--lang {en,pt-BR}]
+                [--password-file FILE] [--cafile FILE] [--lang {en,pt-BR}]
 ```
 
 | Option | Rule |
@@ -247,6 +248,7 @@ mailvigil fetch --host HOST --user NAME --to DIR
 | `--since` | `date.fromisoformat`; an invalid value is argparse's usage error (exit 2) |
 | `--limit` | integer 1..`MAX_LIMIT`, default `DEFAULT_LIMIT` |
 | `--password-file` | see the command, step 2 |
+| `--cafile` | a PEM file with authorities to trust in addition to the system's (ADR-10); checked before the password is asked for |
 | `--lang` | the same parent parser as `summary` and `verdict` (ADR-7) |
 
 Exit codes are the existing contract, no new code: `0` completed (even with nothing new), `1`
@@ -284,6 +286,7 @@ an argument, a variable or a stored value; the certificate is always checked.
   security finding of the spec, which is why RF-01 forbids any switch.
 - **Trade-off:** a server with a self-signed or private-CA certificate is refused. The platform
   trust store is the only trust there is; adding a `--cafile` is a later spec if someone needs it.
+  **Amendment (2026-10-30, #76):** that later spec is ADR-10.
 
 ### ADR-3 — Bounds live in the connection, not only in the caller
 
@@ -398,6 +401,34 @@ an argument, a variable or a stored value; the certificate is always checked.
   password typed as a composed letter on one keyboard and a decomposed one on another does not
   match on a server that normalises. A server without `AUTH=PLAIN` (or with `LOGINDISABLED`) still
   refuses a non-ASCII login.
+
+### ADR-10 — `--cafile` adds a trusted authority and never relaxes a check (amendment of 2026-10-30, issue #76)
+
+- **Decision:** `fetch --cafile FILE` takes a PEM file. `build_context(cafile)` makes the same
+  context as before (ADR-2) and then calls `load_verify_locations(cafile=FILE)` on it, so the
+  authorities in the file are trusted besides the system's. Verification mode, host name check and
+  the TLS floor are not touched, and the file is the only thing the option changes. A file that is
+  missing, cannot be read, is a folder or holds no certificate is `cafile_unusable`, with no detail
+  (the path is the user's own and the library's text adds nothing). The command builds the context
+  once before it asks for the password, so a mistyped path is told at once, and `connect` builds it
+  again from the same path (it takes `cafile`, never a ready-made context, so no caller can hand it
+  an unverified one). The command set of ADR-1 and the exit codes do not change.
+- **Alternatives:** `ssl.create_default_context(cafile=FILE)`, which the issue sketched: it
+  **replaces** the system's trust with the file, so a server with a public certificate stops
+  working the moment the flag is used (the library documents this); `SSL_CERT_FILE`, which the
+  standard library already honours but is an environment variable that decides trust, and the
+  project keeps those out; an option to skip verification, refused for good by RF-01.
+- **Why:** a company or home-lab mail server is a normal case, and the only way out was to edit the
+  machine's trust store, which a managed machine may not allow. Adding trust through the context
+  that is already verified keeps one code path for TLS, and the test pins that the system's
+  authorities are all still there and that `verify_mode` and `check_hostname` are as before.
+- **Trade-off:** a file with a wrong authority is trusted as given, as any trust store is: whoever
+  holds its private key can pose as the server, so the file should hold the authority of the
+  user's own server. Python 3.13 and newer also apply the strict X.509 checks of OpenSSL, so an
+  authority certificate that lacks the key identifiers can be refused as `certificate_invalid`; the
+  fix is a proper certificate, not a switch. The acceptance of a real server signed by the
+  authority is the library's, so the tests pin the contents and the checks of the context rather
+  than a handshake.
 
 ## Impact
 

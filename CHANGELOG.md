@@ -7,6 +7,15 @@ All notable changes to MailVigil are written here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **`fetch --cafile FILE` trusts a private certificate authority.** A mail server behind a company
+  or home-lab authority was refused with `certificate_invalid`, and the only way out was to change
+  the machine's trust store. The PEM file now adds its authorities to the system's, and the
+  certificate and the host name are still checked, so the option can only add trust, never skip a
+  check. A file that is missing, cannot be read or holds no certificate is refused before the
+  password is asked for, with the new reason `cafile_unusable`.
+
 ## [1.1.2] - 2026-10-30
 
 ### Changed

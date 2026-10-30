@@ -309,7 +309,9 @@ O que ele não faz:
 - Nunca altera a caixa de correio: nada de apagar, mover ou marcar, e as mensagens não ficam
   marcadas como lidas.
 - Nunca se conecta sem TLS, e o certificado é sempre verificado. Não existe opção para desligar
-  isso, nem IMAP sem criptografia, nem STARTTLS (o `--port` padrão é 993).
+  isso, nem IMAP sem criptografia, nem STARTTLS (o `--port` padrão é 993). Um servidor atrás de
+  uma autoridade certificadora privada é aceito com `--cafile ARQUIVO` (um arquivo PEM), que soma
+  essa autoridade às do sistema e continua verificando o certificado e o nome do servidor.
 - A senha é pedida no terminal ou lida da primeira linha do `--password-file`. Ela nunca é um
   argumento nem uma variável de ambiente, e nada a guarda.
 - Não interpreta os relatórios: ele salva bytes, e a ingestão os lê.
