@@ -203,7 +203,9 @@ convention, held by review and by the hostile-input tests.
 directly, with handlers that raise as soon as the document declares a `DOCTYPE` or an `ENTITY`.
 A `TreeBuilder` from `ElementTree` assembles the tree that `parser.py` walks to get each record:
 source IP, count, SPF and DKIM results, alignment and DKIM selector. That module is the only place
-that creates an XML parser.
+that creates an XML parser. The same handlers count the depth and the elements and refuse a
+document past 32 levels or 500,000 elements while it is read (ADR-8 of spec 002), because the
+byte cap alone does not bound the cost of the tree.
 
 **Why this:** against `lxml` (a C dependency) and `defusedxml` (a dependency just for this), the
 standard parser is enough once the dangerous constructs are refused. Hooking `expat` instead of

@@ -43,6 +43,7 @@ from mailvigil.reports import (
     read_xml,
 )
 from mailvigil.reports.ingest import FUTURE_TOLERANCE
+from mailvigil.reports.xmlsafe import MAX_DEPTH
 
 # The shapes of the ``conftest.py`` factories, named once so each test signature stays short.
 type _MakeReport = Callable[..., bytes]
@@ -72,6 +73,19 @@ def _attachment(directory: Path, label: str, content: bytes, extension: str = "x
     path = directory / f"{label}!example.com!1790000000!1790086399.{extension}"
     path.write_bytes(content)
     return path
+
+
+def _nested(depth: int) -> bytes:
+    """
+    Build a well-formed document that is ``depth`` levels deep.
+
+    Args:
+        depth (int): How many elements are open at the deepest point.
+
+    Returns:
+        bytes: The document.
+    """
+    return b"<a>" * depth + b"</a>" * depth
 
 
 def _snapshot(directory: Path) -> dict[str, bytes | None]:
@@ -106,6 +120,7 @@ def test_a_good_report_is_returned_and_every_refusal_is_listed_with_its_reason(
             Reason.FORBIDDEN_DECLARATION,
         ),
         "malformed": (b"<feedback><a></feedback>", "xml", Reason.MALFORMED_XML),
+        "nested": (_nested(MAX_DEPTH + 1), "xml", Reason.XML_TOO_COMPLEX),
         "notreport": (make_report_xml(root_tag="other"), "xml", Reason.NOT_A_REPORT),
         "version": (make_report_xml(version="2.0"), "xml", Reason.UNSUPPORTED_VERSION),
         "field": (make_report_xml(pct=101), "xml", Reason.INVALID_FIELD),

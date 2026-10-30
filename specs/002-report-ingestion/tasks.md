@@ -182,3 +182,15 @@ public entry point.
   RF-04, RF-04b
 - [x] Quality gate. — result recorded when run: ruff, black and mypy clean; pytest passed with
   coverage 100% (Python 3.12, 2026-10-29).
+
+## Stage 9 — Cap the depth and the element count of the XML (issue #66)
+
+- [x] `errors.py`: `Reason.XML_TOO_COMPLEX`; `messages/en.py` and `messages/pt_br.py`: its phrase.
+  Tests: the value, and the existing test that iterates `Reason` over both languages. — ADR-8
+- [x] `xmlsafe.py`: `MAX_DEPTH` (32) and `MAX_ELEMENTS` (500,000), counted in the start handler.
+  Tests at both boundaries (the limit accepted, one more refused), a 5 MiB nest refused, the
+  refusal skipped per file by `ingest`, and one run through `main(argv)` for each of the four
+  outputs. — RF-03b
+- [x] Quality gate. — result recorded when run: ruff, black and mypy clean; pytest passed with
+  coverage 100% (Python 3.12, 2026-10-30). Measured after: 5 MiB nest 213 MB to 1 MB, 5 MiB of empty
+  elements 108 MB to 42 MB, a real report at the cap unchanged at 30 MB.
