@@ -14,10 +14,11 @@ venv/
 .uv/
 
 # --- 3. TOOLING CACHES ---
-# ruff, mypy, pytest, coverage — local speed-ups, never useful in Git.
+# ruff, mypy, pytest, hypothesis, coverage — local speed-ups, never useful in Git.
 .mypy_cache/
 .ruff_cache/
 .pytest_cache/
+.hypothesis/
 .coverage
 htmlcov/
 

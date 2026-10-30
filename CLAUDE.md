@@ -150,7 +150,9 @@ tests/               # pytest, one test file per module (test_reports_*.py incl.
                      # test_html_charts.py, test_render_html.py, test_render_html_hostile.py,
                      # test_cli_html.py, test_cli_html_output.py, test_fetch_*.py,
                      # test_render_fetch.py, test_cli_fetch.py, test_smoke.py, test_gitignore.py,
-                     # test_readme_pt_br.py, test_readme_links.py and
+                     # test_readme_pt_br.py, test_readme_links.py, test_properties.py (Hypothesis:
+                     # the readers only refuse and a parsed report reaches every output; the
+                     # `thorough` profile is for a long hunt) and
                      # test_offline_isolation.py, which runs fresh interpreters to prove that
                      # summary and verdict never load the network code); fixtures are synthetic,
                      # built in conftest.py, cli_helpers.py, mail_helpers.py, schema_examples.py,

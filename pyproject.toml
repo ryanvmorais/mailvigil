@@ -63,6 +63,7 @@ Issues = "https://github.com/ryanvmorais/mailvigil/issues"
 [dependency-groups]
 dev = [
     "black>=26.10.1",
+    "hypothesis>=6.170.8",
     "mypy>=2.4.0",
     "pytest>=9.2.0",
     "pytest-cov>=7.1.0",

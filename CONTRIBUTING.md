@@ -10,7 +10,8 @@ starting anything large.
 ## Development
 
 MailVigil is managed with [uv](https://docs.astral.sh/uv/). `uv sync` installs the project and the
-`dev` dependency group, which pins the tooling (`ruff`, `black`, `mypy`, `pytest`, `pytest-cov`).
+`dev` dependency group, which pins the tooling (`ruff`, `black`, `mypy`, `pytest`, `pytest-cov`,
+`hypothesis`).
 The package itself has **zero runtime dependencies** and must stay that way: it is the product
 promise, and the CI fails if the built wheel declares one. Parsing uses the standard library only.
 
