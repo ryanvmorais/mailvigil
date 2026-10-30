@@ -43,7 +43,8 @@ class FetchReason(StrEnum):
         CERTIFICATE_INVALID (str): The server certificate failed verification; nothing was sent.
         TLS_FAILED (str): The handshake failed for another reason, such as an old TLS version.
         LOGIN_FAILED (str): The server said NO or BAD to the login.
-        PASSWORD_UNUSABLE (str): The password is empty, non-ASCII or has a line break.
+        PASSWORD_UNUSABLE (str): The password is empty or has a control character, or a login
+            outside ASCII meets a server without ``AUTH=PLAIN``.
         PASSWORD_FILE (str): The password file is missing, unreadable or empty.
         FOLDER_NOT_FOUND (str): The server has no such folder.
         PROTOCOL_ERROR (str): An answer the bounds or the parsers refuse.

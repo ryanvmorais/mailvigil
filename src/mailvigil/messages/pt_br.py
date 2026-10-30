@@ -293,7 +293,8 @@ _FETCH = FetchMessages(
             FetchReason.TLS_FAILED: "nao foi possivel abrir uma conexao segura",
             FetchReason.LOGIN_FAILED: f"o servidor recusou o usuario ou a senha{_IMAP_HINT}",
             FetchReason.PASSWORD_UNUSABLE: (
-                "a senha esta vazia, tem quebra de linha ou tem caracteres fora do ASCII"
+                "a senha esta vazia, tem quebra de linha ou caractere de controle, ou o login tem "
+                "caracteres fora do ASCII que o servidor nao aceita"
             ),
             FetchReason.PASSWORD_FILE: "nao foi possivel ler a senha do arquivo",
             FetchReason.FOLDER_NOT_FOUND: "a pasta nao foi encontrada",

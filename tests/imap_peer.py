@@ -90,7 +90,12 @@ class ScriptedPeer:
         received (list[bytes]): Every command line the client sent, without its line break.
     """
 
-    def __init__(self, handler: Handler | None = None, greeting: bytes = b"* OK ready\r\n") -> None:
+    def __init__(
+        self,
+        handler: Handler | None = None,
+        greeting: bytes = b"* OK ready\r\n",
+        capabilities: bytes = b"IMAP4rev1",
+    ) -> None:
         """
         Start the server thread.
 
@@ -98,11 +103,13 @@ class ScriptedPeer:
             handler (Handler | None, optional): Answers every command but ``CAPABILITY`` and
                 ``LOGOUT``; ``None`` answers ``OK`` to all. Default: ``None``.
             greeting (bytes, optional): What the server says first. Default: ``* OK ready``.
+            capabilities (bytes, optional): What ``CAPABILITY`` lists. Default: ``IMAP4rev1``.
         """
         self.client, self._server = socket.socketpair()
         self.received: list[bytes] = []
         self._handler = handler
         self._greeting = greeting
+        self._capabilities = capabilities
         self._stopping = threading.Event()
         self._thread = threading.Thread(target=self._serve, daemon=True)
         self._thread.start()
@@ -150,7 +157,7 @@ class ScriptedPeer:
                 tag, _, rest = text.partition(b" ")
                 verb = rest.split(b" ")[0].upper()
                 if verb == b"CAPABILITY":
-                    self.send(ok(tag, b"* CAPABILITY IMAP4rev1\r\n"))
+                    self.send(ok(tag, b"* CAPABILITY " + self._capabilities + b"\r\n"))
                 elif verb == b"LOGOUT":
                     self.send(ok(tag, b"* BYE bye\r\n"))
                     return

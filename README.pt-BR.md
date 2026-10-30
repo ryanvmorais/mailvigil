@@ -321,8 +321,9 @@ igual. Quando um login é recusado ou o servidor não pode ser alcançado, a men
 
 Limites de provedor: ele entra com nome e senha (`LOGIN`), sem OAuth. O Gmail funciona com uma
 [senha de app](https://support.google.com/accounts/answer/185833) (com a verificação em duas etapas
-ligada). Contas do Microsoft 365 e do Google sem senha de app não são suportadas nesta versão. Uma
-senha com caractere fora do ASCII é recusada nesta versão.
+ligada). Contas do Microsoft 365 e do Google sem senha de app não são suportadas nesta versão. Um
+nome ou senha com caractere fora do ASCII é enviado com `AUTHENTICATE PLAIN` em UTF-8, e só se o
+servidor oferecer esse método; do contrário a execução é recusada.
 
 Códigos de saída: `0` quando a execução terminou, mesmo sem nada novo; `1` quando foi recusada (o
 motivo é impresso numa linha); `2` para erro de uso; `70` para um bug (veja abaixo).

@@ -505,7 +505,7 @@ def test_a_user_that_is_not_printable_ascii_is_a_usage_error(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """The adapter raises ``ValueError`` for the user; the command turns it into exit 2."""
-    connect.error = ValueError("the user name must be printable ASCII")
+    connect.error = ValueError("the user name is empty or has a control character")
 
     err = _usage_error(_args(tmp_path, password_file), capsys)
 
@@ -696,18 +696,32 @@ def test_a_first_line_over_four_kib_is_not_a_password(
     assert connect.calls == []
 
 
-def test_a_password_outside_ascii_is_a_refusal(
+def test_a_password_with_a_control_character_is_a_refusal(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Not ASCII: the real ``connect`` refuses it before it opens any connection (exit 1)."""
+    """The real ``connect`` refuses it before it opens any connection (exit 1)."""
     path = tmp_path / "pw.txt"
-    path.write_bytes("sença\n".encode())
+    path.write_bytes(b"sen\x01ha\n")
     path.chmod(0o600)
 
     code, _out, err = _run(_args(tmp_path, path), capsys)
 
     assert code == EXIT_REFUSED
     assert err.startswith("mailvigil: the password is empty, has a line break")
+
+
+def test_a_password_outside_ascii_reaches_the_connection(
+    tmp_path: Path, connect: _Connect, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The command no longer judges it: the adapter decides by the server (ADR-9)."""
+    path = tmp_path / "pw.txt"
+    path.write_bytes("sença\n".encode())
+    path.chmod(0o600)
+
+    code, _out, _err = _run(_args(tmp_path, path), capsys)
+
+    assert code == EXIT_OK
+    assert connect.calls[0]["password"] == "sença"
 
 
 def test_a_file_that_is_not_text_is_a_refusal(
