@@ -184,6 +184,11 @@ before it reaches the builder: no namespace or `urn:ietf:params:xml:ns:dmarc-2.0
 (`feedback`); any other namespace → `{uri}local`, a name no later lookup asks for, so extension
 elements are ignored and a foreign-namespace `feedback` fails the root check (RF-04).
 
+The start handler also keeps two counters, the depth and the number of elements, and raises
+`ReportRefused(XML_TOO_COMPLEX, ...)` past `MAX_DEPTH` (32) or `MAX_ELEMENTS` (500,000), two module
+constants of `xmlsafe.py`. The check runs inside the handler, so the parse stops at the element
+that crosses the line (ADR-8). The detail names the limit and never the content.
+
 A prototype of exactly this shape was run on 2026-10-27 over: a UTF-16 document with `DOCTYPE` and
 `ENTITY`, a UTF-8 one, a UTF-8 one with a byte order mark, an external-entity declaration (all
 refused); and a clean UTF-8 document, a clean UTF-16 document and one with an XML declaration and
@@ -271,6 +276,7 @@ an error is the caller's call (RF-09, spec `006`).
 | `mailvigil.reports.parse_report(xml, *, source="")` | `bytes -> Report`; raises `ReportRefused` |
 | `ReportRefused.reason` | a `Reason`; the stable key later specs translate to text |
 | `MAX_BYTES`, `MAX_TEXT`, `MAX_COUNT` | module constants (5 MiB, 255, 10^12) |
+| `MAX_DEPTH`, `MAX_ELEMENTS` | module constants of `xmlsafe.py` (32, 500,000) |
 
 None of this is a public contract yet: there is no release. `Reason` values and the model fields
 become one at the first version, as specs `004` to `006` build on them.
@@ -361,6 +367,22 @@ flag or by configuration without breaking anything. The reverse (tightening late
 **Trade-off.** A few users will hit a refusal and have to be told what to do; the `Reason` makes
 that message possible. (RF-01, RF-06, RF-07)
 
+### ADR-8 — Cap the depth and the element count of the XML (issue #66)
+
+**Decision.** `MAX_DEPTH = 32` and `MAX_ELEMENTS = 500_000`, counted in the expat start handler;
+past either, `XML_TOO_COMPLEX`.
+**Alternatives.** (a) Lower `MAX_BYTES`. (b) A memory limit on the process. (c) Count after the
+tree is built.
+**Why.** `MAX_BYTES` counts bytes, and the cost of a tree is in its nodes. Measured on 2026-10-30
+(`tracemalloc`, Python 3.12): a realistic report at the cap holds about 227,000 elements and peaks
+at 30 MB; 5 MiB of `<a/>` holds 1.3 million elements and peaks at 108 MB in 4 s; 5 MiB of nesting
+peaks at 213 MB. 32 levels is five times what a report needs (about six), and 500,000 elements
+is twice what one at the cap holds, so no honest report is refused and the dense case stops at
+about 40% of the cost. (a) also refuses honest large reports; (b) is not portable; (c) pays the
+whole cost before it refuses.
+**Trade-off.** A report from a reporter with an unusually deep extension block would be refused;
+the two constants are the place to loosen them, by a decision in this spec. (RF-03b)
+
 ## Impact on existing code
 
 - **New package** `src/mailvigil/reports/` and new test files; `cli.py`, `__init__.py` and the
@@ -419,6 +441,7 @@ documentation address ranges (RNF-07).
 | RF-01 | `.xml`, `.gz`, `.zip` round trip; upper-case suffix; unknown suffix; zip with no XML, with two XMLs; corrupt zip; corrupt gzip; missing file |
 | RF-02 | 5 MiB + 1 of zeros as `.xml`, as `.gz` and as `.zip` member; a zip whose header declares a smaller size than the data (`Bad CRC` → `NOT_AN_ARCHIVE`); `_read_capped` fed a stream larger than the cap, to prove the cap does not read the header; a small legitimate report passes; on-disk size over the cap |
 | RF-03 | `DOCTYPE`; `ENTITY` in an internal subset; external entity (`SYSTEM`); the same in UTF-16 and UTF-8 with a byte order mark; a clean document with a declaration and a comment is accepted |
+| RF-03b | a document `MAX_DEPTH` deep accepted and one level more refused; `MAX_ELEMENTS` elements accepted and one more refused; a 5 MiB nest refused fast; the refusal kept per file through `ingest` and through `main(argv)` |
 | RF-04 | full report to model (every field asserted); RFC 7489 and RFC 9990 namespace give equal reports; foreign namespace root; wrong root; malformed XML with position; negative, non-integer and 5,000-digit `count`; bad timestamp; `end < begin`; `pct` 101; `version` `2.0`; missing optionals take defaults; whitespace around values; two `dkim` blocks; IPv6 source normalized |
 | RF-05 | C1 control, bidirectional override, line break inside a field (removed or replaced); a 1,000-character field cut at 255; ESC and NUL refused by the parser (documents the parser's behavior) |
 | RF-06 | file taken whatever its name; folder keeps only the attachment pattern; non-recursive; same file twice; names differing in case sort identically on every platform; missing path reported, others still read |

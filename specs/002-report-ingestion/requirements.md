@@ -138,6 +138,18 @@ adds the reading layer; it does not add a command (Resolved decision 5).
   **When** it is parsed
   **Then** it is accepted: only the dangerous declarations are refused.
 
+### RF-03b — Refuse a document built to be expensive for its size (issue #66)
+
+- **Given** an XML document nested deeper than 32 levels, or holding more than 500,000 elements
+  (figures no real report reaches: a report has about six levels, and one at the 5 MiB cap about
+  230,000 elements)
+  **When** it is parsed
+  **Then** it is refused with the reason `XML_TOO_COMPLEX`, counted while the parser reads, so the
+  tree of the rest of the document is never built.
+- **Given** a document that is at, and not over, either limit
+  **When** it is parsed
+  **Then** it is accepted.
+
 ### RF-04 — Parse a report into the record model
 
 - **Given** the XML of a valid aggregate report

@@ -7,6 +7,14 @@ All notable changes to MailVigil are written here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **A report built to be expensive for its size is refused.** An XML nested more than 32 levels deep
+  or holding more than 500,000 elements is skipped with the new reason `xml_too_complex`, while it
+  is read. A real report has about six levels and, at the 5 MiB cap, about 230,000 elements, so
+  none is refused. The worst case drops from 213 MB of memory to 1 MB (nesting) and from 108 MB to
+  42 MB (empty elements). The reason shows up in the skipped files of the text and of `--json`.
+
 ## [1.1.1] - 2026-10-30
 
 ### Changed
