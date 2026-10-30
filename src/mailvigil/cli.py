@@ -40,6 +40,7 @@ from mailvigil.cli_common import (
     EXIT_REFUSED,
     EXIT_TOO_EARLY,
     EXIT_USAGE,
+    config_line,
     echo,
     write,
 )
@@ -99,31 +100,6 @@ class _Refusal(Exception):
 # ---------------------------------------------------------------------------
 
 
-def _config_line(error: ConfigError, messages: Messages) -> str:
-    """
-    Write the line of a refused configuration or ``--domain`` value.
-
-    The phrase of the reason, then the key, then the detail only for the reasons the language keeps
-    it for: ``config.py`` writes the detail in English, so a translation drops it where the reason
-    already says what it said (ADR-5). In English every reason keeps it, so the line is what
-    ``str(error)`` has always been.
-
-    Args:
-        error (ConfigError): The refusal.
-        messages (Messages): The language.
-
-    Returns:
-        str: The line, without the path it concerns.
-    """
-    refusals = messages.refusals
-    line = refusals.config_reasons[error.reason]
-    if error.key:
-        line += f" [{error.key}]"
-    if error.detail and error.reason in refusals.config_detail:
-        line += f": {error.detail}"
-    return line
-
-
 def resolve_config(
     config_path: Path | None, domain: str | None, messages: Messages = ENGLISH
 ) -> tuple[Config, str | None]:
@@ -152,7 +128,7 @@ def resolve_config(
         try:
             wanted = check_domain(domain, key="--domain")
         except ConfigError as error:
-            raise _Refusal(_config_line(error, messages)) from error
+            raise _Refusal(config_line(error, messages)) from error
 
     # ``exists``, not ``is_file``: a folder with that name is refused as unreadable by the loader
     # instead of being silently ignored.
@@ -170,7 +146,7 @@ def resolve_config(
     try:
         config = load_config(path)
     except ConfigError as error:
-        raise _Refusal(f"{echo(path)}: {_config_line(error, messages)}") from error
+        raise _Refusal(f"{echo(path)}: {config_line(error, messages)}") from error
     if wanted is not None and wanted != config.domain:
         raise _Refusal(
             messages.refusals.domain_mismatch.format(

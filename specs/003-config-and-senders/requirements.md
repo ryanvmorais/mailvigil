@@ -139,6 +139,11 @@ command (as 002 did): the command, and with it where the file is looked for, arr
   **When** it is loaded
   **Then** it is refused with a reason that names the key and, when one is close, suggests the
   intended one.
+- **Given** a key of the `[fetch]` table that the format does not define, or one whose name
+  suggests a password (*amendment of 2026-10-30, issue #75, design ADR-7*)
+  **When** it is loaded
+  **Then** it is refused with a reason that names the key as `fetch.<name>`: the second
+  case has a reason of its own, and the value is never repeated in the error.
 - **Given** a `[senders]` entry whose value is a table or a list instead of a string
   **When** it is loaded
   **Then** it is refused with a reason that names the key. (Nested forms are reserved for future

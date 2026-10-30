@@ -1,5 +1,6 @@
 """
-Tests of the configuration loader: the vocabulary, the file, the domain and the selector map.
+Tests of the configuration loader: the vocabulary, the file, the domain, the selector map and
+the ``[fetch]`` table.
 
 Isolation: every file is written in ``tmp_path`` as explicit bytes, so the newline style and the
 encoding of the platform do not matter, and nothing outside it is touched. The domains
@@ -22,6 +23,7 @@ from mailvigil.config import (
     Config,
     ConfigError,
     ConfigReason,
+    FetchSettings,
     check_domain,
     load_config,
 )
@@ -72,10 +74,10 @@ def refusal(path: Path) -> ConfigError:
 # ---------------------------------------------------------------------------
 
 
-def test_config_reason_is_a_string_enum_with_the_thirteen_members() -> None:
-    """``ConfigReason`` has exactly the thirteen refusals of the design, each a string."""
+def test_config_reason_is_a_string_enum_with_the_fifteen_members() -> None:
+    """``ConfigReason`` has exactly the fifteen refusals of the design, each a string."""
     assert issubclass(ConfigReason, StrEnum)
-    assert len(ConfigReason) == 13
+    assert len(ConfigReason) == 15
 
 
 def test_config_reason_values_are_unique_lower_snake_strings() -> None:
@@ -394,7 +396,7 @@ def test_an_unrelated_unknown_key_has_no_suggestion(tmp_path: Path) -> None:
 
 
 def test_an_unknown_table_is_refused_like_an_unknown_key(tmp_path: Path) -> None:
-    """The format defines two top-level keys; a table of another name is not one of them."""
+    """The format defines three top-level keys; a table of another name is not one of them."""
     error = refusal(write(tmp_path, f"{_VALID}[sender]\nresend = 'Example Mailer'\n"))
 
     assert error.reason is ConfigReason.UNKNOWN_KEY
@@ -519,6 +521,141 @@ def test_an_absent_or_empty_senders_table_is_accepted(tmp_path: Path, senders: s
     config = load_config(write(tmp_path, _VALID + senders))
 
     assert dict(config.senders) == {}
+
+
+# ---------------------------------------------------------------------------
+# The [fetch] table (spec 003 ADR-7, spec 009 ADR-12)
+# ---------------------------------------------------------------------------
+
+
+def test_a_file_without_a_fetch_table_gives_empty_settings(tmp_path: Path) -> None:
+    """Absent is not an error: every field stays ``None`` for the flags and defaults to fill."""
+    config = load_config(write(tmp_path, _VALID))
+
+    assert config.fetch == FetchSettings()
+
+
+def test_the_four_keys_of_the_fetch_table_are_read(tmp_path: Path) -> None:
+    """Host, user, port and folder come back as the file wrote them, stripped."""
+    table = '[fetch]\nhost = " imap.example.com "\nuser = "reports"\nport = 143\nfolder = "DMARC"\n'
+
+    config = load_config(write(tmp_path, _VALID + table))
+
+    assert config.fetch == FetchSettings("imap.example.com", "reports", 143, "DMARC")
+
+
+def test_a_fetch_table_may_hold_only_some_keys(tmp_path: Path) -> None:
+    """The flags fill the rest, so a partial table is valid."""
+    config = load_config(write(tmp_path, f'{_VALID}[fetch]\nhost = "imap.example.com"\n'))
+
+    assert config.fetch == FetchSettings(host="imap.example.com")
+
+
+def test_a_folder_name_may_hold_a_space(tmp_path: Path) -> None:
+    """Only a host and a login are one word; a mailbox folder is not."""
+    config = load_config(write(tmp_path, f'{_VALID}[fetch]\nfolder = "DMARC reports"\n'))
+
+    assert config.fetch.folder == "DMARC reports"
+
+
+def test_fetch_that_is_not_a_table_is_refused(tmp_path: Path) -> None:
+    """``fetch = "x"`` is a mistake the loader names instead of ignoring."""
+    error = refusal(write(tmp_path, 'fetch = "x"\n' + _VALID))
+
+    assert error.reason is ConfigReason.WRONG_TYPE
+    assert error.key == "fetch"
+
+
+@pytest.mark.parametrize("key", ["password", "Password", "passwd", "imap_pass", "secret", "token"])
+def test_a_key_that_would_hold_a_password_is_refused_by_name(tmp_path: Path, key: str) -> None:
+    """The password never lives in the file; the refusal says where it goes."""
+    error = refusal(write(tmp_path, f'{_VALID}[fetch]\n{key} = "hunter2"\n'))
+
+    assert error.reason is ConfigReason.PASSWORD_NOT_ALLOWED
+    assert error.key == f"fetch.{key}"
+    assert "--password-file" in error.detail
+    assert "hunter2" not in str(error)
+
+
+def test_an_unknown_fetch_key_is_refused_and_a_close_one_is_suggested(tmp_path: Path) -> None:
+    """The strict reading of the file reaches inside ``[fetch]``."""
+    error = refusal(write(tmp_path, f'{_VALID}[fetch]\nhots = "imap.example.com"\n'))
+
+    assert error.reason is ConfigReason.UNKNOWN_KEY
+    assert error.key == "fetch.hots"
+    assert "host" in error.detail
+
+
+@pytest.mark.parametrize("key", ["to", "since", "limit", "cafile"])
+def test_the_other_flags_are_not_keys_of_the_table(tmp_path: Path, key: str) -> None:
+    """A path or a date does not belong in a shared file (ADR-12)."""
+    error = refusal(write(tmp_path, f"{_VALID}[fetch]\n{key} = 1\n"))
+
+    assert error.reason is ConfigReason.UNKNOWN_KEY
+    assert error.key == f"fetch.{key}"
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "host = 1",
+        'host = ""',
+        'host = "   "',
+        'host = "imap example.com"',
+        'user = ["a"]',
+        'user = "a b"',
+        'folder = ""',
+        "folder = 7",
+        'port = "993"',
+        "port = 0",
+        "port = 65536",
+        "port = true",
+        "port = 993.0",
+    ],
+)
+def test_a_fetch_value_of_the_wrong_kind_is_refused(tmp_path: Path, line: str) -> None:
+    """The same ranges the flags have: a string where a string goes, a port in 1..65535."""
+    error = refusal(write(tmp_path, f"{_VALID}[fetch]\n{line}\n"))
+
+    assert error.reason is ConfigReason.INVALID_FETCH_VALUE
+    assert error.key == f"fetch.{line.split()[0]}"
+
+
+def test_the_edges_of_the_port_are_accepted(tmp_path: Path) -> None:
+    """1 and 65535 are ports."""
+    for port in (1, 65535):
+        config = load_config(write(tmp_path, f"{_VALID}[fetch]\nport = {port}\n"))
+        assert config.fetch.port == port
+
+
+@pytest.mark.parametrize("key", ["host", "user", "folder"])
+@pytest.mark.parametrize("escape", ["\\n", "\\u202e", "\\u0085", "\\u200b"])
+def test_a_control_or_format_character_in_a_fetch_value_is_refused(
+    tmp_path: Path, key: str, escape: str
+) -> None:
+    """A line break in a folder would end the IMAP command line and start another one."""
+    error = refusal(write(tmp_path, f'{_VALID}[fetch]\n{key} = "a{escape}b"\n'))
+
+    assert error.reason is ConfigReason.FORBIDDEN_CHARACTER
+    assert error.key == f"fetch.{key}"
+
+
+def test_the_fetch_table_is_checked_after_the_senders(tmp_path: Path) -> None:
+    """The fixed order grows by one step: file, parse, keys, domain, senders, fetch."""
+    text = f"{_VALID}[senders]\nresend = 42\n[fetch]\nport = 0\n"
+
+    assert refusal(write(tmp_path, text)).reason is ConfigReason.INVALID_SERVICE_NAME
+
+
+def test_two_bad_fetch_keys_report_the_same_one_in_any_order(tmp_path: Path) -> None:
+    """Keys are visited in sorted order, not in the order of the file."""
+    keys = ("zzz = 1", "aaa = 2")
+    found = {
+        refusal(write(tmp_path, f"{_VALID}[fetch]\n{first}\n{second}\n")).key
+        for first, second in (keys, keys[::-1])
+    }
+
+    assert found == {"fetch.aaa"}
 
 
 # ---------------------------------------------------------------------------

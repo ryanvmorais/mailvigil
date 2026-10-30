@@ -35,6 +35,7 @@ uv run mailvigil summary --config FILE path/to/reports --lang pt-BR   # the text
 uv run mailvigil verdict --config FILE path/to/reports --html > report.html   # one static page (spec 008)
 uv run mailvigil verdict --config FILE path/to/reports --html --output report.html   # the same, written as ASCII by the tool
 uv run mailvigil fetch --host HOST --user NAME --to DIR   # saves the report mail as .eml (spec 009); asks for the password
+uv run mailvigil fetch --config FILE --to DIR   # host, user, port and folder from the [fetch] table of the file
 
 # Run the tests (one file, then one test)
 uv run pytest
@@ -77,11 +78,13 @@ src/mailvigil/
                      # `fetch` (spec 009) is added by `cli_fetch.add_fetch_parser` and run by
                      # `cli_fetch.run_fetch`
   cli_common.py      # the eight EXIT_* codes (the one table), `echo` (a command-line value made safe to
-                     # print) and `write` (a line to a stream, whatever it can encode); shared by cli
-                     # and cli_fetch, which may not import each other
+                     # print), `write` (a line to a stream, whatever it can encode) and `config_line`
+                     # (the line of a refused configuration); shared by cli and cli_fetch, which may
+                     # not import each other
   cli_fetch.py       # the `fetch` command (spec 009): option types (`--port`, `--limit`, `--since`,
                      # `--folder`), the subparser (takes only `--lang` from the parents), the password
-                     # helpers and `run_fetch`, which loads `fetch.imap` (imaplib, ssl) inside the
+                     # helpers, `_connection` (flag, else the [fetch] table of `--config`, else the
+                     # default; the file is never searched for, ADR-12) and `run_fetch`, which loads `fetch.imap` (imaplib, ssl) inside the
                      # function, never at import (#82)
   py.typed           # marks the package as typed (PEP 561)
   reports/           # report ingestion (spec 002); public API re-exported by __init__.py
@@ -98,8 +101,9 @@ src/mailvigil/
                      #   files whose name did not qualify are counted (`passed_over`, ADR-9 of 002)
     ingest.py        #   ingest(paths, domain, now=None): the entry point; refusals go to `skipped`
   text.py            # text and domain rules shared by reports and config (clean_text, normalize_domain…)
-  config.py          # load_config(path) → frozen Config (domain + selector map); check_domain is shared with
-                     # the CLI's --domain; ConfigError is typed (spec 003)
+  config.py          # load_config(path) → frozen Config (domain + selector map + the [fetch] settings:
+                     # host, user, port, folder, never a password); check_domain is shared with the
+                     # CLI's --domain; ConfigError is typed (spec 003)
   senders.py         # identify_sender(record, config) → Identification; a selector counts only under the domain
   summary.py         # summarize(result, config) → frozen Summary: rows per sender, failing sources, period,
                      # policy, what was left out (spec 004), the messages per day (`DayCounts`, spec 008,

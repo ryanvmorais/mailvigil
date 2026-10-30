@@ -213,3 +213,20 @@ signature changed (the parent parser split); if any other one fails, the code is
   CHANGELOG `[Unreleased]`.
 - [x] Quality gate. — **Result:** 2026-10-30: ruff, black and mypy (36 source files) clean; pytest passed
   at 100% coverage (Python 3.12, Windows).
+
+## Stage 9 — The `[fetch]` table in the configuration (RF-01, ADR-12; issue #75)
+
+- [x] `fetch --config FILE` in `cli_fetch.py`: `--host` and `--user` stop being `required`; `--port`
+  and `--folder` lose their parser default so the command can tell a flag from a default; one
+  function resolves flag, then file, then default; a run with no host or no user is a usage error
+  (exit 2) that names the flag and the table. Tests: the table gives the connection and the folder;
+  a flag wins and only for its own key; the defaults fill the rest; the key tag of the file names is
+  the same from flags or from the table; a missing host or user is exit 2; a `mailvigil.toml` in the
+  current folder is not read; a file without the table leaves the flags in charge. — RF-01, ADR-12
+- [x] A refused file is one line, exit 1, before the authority file and the password. Tests: the
+  four refusal kinds of the table (password key, bad value, unknown key, missing domain), a missing
+  path, the line in Portuguese is ASCII, no prompt and no connection. — RF-08, ADR-12
+- [x] Docs: README in both languages, `docs/stability.md`, CHANGELOG `[Unreleased]`, specs 003
+  (ADR-7) and 009 (ADR-12), `CLAUDE.md`, `docs/stack.md` if it names the config keys.
+- [x] Quality gate. — **Result:** 2026-10-30: ruff, black and mypy clean; pytest passed at 100%
+  coverage (Python 3.12, Windows).

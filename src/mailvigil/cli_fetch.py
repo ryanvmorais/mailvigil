@@ -19,7 +19,8 @@ import time
 from datetime import date
 from pathlib import Path
 
-from mailvigil.cli_common import EXIT_OK, EXIT_REFUSED, echo, write
+from mailvigil.cli_common import EXIT_OK, EXIT_REFUSED, config_line, echo, write
+from mailvigil.config import ConfigError, FetchSettings, load_config
 from mailvigil.fetch.errors import FetchReason, FetchRefused
 from mailvigil.fetch.model import DEADLINE_SECONDS, DEFAULT_LIMIT, MAX_LIMIT
 from mailvigil.fetch.run import fetch_reports
@@ -31,8 +32,9 @@ from mailvigil.render_json import dumps, fetch_document
 # The most a password file is read for: the first line of a file longer than this is not a password.
 _PASSWORD_FILE_MAX = 4096
 
-# The port of IMAP over implicit TLS (RFC 8314).
+# The port of IMAP over implicit TLS (RFC 8314), and the folder read when nothing says otherwise.
 _DEFAULT_PORT = 993
+_DEFAULT_FOLDER = "INBOX"
 
 # ---------------------------------------------------------------------------
 # Options
@@ -163,8 +165,21 @@ def add_fetch_parser(
         f"it. Exit code {EXIT_OK} when the run finished, even with nothing new, {EXIT_REFUSED} "
         "when it was refused.",
     )
-    fetch_parser.add_argument("--host", required=True, metavar="HOST", help="the IMAP server")
-    fetch_parser.add_argument("--user", required=True, metavar="NAME", help="the login name")
+    # Not ``required``: the host and the user may come from [fetch] of --config (spec 009, ADR-12),
+    # so a missing one is told by ``_connection``, with the same exit code (2).
+    fetch_parser.add_argument(
+        "--config",
+        type=Path,
+        metavar="FILE",
+        help="TOML file whose [fetch] table gives host, user, port and folder; a flag wins over "
+        "the file (no file is searched for by default)",
+    )
+    fetch_parser.add_argument(
+        "--host", metavar="HOST", help="the IMAP server (required unless [fetch] gives it)"
+    )
+    fetch_parser.add_argument(
+        "--user", metavar="NAME", help="the login name (required unless [fetch] gives it)"
+    )
     fetch_parser.add_argument(
         "--to",
         required=True,
@@ -175,16 +190,14 @@ def add_fetch_parser(
     fetch_parser.add_argument(
         "--port",
         type=_port,
-        default=_DEFAULT_PORT,
         metavar="N",
         help=f"where to connect (default: {_DEFAULT_PORT}); the connection is always TLS",
     )
     fetch_parser.add_argument(
         "--folder",
         type=_folder,
-        default="INBOX",
         metavar="NAME",
-        help="the mailbox folder to read (default: INBOX)",
+        help=f"the mailbox folder to read (default: {_DEFAULT_FOLDER})",
     )
     fetch_parser.add_argument(
         "--since",
@@ -291,13 +304,56 @@ def _password(args: argparse.Namespace, parser: argparse.ArgumentParser) -> str:
     return password
 
 
+def _connection(
+    args: argparse.Namespace, parser: argparse.ArgumentParser
+) -> tuple[str, str, int, str] | None:
+    """
+    Decide the host, user, port and folder: the flag, else ``[fetch]``, else the default.
+
+    The file is read only when ``--config`` names it: ``fetch`` never searches the current folder,
+    so a ``mailvigil.toml`` made for ``summary`` cannot change a command that worked (spec 009,
+    ADR-12). A file that is refused ends the run before the password is asked for.
+
+    Args:
+        args (argparse.Namespace): The parsed arguments: ``config``, ``host``, ``user``, ``port``,
+            ``folder`` and ``lang``.
+        parser (argparse.ArgumentParser): Used to end the run with a usage error.
+
+    Returns:
+        tuple[str, str, int, str] | None: The host, the user, the port and the folder; ``None``
+            when the file was refused, after the one line on standard error.
+    """
+    settings = FetchSettings()
+    if args.config is not None:
+        try:
+            settings = load_config(args.config).fetch
+        except ConfigError as error:
+            write(sys.stderr, f"mailvigil: {echo(args.config)}: {config_line(error, args.lang)}")
+            return None
+    host = args.host if args.host is not None else settings.host
+    user = args.user if args.user is not None else settings.user
+    if host is None:
+        parser.error("--host is required (or give host in the [fetch] table of --config)")
+    if user is None:
+        parser.error("--user is required (or give user in the [fetch] table of --config)")
+    port = args.port if args.port is not None else settings.port
+    folder = args.folder if args.folder is not None else settings.folder
+    return (
+        host,
+        user,
+        port if port is not None else _DEFAULT_PORT,
+        folder if folder is not None else _DEFAULT_FOLDER,
+    )
+
+
 def run_fetch(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
     """
     Run the ``fetch`` command: the password, the connection, the loop, the outcome.
 
     Args:
-        args (argparse.Namespace): The parsed arguments: ``host``, ``port``, ``user``, ``to``,
-            ``folder``, ``since``, ``limit``, ``password_file``, ``cafile``, ``json`` and ``lang``.
+        args (argparse.Namespace): The parsed arguments: ``config``, ``host``, ``port``,
+            ``user``, ``to``, ``folder``, ``since``, ``limit``, ``password_file``, ``cafile``,
+            ``json`` and ``lang``.
         parser (argparse.ArgumentParser): Used to end the run with a usage error.
 
     Returns:
@@ -308,6 +364,11 @@ def run_fetch(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
     # ``summary`` and ``verdict`` must never load them (spec 009, ADR-7, RF-09).
     from mailvigil.fetch import imap
 
+    connection = _connection(args, parser)
+    if connection is None:
+        return EXIT_REFUSED
+    host, user, port, folder = connection
+
     try:
         # Read the authority file first, so a bad one is told before the password is asked for.
         imap.build_context(args.cafile)
@@ -316,16 +377,12 @@ def run_fetch(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
         deadline = clock() + DEADLINE_SECONDS
         try:
             # Looked up on the module at call time, so a test can replace it.
-            mailbox = imap.connect(
-                args.host, args.port, args.user, password, clock, deadline, cafile=args.cafile
-            )
+            mailbox = imap.connect(host, port, user, password, clock, deadline, cafile=args.cafile)
         except ValueError as error:
             parser.error(f"argument --user: {error}")
         try:
-            store = Store(args.to, tag_of(args.host, args.user, args.folder))
-            outcome = fetch_reports(
-                mailbox, args.folder, args.since, store, args.limit, clock, deadline
-            )
+            store = Store(args.to, tag_of(host, user, folder))
+            outcome = fetch_reports(mailbox, folder, args.since, store, args.limit, clock, deadline)
         finally:
             mailbox.close()
     except FetchRefused as refusal:

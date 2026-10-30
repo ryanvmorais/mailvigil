@@ -240,7 +240,8 @@ library and handles IPv4 and IPv6.
 
 ### `tomllib`
 
-Reads the configuration file: the domain and the map from DKIM selector to service name.
+Reads the configuration file: the domain, the map from DKIM selector to service name and the
+`[fetch]` table (host, user, port and folder of the mailbox; never the password).
 `mailvigil/config.py` reads the file as bytes (capped at 64 KiB), decodes it as strict UTF-8,
 parses it with `tomllib.loads` and then checks the shape of the result by hand. Every refusal is a
 `ConfigError` with a typed reason, never a stack trace.

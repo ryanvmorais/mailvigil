@@ -112,3 +112,18 @@ first and alone), the loader, then identification, then the close.
 - [x] Mark the three files `done` and move the roadmap row of `003` in `specs/README.md` to `done`.
   — all
 - [x] Quality gate and CI. — result recorded when run: local gate all green on 2026-10-27 (ruff, black, mypy, 329 passed, coverage 100%, Python 3.12); the wheel declares no `Requires-Dist` and holds `text.py`, `config.py` and `senders.py`; the CI result is read on the pull request.
+
+## Stage 5 — The `[fetch]` table (RF-04, ADR-7; issue #75)
+
+- [x] `config.py`: `FetchSettings`, `Config.fetch`, `_read_fetch` after the selector map,
+  `ConfigReason.INVALID_FETCH_VALUE` and `PASSWORD_NOT_ALLOWED`, `fetch` as a third allowed
+  top-level key. Tests: the four keys are read and stripped; a partial table; a file without the
+  table gives `FetchSettings()`; `fetch` that is not a table; a password-like key is refused by name
+  and the value is not in the error; an unknown key with its suggestion; `to`, `since`, `limit` and
+  `cafile` are not keys; wrong types and ranges (a boolean and a float are not a port); the edges of
+  the port; a control or format character; the order (senders before fetch) and the sorted visit of
+  the keys. — RF-04, ADR-7
+- [x] Both catalogs phrase the two new reasons (the completeness test covers them), and the line of
+  a refused file moved to `cli_common.config_line` so `fetch` can write it. — RF-07
+- [x] Quality gate. — **Result:** 2026-10-30: ruff, black and mypy clean; pytest passed at 100%
+  coverage (Python 3.12, Windows).

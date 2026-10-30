@@ -1,5 +1,6 @@
 """
-The configuration file: the domain the reports are about and the DKIM selector to service map.
+The configuration file: the domain the reports are about, the DKIM selector to service map and,
+for ``fetch``, the connection settings of the mailbox.
 
 Only the owner knows which selector is which service, so the answer comes from a short TOML file.
 Unlike a report, which is third-party text shown despite being dirty, the file is written on purpose
@@ -38,7 +39,18 @@ MAX_SERVICE_NAME = 100
 _MAX_KEY = 100
 
 # The top-level keys of the format. Anything else is a typo or a feature from the future.
-_ALLOWED_KEYS = ("domain", "senders")
+_ALLOWED_KEYS = ("domain", "senders", "fetch")
+
+# The keys of the ``[fetch]`` table (ADR-7 of spec 003, ADR-12 of spec 009). The password is not one
+# of them and never will be; ``to``, ``since``, ``limit`` and ``cafile`` stay flags.
+_FETCH_KEYS = ("host", "user", "port", "folder")
+
+# A ``[fetch]`` key that names a secret gets a refusal of its own instead of "unknown key", so the
+# reader is told where the password goes, not only that it may not be here.
+_SECRET_WORDS = ("pass", "secret", "token")
+
+# The longest value kept for a host, a login or a folder; the file is capped anyway.
+_MAX_FETCH_TEXT = 253
 
 # DNS limits: 253 characters in all, 63 per label, letters-digits-hyphen with no hyphen at the ends.
 _MAX_DOMAIN = 253
@@ -63,15 +75,18 @@ class ConfigReason(StrEnum):
         FILE_TOO_LARGE (str): The file is over the cap.
         NOT_UTF8 (str): The bytes are not valid UTF-8.
         MALFORMED_TOML (str): Not valid TOML, or nested too deeply to parse.
-        UNKNOWN_KEY (str): A top-level key or table the format does not define.
+        UNKNOWN_KEY (str): A top-level key or table, or a ``[fetch]`` key, the format does not
+            define.
         MISSING_DOMAIN (str): There is no ``domain``.
         INVALID_DOMAIN (str): Not a string, empty, or not a plausible host name.
         NON_ASCII_DOMAIN (str): The domain must be written in its ``xn--`` form.
-        WRONG_TYPE (str): ``senders`` is not a table.
+        WRONG_TYPE (str): ``senders`` or ``fetch`` is not a table.
         INVALID_SELECTOR (str): A selector key a DKIM selector cannot be.
         DUPLICATE_SELECTOR (str): Two selector keys that differ only by case.
         INVALID_SERVICE_NAME (str): Not a string, blank, too long, or a nested value.
         FORBIDDEN_CHARACTER (str): A control, format or separator character in a name.
+        INVALID_FETCH_VALUE (str): A ``[fetch]`` value of the wrong type or outside its range.
+        PASSWORD_NOT_ALLOWED (str): A ``[fetch]`` key that would hold a password or a token.
     """
 
     UNREADABLE = "unreadable"
@@ -87,6 +102,8 @@ class ConfigReason(StrEnum):
     DUPLICATE_SELECTOR = "duplicate_selector"
     INVALID_SERVICE_NAME = "invalid_service_name"
     FORBIDDEN_CHARACTER = "forbidden_character"
+    INVALID_FETCH_VALUE = "invalid_fetch_value"
+    PASSWORD_NOT_ALLOWED = "password_not_allowed"
 
 
 class ConfigError(Exception):
@@ -132,6 +149,24 @@ class ConfigError(Exception):
 
 
 @dataclass(frozen=True, slots=True)
+class FetchSettings:
+    """
+    The connection settings of the ``[fetch]`` table; ``None`` is a key the file does not give.
+
+    Attributes:
+        host (str | None): The IMAP server.
+        user (str | None): The login name.
+        port (int | None): The port, 1 to 65535.
+        folder (str | None): The mailbox folder to read.
+    """
+
+    host: str | None = None
+    user: str | None = None
+    port: int | None = None
+    folder: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class Config:
     """
     A loaded configuration.
@@ -140,10 +175,12 @@ class Config:
         domain (str): The domain the reports are about: lower case, no trailing dot.
         senders (Mapping[str, str]): Lower-case DKIM selector to service name, as a read-only view.
             The loader builds it in sorted order, so two loads of the same content are equal.
+        fetch (FetchSettings): The ``[fetch]`` table; every field is ``None`` when it is absent.
     """
 
     domain: str
     senders: Mapping[str, str]
+    fetch: FetchSettings = FetchSettings()
 
 
 # ---------------------------------------------------------------------------
@@ -210,7 +247,9 @@ def _check_keys(table: dict[str, Any]) -> None:
         if key in _ALLOWED_KEYS:
             continue
         close = difflib.get_close_matches(key, _ALLOWED_KEYS, n=1)
-        detail = f'did you mean "{close[0]}"?' if close else "allowed keys: domain, senders"
+        detail = (
+            f'did you mean "{close[0]}"?' if close else "allowed keys: " + ", ".join(_ALLOWED_KEYS)
+        )
         raise ConfigError(ConfigReason.UNKNOWN_KEY, key, detail)
 
 
@@ -314,6 +353,96 @@ def _read_senders(table: dict[str, Any]) -> dict[str, str]:
     return senders
 
 
+def _fetch_text(table: dict[str, Any], key: str, *, spaces: bool) -> str | None:
+    """
+    Read one text value of ``[fetch]``.
+
+    Args:
+        table (dict[str, Any]): The ``[fetch]`` table.
+        key (str): The key to read.
+        spaces (bool): Whether the value may hold a space (a folder name may, a host may not).
+
+    Returns:
+        str | None: The stripped value, ``None`` when the key is absent.
+
+    Raises:
+        ConfigError: ``INVALID_FETCH_VALUE`` for a value that is not a string, is blank or is too
+            long, or ``FORBIDDEN_CHARACTER`` for a control or format character.
+    """
+    if key not in table:
+        return None
+    name = f"fetch.{key}"
+    value = table[key]
+    if not isinstance(value, str):
+        raise ConfigError(ConfigReason.INVALID_FETCH_VALUE, name, "the value must be a string")
+    if has_dropped_characters(value):
+        raise ConfigError(ConfigReason.FORBIDDEN_CHARACTER, name, "control or format character")
+    text = value.strip()
+    if not text or len(text) > _MAX_FETCH_TEXT or (not spaces and any(c.isspace() for c in text)):
+        raise ConfigError(
+            ConfigReason.INVALID_FETCH_VALUE,
+            name,
+            f"the value must have 1 to {_MAX_FETCH_TEXT} characters"
+            + ("" if spaces else " and no space"),
+        )
+    return text
+
+
+def _read_fetch(table: dict[str, Any]) -> FetchSettings:
+    """
+    Validate the ``[fetch]`` table (step 8).
+
+    The password has no key: a key that looks like one is refused with a reason of its own.
+
+    Args:
+        table (dict[str, Any]): The parsed file.
+
+    Returns:
+        FetchSettings: The settings the file gives; the rest stay ``None``.
+
+    Raises:
+        ConfigError: ``WRONG_TYPE``, ``PASSWORD_NOT_ALLOWED``, ``UNKNOWN_KEY``,
+            ``INVALID_FETCH_VALUE`` or ``FORBIDDEN_CHARACTER``.
+    """
+    raw = table.get("fetch", {})
+    if not isinstance(raw, dict):
+        raise ConfigError(ConfigReason.WRONG_TYPE, "fetch", "fetch must be a table")
+
+    # Sorted, like the selector map, so the first problem does not depend on the file's order.
+    for key in sorted(raw):
+        if key in _FETCH_KEYS:
+            continue
+        name = f"fetch.{key}"
+        if any(word in key.lower() for word in _SECRET_WORDS):
+            raise ConfigError(
+                ConfigReason.PASSWORD_NOT_ALLOWED,
+                name,
+                "the password is never kept in the file: use the prompt or --password-file",
+            )
+        close = difflib.get_close_matches(key, _FETCH_KEYS, n=1)
+        detail = (
+            f'did you mean "{close[0]}"?' if close else "allowed keys: " + ", ".join(_FETCH_KEYS)
+        )
+        raise ConfigError(ConfigReason.UNKNOWN_KEY, name, detail)
+
+    port = raw.get("port")
+    # ``bool`` is an ``int`` in Python: ``port = true`` must not read as port 1.
+    if port is not None and (
+        isinstance(port, bool) or not isinstance(port, int) or not 1 <= port <= 65535
+    ):
+        raise ConfigError(
+            ConfigReason.INVALID_FETCH_VALUE,
+            "fetch.port",
+            "the port must be a whole number 1-65535",
+        )
+    return FetchSettings(
+        host=_fetch_text(raw, "host", spaces=False),
+        user=_fetch_text(raw, "user", spaces=False),
+        port=port,
+        folder=_fetch_text(raw, "folder", spaces=True),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
@@ -324,7 +453,7 @@ def load_config(path: Path) -> Config:
     Load a configuration file.
 
     The checks run in a fixed order and the first failure is the one reported (RF-07): the file,
-    its bytes, its TOML, the top-level keys, the domain, then the selector map.
+    its bytes, its TOML, the top-level keys, the domain, the selector map, then ``[fetch]``.
 
     Args:
         path (Path): The TOML file. The loader never searches for one.
@@ -339,4 +468,5 @@ def load_config(path: Path) -> Config:
     _check_keys(table)
     domain = _read_domain(table)
     senders = _read_senders(table)
-    return Config(domain, MappingProxyType(senders))
+    fetch = _read_fetch(table)
+    return Config(domain, MappingProxyType(senders), fetch)

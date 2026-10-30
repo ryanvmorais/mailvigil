@@ -9,6 +9,12 @@ All notable changes to MailVigil are written here. The format follows
 
 ### Added
 
+- **`fetch --config FILE` reads the mailbox from a `[fetch]` table.** The table takes `host`, `user`,
+  `port` and `folder`, so a scheduled job stops repeating them; a flag wins over the file, and `fetch`
+  reads a file only when `--config` names it. The password is not a key: `password` is refused with
+  its own reason (`invalid_fetch_value` and `password_not_allowed` are new). A run with no host or
+  user still ends with exit code `2`.
+
 - **`fetch --json` prints the outcome of a run as one JSON document.** A script that runs `fetch`
   from `cron` had to parse the text to read the six numbers. With `--json`, a finished run prints
   `schema_version`, `command` and the six numbers (`matched`, `saved`, `already`, `too_large`,

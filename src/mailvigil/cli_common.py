@@ -12,6 +12,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TextIO
 
+from mailvigil.config import ConfigError
+from mailvigil.messages import Messages
 from mailvigil.text import clean_text
 
 # ---------------------------------------------------------------------------
@@ -72,3 +74,28 @@ def write(stream: TextIO, text: str) -> None:
     """
     encoding = getattr(stream, "encoding", None) or "utf-8"
     stream.write(text.encode(encoding, errors="replace").decode(encoding) + "\n")
+
+
+def config_line(error: ConfigError, messages: Messages) -> str:
+    """
+    Write the line of a refused configuration or ``--domain`` value.
+
+    The phrase of the reason, then the key, then the detail only for the reasons the language keeps
+    it for: ``config.py`` writes the detail in English, so a translation drops it where the reason
+    already says what it said (ADR-5). In English every reason keeps it, so the line is what
+    ``str(error)`` has always been.
+
+    Args:
+        error (ConfigError): The refusal.
+        messages (Messages): The language.
+
+    Returns:
+        str: The line, without the path it concerns.
+    """
+    refusals = messages.refusals
+    line = refusals.config_reasons[error.reason]
+    if error.key:
+        line += f" [{error.key}]"
+    if error.detail and error.reason in refusals.config_detail:
+        line += f": {error.detail}"
+    return line
