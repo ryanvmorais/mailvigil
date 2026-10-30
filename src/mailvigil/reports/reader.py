@@ -38,7 +38,8 @@ KIND_BY_SUFFIX: dict[str, Kind] = {".xml": "xml", ".gz": "gz", ".zip": "zip"}
 
 # What the standard library raises for an archive it cannot read. ``BadGzipFile`` is an ``OSError``,
 # so this tuple must be caught before ``OSError``. ``NotImplementedError`` is a compression method
-# it lacks and ``RuntimeError`` is an encrypted member.
+# it lacks and ``RuntimeError`` is an encrypted member. ``ValueError`` is what ``zipfile`` raises
+# for a damaged archive read from memory, where a file would give ``BadZipFile``.
 _ARCHIVE_ERRORS = (
     zipfile.BadZipFile,
     gzip.BadGzipFile,
@@ -46,6 +47,7 @@ _ARCHIVE_ERRORS = (
     EOFError,
     NotImplementedError,
     RuntimeError,
+    ValueError,
 )
 
 # ---------------------------------------------------------------------------

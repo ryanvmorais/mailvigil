@@ -7,6 +7,12 @@ All notable changes to MailVigil are written here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **A damaged zip attachment inside an `.eml` or `.mbox` no longer stops the run.** It is refused as
+  `not_an_archive`, listed with the other skipped files, and the reports around it are read as
+  usual.
+
 ## [1.3.0] - 2026-10-30
 
 ### Added

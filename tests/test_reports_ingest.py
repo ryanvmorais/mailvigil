@@ -414,6 +414,23 @@ def test_a_bad_attachment_is_refused_with_its_part_and_the_good_one_is_kept(
     ]
 
 
+def test_a_damaged_zip_attachment_costs_one_entry_and_the_run_goes_on(
+    tmp_path: Path,
+    make_report_xml: _MakeReport,
+    make_zip: Callable[[Mapping[str, bytes]], bytes],
+) -> None:
+    path = tmp_path / "inbox.eml"
+    damaged = make_zip({"report.xml": make_report_xml()})[1:]
+    path.write_bytes(build_eml(("bad.zip", "zip", damaged), ("good.xml", "xml", make_report_xml())))
+
+    result = ingest([path], "example.com")
+
+    assert len(result.reports) == 1
+    assert [(entry.path, entry.reason, entry.part) for entry in result.skipped] == [
+        (path, Reason.NOT_AN_ARCHIVE, "bad.zip")
+    ]
+
+
 def test_a_mailbox_refusal_names_the_message_and_the_attachment(
     tmp_path: Path, make_report_xml: _MakeReport
 ) -> None:

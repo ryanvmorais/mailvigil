@@ -215,6 +215,18 @@ def test_truncated_gzip_is_refused(tmp_path: Path, make_gzip: _MakeGzip) -> None
     assert caught.value.reason is Reason.NOT_AN_ARCHIVE
 
 
+def test_a_zip_damaged_near_its_start_is_refused_when_read_from_memory(
+    make_zip: _MakeZip,
+) -> None:
+    """From memory ``zipfile`` raises ``ValueError``, not ``BadZipFile``; it is still refused."""
+    damaged = make_zip({"report.xml": _XML})[1:]
+
+    with pytest.raises(ReportRefused) as caught:
+        read_xml_bytes(damaged, "zip")
+
+    assert caught.value.reason is Reason.NOT_AN_ARCHIVE
+
+
 def test_encrypted_zip_member_is_refused(tmp_path: Path, make_zip: _MakeZip) -> None:
     """An encrypted member needs a password the reader does not have (``RuntimeError``)."""
     archive = _patch_central_entry(make_zip({"r.xml": _XML}), _FLAGS_OFFSET, "<H", 0x1)
