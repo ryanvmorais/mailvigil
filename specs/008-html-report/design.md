@@ -251,7 +251,8 @@ standard output (RF-01).
   any output as UTF-16 with a byte-order mark. Browsers read that file correctly, but other tools
   may not. ASCII makes the page immune to a legacy code page; it does not make the bytes identical
   across shells. The `--help` text and the README suggest `| Out-File -Encoding ascii` for that
-  shell. If it hurts in practice, a later spec adds `--output FILE` (question 5).
+  shell. If it hurts in practice, a later spec adds `--output FILE` (question 5). It did, and
+  ADR-11 adds it.
 
 ### ADR-8 — The document cannot run or load anything, and says so to the browser
 
@@ -300,6 +301,30 @@ standard output (RF-01).
   hidden.
 - **Trade-off:** the stylesheet is built, not pasted, so it is a little harder to read than CSS.
   The rest of the CSS stays a constant string.
+
+### ADR-11 — `--output FILE` writes the page itself (amendment of 2026-10-30, issue #69)
+
+- **Decision:** `--output FILE` (`Path`) on the `verdict` subparser. `main` refuses it without
+  `--html` through `parser.error` ("argument --output: requires --html", exit 2), next to the check
+  of ADR-6, before any work; with `--json` the ADR-6 check already fires. `_run_verdict` renders the
+  page as it does for standard output and then calls `_write_page(path, page)`: the page is encoded
+  as ASCII (it already is, ADR-7), written to a temporary file in the folder of `FILE` and moved
+  over it with `os.replace`, so a failure never leaves a half page and an old file survives. The
+  temporary file takes the permission a new file gets (`0o666` minus the umask), not the `0600` of
+  `mkstemp`, so a page written to a web folder is readable. The bytes use `\n` on every system. An
+  `OSError` becomes one refusal line (new catalog sentence `output_failed`, both languages), exit 1,
+  and the temporary file is removed.
+- **Alternatives:** the option for the text and `--json` too, or on `summary`; refuse an existing
+  file unless `--force`; create the missing folders; write directly with `write_text`; a UTF-8 page
+  with a byte-order mark.
+- **Why:** the shell is the only thing that corrupts the page (PowerShell 5.1 rewrites `>` as
+  UTF-16), so writing the bytes in the tool removes it. The narrow scope is the smaller public
+  contract and can grow later; replacing a file is what `>` does, and a report is made again often,
+  so a `--force` would be friction with no protection worth the flag. A missing folder is nearly
+  always a typo.
+- **Trade-off:** the JSON and the text still go through the shell, so a PowerShell 5.1 user who
+  redirects them still gets UTF-16; the README says so and points at `--output` for the page only.
+  `cli.py` grows by one small function while issue #82 plans to shrink it.
 
 ## Interface record
 
@@ -384,7 +409,7 @@ Made together with this design, because the design found them:
    is a darker token, decided in the stage that writes the test.
 3. **The shared helpers are refactored under a passing suite.** Mitigated by the byte-identical test
    of the text output before the refactor starts.
-4. **PowerShell 5.1 and `>`** (ADR-7): documented, not solved.
+4. **PowerShell 5.1 and `>`** (ADR-7): documented; solved for the page by `--output` (ADR-11).
 5. **A hostile value is long** (a 5 MiB organization name is impossible: the parser cuts text at 255
    characters, 002 RF-05), but the config and `--domain` come from the user. They are cut with the
    same `clean_text` the other formats use before they reach the page.

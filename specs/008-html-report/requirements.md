@@ -94,7 +94,25 @@ approved.
   exit code is 1, as in the text format.
 - **Given** `--help`
   **When** it is read
-  **Then** it says the HTML format exists and that the output is meant to be redirected to a file.
+  **Then** it says the HTML format exists and that the output is meant to be redirected to a file,
+  or written with `--output FILE` (amendment of 2026-10-30, Resolved decision 5).
+- **Given** the HTML format and `--output FILE` (amendment of 2026-10-30, issue #69)
+  **When** the run ends with an answer
+  **Then** the page is in `FILE` as ASCII bytes with `\n` line ends, whatever the shell or the
+  system, nothing is written to standard output or standard error, and the exit code is the
+  verdict's. A file already there is replaced; a failed write leaves it as it was.
+- **Given** `--output` without `--html`, or `--output` with `--json`
+  **When** the arguments are parsed
+  **Then** it is a usage error with exit code 2: the option belongs to the page. `summary` has no
+  `--output`.
+- **Given** `--output FILE` whose folder does not exist, a `FILE` that is a folder, or a disk that
+  refuses the write
+  **When** the run reaches the write
+  **Then** nothing is written to standard output, one line on standard error says what could not be
+  written (in the language of `--lang`) and the exit code is 1. No folder is created.
+- **Given** a run refused before any answer (no reports, bad configuration) with `--output FILE`
+  **When** the run ends
+  **Then** `FILE` is not created and an existing one is not touched.
 
 ### RF-02 — What the page says, in order
 
@@ -355,6 +373,13 @@ approved.
    reconfirmed and attached to the design before any HTML is written.
 3. **The page judges nothing.** It renders the `Verdict` of 005 and the `Summary` of 004.
 4. **Escaping lives in one module.** No other module builds markup.
+5. **Amendment (2026-10-30, issue #69): `verdict --html --output FILE`.** Question 5 said "if it
+   hurts in practice, a later spec adds the flag"; it did: a Windows PowerShell 5.1 user meets the
+   UTF-16 redirect first. Decided with the maintainer: the option exists on `verdict` only and only
+   with `--html` (the text and the JSON stay redirects; widening it later is compatible, narrowing
+   is not); a file already there is replaced, atomically, as `>` would; a missing folder is a
+   refusal, never created. Without `--output` nothing changes. It is a new option on a public
+   command, so it is a minor release (`docs/stability.md`).
 
 ## Tests
 

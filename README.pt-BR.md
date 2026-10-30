@@ -274,9 +274,11 @@ mailvigil verdict --config mailvigil.toml reports/ --html > report.html
   compartilhada como está quando você aceitar mostrar nela o domínio e os endereços de envio.
 - **O código de saída é o mesmo** de quando não há `--html` (`0`, `3`, `4`), e o `--html` não pode
   ser combinado com o `--json`. O `summary` não tem `--html`.
-- **O Windows PowerShell 5.1** grava um redirecionamento em UTF-16, que os navegadores não leem como
-  a página espera; lá, use `mailvigil verdict ... --html | Out-File -Encoding ascii report.html`.
-  A página é ASCII, então o `>` de qualquer outro shell funciona.
+- **O `--output FILE` grava a página por conta própria**, em bytes ASCII, sem shell no meio:
+  `mailvigil verdict --config mailvigil.toml reports/ --html --output report.html`. Ele substitui
+  um arquivo que já exista, nunca cria a pasta, não imprime nada quando dá certo e exige `--html`.
+  Use-o no **Windows PowerShell 5.1**, cujo `>` grava UTF-16, que os navegadores não leem como a
+  página espera. A página é ASCII, então o `>` de qualquer outro shell também funciona.
 
 ### Fetch
 
