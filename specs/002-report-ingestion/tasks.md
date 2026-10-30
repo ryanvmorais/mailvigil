@@ -194,3 +194,17 @@ public entry point.
 - [x] Quality gate. — result recorded when run: ruff, black and mypy clean; pytest passed with
   coverage 100% (Python 3.12, 2026-10-30). Measured after: 5 MiB nest 213 MB to 1 MB, 5 MiB of empty
   elements 108 MB to 42 MB, a real report at the cap unchanged at 30 MB.
+
+## Stage 10 — Subfolders and the files passed over by name (issue #80)
+
+- [x] `discovery.py`: `discover(paths, recursive)` returns the count of files passed over;
+  `MAX_FOLDER_DEPTH` (8), links and junctions not entered, an unreadable subfolder skipped.
+  `model.py`, `ingest.py`: `IngestionResult.passed_over`. Tests: depth, order, links, unreadable
+  subfolder, the count in each case. — RF-06, ADR-9
+- [x] `summary.py`, `verdict.py`, `render*.py`, `messages/`: `passed_over` in the summary, the left-out
+  sentence, both `--json` documents (`docs/json-schema.md`) and the no-reports hint; `cli.py`:
+  `--recursive` (help golden updated). Tests at each layer and end to end through `main(argv)`. —
+  RF-06, ADR-9
+- [x] Quality gate. — result recorded when run: ruff, black and mypy clean; pytest passed with
+  coverage 100% (Python 3.12, 2026-10-30; the two tests that need a real symbolic link are skipped
+  on Windows and run in the Linux CI).

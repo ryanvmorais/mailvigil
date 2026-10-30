@@ -641,6 +641,7 @@ def left_out_parts(verdict: Verdict, messages: Messages) -> list[str]:
         text.skipped_file.of(left.skipped) if left.skipped else "",
         text.duplicate.of(left.duplicates) if left.duplicates else "",
         text.other_domain.of(left.other_domain) if left.other_domain else "",
+        text.passed_over.of(left.passed_over) if left.passed_over else "",
     ]
     return [part for part in parts if part]
 

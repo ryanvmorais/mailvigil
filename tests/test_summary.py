@@ -219,6 +219,7 @@ def test_summary_has_the_fields_of_the_design_and_no_display_text() -> None:
         "skipped_by_reason",
         "duplicates",
         "other_domain",
+        "passed_over",
         "days",
         "covered",
         "reporter_activity",

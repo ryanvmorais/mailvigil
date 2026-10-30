@@ -69,6 +69,7 @@ def make_summary(
     skipped: tuple[SkippedFile, ...] = (),
     duplicates: int = 0,
     other_domain: int = 0,
+    passed_over: int = 0,
 ) -> Summary:
     """
     Build a ``Summary`` of ``example.com`` whose figures agree with each other.
@@ -92,6 +93,7 @@ def make_summary(
         skipped (tuple[SkippedFile, ...], optional): The refused files. Default: none.
         duplicates (int, optional): Reports dropped as already seen. Default: 0.
         other_domain (int, optional): Reports of another domain. Default: 0.
+        passed_over (int, optional): Files passed over by name. Default: 0.
 
     Returns:
         Summary: The summary.
@@ -104,6 +106,7 @@ def make_summary(
         "skipped_by_reason": tuple(by_reason.items()),
         "duplicates": duplicates,
         "other_domain": other_domain,
+        "passed_over": passed_over,
     }
     if days == 0:
         return Summary(domain="example.com", **left_out)  # type: ignore[arg-type]
@@ -222,6 +225,7 @@ def test_the_summary_document_has_its_keys_in_the_documented_order() -> None:
         "skipped_by_reason",
         "duplicates",
         "other_domain",
+        "passed_over",
     ]
     assert document["schema_version"] == 1
     assert document["command"] == "summary"
@@ -535,13 +539,20 @@ def test_every_note_kind_is_written_by_its_value() -> None:
     assert [note["kind"] for note in notes] == [kind.value for kind in NoteKind]
 
 
-def test_left_out_is_three_integers() -> None:
+def test_left_out_is_four_integers() -> None:
     """What the summary did not count, as numbers."""
     skipped = (SkippedFile(Path("a.xml"), Reason.MALFORMED_XML, ""),)
 
-    document = verdict_document(make_verdict(skipped=skipped, duplicates=2, other_domain=3))
+    document = verdict_document(
+        make_verdict(skipped=skipped, duplicates=2, other_domain=3, passed_over=4)
+    )
 
-    assert document["left_out"] == {"skipped": 1, "duplicates": 2, "other_domain": 3}
+    assert document["left_out"] == {
+        "skipped": 1,
+        "duplicates": 2,
+        "other_domain": 3,
+        "passed_over": 4,
+    }
 
 
 def test_the_answer_is_the_same_under_reject_and_under_none() -> None:

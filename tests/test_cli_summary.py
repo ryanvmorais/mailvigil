@@ -12,6 +12,7 @@ outside ``tmp_path`` is read or written (RNF-02).
 from __future__ import annotations
 
 import io
+import json
 import sys
 from collections.abc import Callable
 from pathlib import Path
@@ -468,3 +469,51 @@ def test_a_stream_whose_encoding_is_none_falls_back_to_utf8() -> None:
     _write(stream, "Café")
 
     assert stream.getvalue() == "Café\n"
+
+
+# ---------------------------------------------------------------------------
+# Subfolders and the files passed over (ADR-9 of 002)
+# ---------------------------------------------------------------------------
+
+
+def test_recursive_reads_a_report_kept_in_a_subfolder(
+    tmp_path: Path, make_report_xml: Callable[..., bytes], capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Without the flag the folder is read one level deep and the run is refused (exit 1)."""
+    month = tmp_path / "reports" / "2026-09"
+    month.mkdir(parents=True)
+    (month / _ATTACHMENT).write_bytes(make_report_xml())
+
+    assert main(["summary", str(tmp_path / "reports"), "--domain", "example.com"]) == 1
+    capsys.readouterr()
+
+    code = main(["summary", str(tmp_path / "reports"), "--domain", "example.com", "--recursive"])
+
+    assert code == 0
+    assert "example.com" in capsys.readouterr().out
+
+
+def test_a_renamed_report_is_counted_and_the_hint_names_the_flag(
+    tmp_path: Path, make_report_xml: Callable[..., bytes], capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A report saved under another name is not read, but the refusal says it was passed over."""
+    folder = tmp_path / "reports"
+    folder.mkdir()
+    (folder / "renamed.xml").write_bytes(make_report_xml())
+
+    code = main(["summary", str(folder), "--domain", "example.com"])
+
+    err = capsys.readouterr().err
+    assert code == 1
+    assert "passed over by name  1" in err
+    assert "--recursive" in err
+
+
+def test_the_json_counts_the_files_passed_over(
+    reports: Path, make_report_xml: Callable[..., bytes], capsys: pytest.CaptureFixture[str]
+) -> None:
+    (reports / "renamed.zip").write_bytes(b"")
+
+    assert main(["summary", str(reports), "--domain", "example.com", "--json"]) == 0
+
+    assert json.loads(capsys.readouterr().out)["passed_over"] == 1

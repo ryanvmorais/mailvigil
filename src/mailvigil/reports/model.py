@@ -186,9 +186,12 @@ class IngestionResult:
         skipped (tuple[SkippedFile, ...]): The refused files, in discovery order.
         duplicates (int): Reports dropped for repeating a reporter and report id already kept.
         other_domain (int): Reports dropped for belonging to a different domain.
+        passed_over (int): Files a folder search did not read because their name is not the
+            providers', although their suffix is a report's (``.zip``, ``.gz``, ``.xml``).
     """
 
     reports: tuple[Report, ...] = ()
     skipped: tuple[SkippedFile, ...] = ()
     duplicates: int = 0
     other_domain: int = 0
+    passed_over: int = 0

@@ -156,7 +156,10 @@ network. Only `fetch` connects to a server (see [Fetch](#fetch)).
 A folder is searched, one level deep, only for the names providers use for their attachments
 (`provider!domain!begin!end.zip`, also `.gz` and `.xml`) and for `.eml` and `.mbox` files, whose
 report attachments are taken out of the messages in memory. A file named on the command line is
-read whatever its name.
+read whatever its name. Add `--recursive` to search the subfolders too (up to 8 levels; a linked
+folder is not entered). A `.zip`, `.gz` or `.xml` file with another name is not read, but the
+"left out" block counts it as "passed over by name", so a renamed report is not silent: name the
+file to read it.
 
 <details>
 <summary>What <code>summary</code> prints (invented data)</summary>

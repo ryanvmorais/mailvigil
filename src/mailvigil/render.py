@@ -517,6 +517,7 @@ def _left_out(
     by_reason: Sequence[tuple[Reason, int]],
     duplicates: int,
     other_domain: int,
+    passed_over: int,
     messages: Messages,
 ) -> list[str]:
     """
@@ -528,14 +529,19 @@ def _left_out(
             print them.
         duplicates (int): Reports dropped as already seen.
         other_domain (int): Reports dropped for belonging to another domain.
+        passed_over (int): Files a folder search passed over by name.
         messages (Messages): The language.
 
     Returns:
         list[str]: The skipped count with its reasons, the first ``_LIMIT`` files with their reason
-            and a line with how many more, then the duplicates and the other domains.
+            and a line with how many more, then the duplicates and the other domains, and the files
+            passed over by name only when there are some.
     """
     text = messages.summary
-    key_width = _key_width(text.key_skipped, text.key_duplicates, text.key_other_domains)
+    keys = [text.key_skipped, text.key_duplicates, text.key_other_domains]
+    if passed_over:
+        keys.append(text.key_passed_over)
+    key_width = _key_width(*keys)
     reasons = ", ".join(f"{number} {text.reasons[reason]}" for reason, number in by_reason)
     count = str(len(skipped)) + (f" ({reasons})" if reasons else "")
     lines = [_field(text.key_skipped, count, key_width)]
@@ -551,6 +557,9 @@ def _left_out(
         lines.append("    " + text.skipped_more.format(n=len(skipped) - _LIMIT))
     lines.append(_field(text.key_duplicates, str(duplicates), key_width))
     lines.append(_field(text.key_other_domains, str(other_domain), key_width))
+    # Only when there are some: a clean folder has none, and a line of zeros would be noise.
+    if passed_over:
+        lines.append(_field(text.key_passed_over, str(passed_over), key_width))
     return lines
 
 
@@ -587,6 +596,7 @@ def render_summary(
                 summary.skipped_by_reason,
                 summary.duplicates,
                 summary.other_domain,
+                summary.passed_over,
                 messages,
             ),
         ],
@@ -624,6 +634,7 @@ def no_reports_message(result: IngestionResult, domain: str, messages: Messages 
             summary.skipped_by_reason,
             summary.duplicates,
             summary.other_domain,
+            summary.passed_over,
             messages,
         )
     )

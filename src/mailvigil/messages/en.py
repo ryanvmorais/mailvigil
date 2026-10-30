@@ -98,6 +98,7 @@ _SUMMARY = SummaryMessages(
     key_skipped="skipped files",
     key_duplicates="duplicates",
     key_other_domains="other domains",
+    key_passed_over="passed over by name",
     # One phrase per refusal. A test iterates ``Reason``, so a reason added by a later spec cannot
     # reach the output as a bare key.
     reasons=MappingProxyType(
@@ -223,6 +224,7 @@ _VERDICT = VerdictMessages(
     skipped_file=Plural("{n} file skipped", "{n} files skipped"),
     duplicate=Plural("{n} duplicate", "{n} duplicates"),
     other_domain=Plural("{n} report of another domain", "{n} reports of other domains"),
+    passed_over=Plural("{n} file passed over by name", "{n} files passed over by name"),
     left_out="Left out of this verdict: {parts}. mailvigil summary shows why.",
     caveat=(
         "This reads only the reports you gave it: mail that no receiver reports on, and "
@@ -243,7 +245,7 @@ _REFUSALS = RefusalMessages(
     config_detail=frozenset(ConfigReason),
     no_reports="No DMARC report for {domain} was kept.",
     no_file_found="No report file was found. A folder is searched only for names like",
-    no_file_hint="provider!domain!begin!end.zip; or name the file itself to read it.",
+    no_file_hint="provider!domain!begin!end.zip; try --recursive, or name the file itself.",
     output_failed="could not write {path}: {reason}",
 )
 

@@ -584,6 +584,25 @@ def test_left_out_prints_zero_counts() -> None:
     ]
 
 
+def test_the_files_passed_over_by_name_print_only_when_there_are_some() -> None:
+    summary = make_summary(passed_over=12)
+
+    assert section(render(summary), "Left out") == [
+        "Left out of these numbers",
+        "  skipped files        0",
+        "  duplicates           0",
+        "  other domains        0",
+        "  passed over by name  12",
+    ]
+
+
+def test_the_files_passed_over_by_name_show_in_the_no_reports_message() -> None:
+    lines = no_reports_message(IngestionResult(passed_over=2), "example.com").split("\n")
+
+    assert lines[-1] == "  passed over by name  2"
+    assert "  provider!domain!begin!end.zip; try --recursive, or name the file itself." in lines
+
+
 def test_skipped_files_show_the_counts_per_reason_and_each_file() -> None:
     summary = make_summary(
         skipped=(skipped("a.xml", Reason.FILE_TOO_LARGE), skipped("b.txt")),
@@ -743,7 +762,7 @@ def test_no_reports_message_for_nothing_found_says_where_to_look() -> None:
     lines = no_reports_message(IngestionResult(), "example.com").split("\n")
     assert lines[0] == "No DMARC report for example.com was kept."
     assert lines[1] == "No report file was found. A folder is searched only for names like"
-    assert lines[2] == "  provider!domain!begin!end.zip; or name the file itself to read it."
+    assert lines[2] == "  provider!domain!begin!end.zip; try --recursive, or name the file itself."
     assert lines[3:] == ["  skipped files  0", "  duplicates     0", "  other domains  0"]
     assert max(len(line) for line in lines) <= 80
 

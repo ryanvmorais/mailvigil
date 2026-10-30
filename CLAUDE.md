@@ -93,7 +93,9 @@ src/mailvigil/
     mail.py          #   .eml/.mbox (spec 007): report attachments out of messages, bounded in size,
                      #   lines, parts and depth before and while the `email` parser works
     parser.py        #   XML tree to Report: sanitized text, strict numbers, IPs normalized
-    discovery.py     #   paths (files and folders) to an ordered list of `Source`s, deduplicated
+    discovery.py     #   paths (files and folders) to an ordered list of `Source`s, deduplicated;
+                     #   `--recursive` goes down 8 levels (no link entered) and the report-suffix
+                     #   files whose name did not qualify are counted (`passed_over`, ADR-9 of 002)
     ingest.py        #   ingest(paths, domain, now=None): the entry point; refusals go to `skipped`
   text.py            # text and domain rules shared by reports and config (clean_text, normalize_domain…)
   config.py          # load_config(path) → frozen Config (domain + selector map); check_domain is shared with

@@ -299,6 +299,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="the domain the reports are about (required when there is no configuration file)",
     )
     reading.add_argument(
+        "--recursive",
+        action="store_true",
+        help="also search the subfolders of each folder (up to 8 levels, links not followed)",
+    )
+    reading.add_argument(
         "--json",
         action="store_true",
         help="print one JSON document instead of the text (see docs/json-schema.md)",
@@ -366,7 +371,7 @@ def _load(
         write(sys.stderr, f"mailvigil: {refusal.message}")
         return None
 
-    result = ingest(args.paths, config.domain, _now())
+    result = ingest(args.paths, config.domain, _now(), args.recursive)
     if not result.reports:
         write(sys.stderr, no_reports_message(result, config.domain, messages))
         return None

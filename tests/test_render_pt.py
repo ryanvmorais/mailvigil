@@ -546,6 +546,8 @@ def test_a_ready_verdict_has_no_next_step() -> None:
         (LeftOut(duplicates=1), "1 duplicado"),
         (LeftOut(other_domain=1), "1 relatorio de outro dominio"),
         (LeftOut(other_domain=3), "3 relatorios de outros dominios"),
+        (LeftOut(passed_over=1), "1 arquivo ignorado pelo nome"),
+        (LeftOut(passed_over=4), "4 arquivos ignorados pelo nome"),
         (
             LeftOut(skipped=2, duplicates=1, other_domain=3),
             "2 arquivos ignorados, 1 duplicado, 3 relatorios de outros dominios",

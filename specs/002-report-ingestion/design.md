@@ -232,7 +232,8 @@ ignored.
 
 ### Discovery (RF-06)
 
-`discover(paths: Sequence[Path]) -> tuple[tuple[Path, ...], tuple[SkippedFile, ...]]`.
+`discover(paths: Sequence[Path], recursive: bool = False) -> tuple[tuple[Source, ...],
+tuple[SkippedFile, ...], int]`; the last item is the count of files passed over (ADR-9).
 
 - A path that does not exist or cannot be listed → a `SkippedFile(UNREADABLE)`, and discovery goes
   on with the next path.
@@ -240,7 +241,12 @@ ignored.
   ordering is case-insensitive on Windows and case-sensitive on Linux; RNF-05), kept when they are
   regular files and the name matches
   `^[^!]+![^!]+!\d+!\d+.*\.(zip|gz|xml)$` (case-insensitive), the attachment pattern of the source
-  script. Subdirectories are skipped without a word.
+  script. Subdirectories are skipped without a word, unless `recursive` is set: then each one is
+  listed the same way after the files of its parent, in name order, depth first, down to
+  `MAX_FOLDER_DEPTH` (8) levels below the folder named, and a link or junction is not entered
+  (ADR-9). A regular file with a report's suffix (`.zip`, `.gz`, `.xml`) whose name does not match
+  is counted as passed over, once per real path and not when the same file is read by another
+  path; other suffixes are not counted.
 - Any other path is taken as a file and kept whatever its name. If it is not a regular file, the
   reader reports `UNREADABLE` later, which is also what keeps a named pipe from blocking the run.
 - Duplicates are removed by `os.path.realpath`, keeping the first spelling given.
@@ -359,8 +365,8 @@ metadata are ASCII in practice, and the loss is cosmetic. (RF-05)
 
 ### ADR-7 — Strict defaults: one zip member, no recursion, exact domain
 
-**Decision.** More than one `.xml` in a zip is refused; folders are not entered recursively; the
-domain filter is an exact match.
+**Decision.** More than one `.xml` in a zip is refused; folders are not entered recursively (until
+ADR-9 added `--recursive`, opt-in); the domain filter is an exact match.
 **Alternatives.** Read every member; recurse; match subdomains.
 **Why.** Resolved decisions 7 to 9: each is the cheapest to defend and can be loosened later by a
 flag or by configuration without breaking anything. The reverse (tightening later) would.
@@ -382,6 +388,27 @@ about 40% of the cost. (a) also refuses honest large reports; (b) is not portabl
 whole cost before it refuses.
 **Trade-off.** A report from a reporter with an unusually deep extension block would be refused;
 the two constants are the place to loosen them, by a decision in this spec. (RF-03b)
+
+### ADR-9 — Subfolders on request, and a count of the files passed over by name (issue #80)
+
+**Decision.** `--recursive` (opt-in) searches subfolders, with `MAX_FOLDER_DEPTH = 8`, no link or
+junction followed, name order and depth first. The filter by name stays as it was. The files with a
+report's suffix whose name did not qualify are counted in `IngestionResult.passed_over`, shown as
+`passed over by name` in the summary's left-out block (only when above zero), in the verdict's
+left-out sentence, and as `passed_over` in the two `--json` documents (additive).
+**Alternatives.** (a) A switch that reads every `.xml`, `.gz` and `.zip` whatever the name, so the
+content decides. (b) Recursion by default. (c) Follow links with a visited set. (d) Count every
+file of the folder.
+**Why.** The user chose the recursive option and the count on 2026-10-30. Recursion by default
+would change what existing runs read (and a download folder is large); a link can lead out of the
+tree the user pointed at or back up into it, and the depth bound keeps a deep tree cheap. The count
+answers "what did you not look at?" without loosening the filter, so a renamed report stops being
+silent; only report suffixes are counted, because a download folder holds thousands of other files.
+(a) stays open for a later issue.
+**Trade-off.** A report renamed to something else is still not read until the user names it or the
+filter changes; it is now at least counted, and the no-reports message names `--recursive`. A tree
+deeper than 8 levels is not searched past that point, and a linked folder is never entered.
+(RF-06)
 
 ## Impact on existing code
 
@@ -444,6 +471,7 @@ documentation address ranges (RNF-07).
 | RF-03b | a document `MAX_DEPTH` deep accepted and one level more refused; `MAX_ELEMENTS` elements accepted and one more refused; a 5 MiB nest refused fast; the refusal kept per file through `ingest` and through `main(argv)` |
 | RF-04 | full report to model (every field asserted); RFC 7489 and RFC 9990 namespace give equal reports; foreign namespace root; wrong root; malformed XML with position; negative, non-integer and 5,000-digit `count`; bad timestamp; `end < begin`; `pct` 101; `version` `2.0`; missing optionals take defaults; whitespace around values; two `dkim` blocks; IPv6 source normalized |
 | RF-05 | C1 control, bidirectional override, line break inside a field (removed or replaced); a 1,000-character field cut at 255; ESC and NUL refused by the parser (documents the parser's behavior) |
+| RF-06 (ADR-9) | `--recursive` reads a report in a subfolder and a plain run does not; name order, depth first; the depth limit; a link and a looping link not entered; a subfolder that cannot be listed skipped, the rest read; a report suffix with another name counted, other suffixes not; a named or found file not counted; the same folder twice counted once; the count reaches `IngestionResult`, the summary, the verdict, the JSON and the refusal message |
 | RF-06 | file taken whatever its name; folder keeps only the attachment pattern; non-recursive; same file twice; names differing in case sort identically on every platform; missing path reported, others still read |
 | RF-07 | exact match, case-insensitive; trailing dot in the argument; subdomain is "other domain"; zero reports for the domain still returns the `other_domain` count |
 | RF-08 | same reporter and id twice (second counted, records not summed); same id from two reporters kept; an other-domain report never counts as a duplicate |

@@ -101,6 +101,7 @@ _SUMMARY = SummaryMessages(
     key_skipped="arquivos ignorados",
     key_duplicates="duplicados",
     key_other_domains="outros dominios",
+    key_passed_over="ignorados pelo nome",
     reasons=MappingProxyType(
         {
             Reason.UNSUPPORTED_EXTENSION: "tipo de arquivo nao suportado",
@@ -221,6 +222,7 @@ _VERDICT = VerdictMessages(
     skipped_file=Plural("{n} arquivo ignorado", "{n} arquivos ignorados"),
     duplicate=Plural("{n} duplicado", "{n} duplicados"),
     other_domain=Plural("{n} relatorio de outro dominio", "{n} relatorios de outros dominios"),
+    passed_over=Plural("{n} arquivo ignorado pelo nome", "{n} arquivos ignorados pelo nome"),
     left_out="Fora deste veredito: {parts}. O comando mailvigil summary mostra o motivo.",
     caveat=(
         "Isto le apenas os relatorios que voce deu: email que nenhum receptor reporta, e "
@@ -258,7 +260,7 @@ _REFUSALS = RefusalMessages(
     no_reports="Nenhum relatorio DMARC de {domain} foi mantido.",
     no_file_found="Nenhum arquivo de relatorio foi achado. Uma pasta so le nomes como",
     # The pattern is the one the providers use (RFC 7489), so its words stay as they are.
-    no_file_hint="provider!domain!begin!end.zip; ou informe o proprio arquivo para le-lo.",
+    no_file_hint="provider!domain!begin!end.zip; use --recursive ou informe o proprio arquivo.",
     output_failed="nao foi possivel gravar {path}: {reason}",
 )
 

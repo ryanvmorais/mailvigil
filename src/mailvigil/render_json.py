@@ -227,15 +227,16 @@ def _left_out(left_out: LeftOut) -> dict[str, object]:
     Write what the summary did not count.
 
     Args:
-        left_out (LeftOut): The three figures.
+        left_out (LeftOut): The four figures.
 
     Returns:
-        dict[str, object]: ``skipped``, ``duplicates`` and ``other_domain``.
+        dict[str, object]: ``skipped``, ``duplicates``, ``other_domain`` and ``passed_over``.
     """
     return {
         "skipped": left_out.skipped,
         "duplicates": left_out.duplicates,
         "other_domain": left_out.other_domain,
+        "passed_over": left_out.passed_over,
     }
 
 
@@ -275,6 +276,7 @@ def summary_document(summary: Summary, config_source: str | None) -> dict[str, o
         ],
         "duplicates": summary.duplicates,
         "other_domain": summary.other_domain,
+        "passed_over": summary.passed_over,
     }
 
 
