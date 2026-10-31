@@ -31,7 +31,7 @@ The release (1.6.0) is the maintainer's act and is prepared apart, with `/prepar
 
 ## Stage 1 — Internationalized domains (RF-03, RNF-04, ADR-2)
 
-- [ ] `tests/test_config.py`, written first: a table for `check_domain` — accented lower and upper
+- [x] `tests/test_config.py`, written first: a table for `check_domain` — accented lower and upper
   case (`bücher.example`, `BÜCHER.example`) give `xn--bcher-kva.example`; the `xn--` form is
   accepted unchanged and equals the Unicode spelling; a trailing dot and surrounding spaces are
   ignored; `faß.example`, a Greek final sigma, the Kelvin sign (U+212A), `İ`, the ideographic full
@@ -40,16 +40,21 @@ The release (1.6.0) is the maintainer's act and is prepared apart, with `/prepar
   where the converted name fails the label rules), naming the key; a mixed-script look-alike
   converts to a name that is not the Latin one; the same table through an `[spf]` key (it must be
   within the domain after conversion) and through `--domain`. — RF-03
-- [ ] `src/mailvigil/config.py`: `check_domain` converts a non-ASCII value with the `idna` codec and
+- [x] `src/mailvigil/config.py`: `check_domain` converts a non-ASCII value with the `idna` codec and
   accepts it only when the way back gives the typed name under the case rule of ADR-2; every
   `UnicodeError` becomes a refusal; the phrase of `NON_ASCII_DOMAIN` in both languages says the
   name could not be converted as written and to write it in its `xn--` form (`messages/`). The
   ASCII path is untouched. — RF-03, ADR-2
-- [ ] `tests/test_cli_*.py`: `summary --domain bücher.example` and a file with the same domain run,
+- [x] `tests/test_cli_*.py`: `summary --domain bücher.example` and a file with the same domain run,
   and print the `xn--` form (text and the `domain` field of `--json`); a refused name prints the
   line of the language. — RF-03
-- [ ] Quality gate of the stage: `uv run ruff check .` → `uv run black --check .` → `uv run mypy` →
+- [x] Quality gate of the stage: `uv run ruff check .` → `uv run black --check .` → `uv run mypy` →
   `uv run pytest --cov`. Record the result here, with the number of tests and the coverage. — RNF-01, RNF-06
+  Result (2026-10-30): ruff, black and mypy clean; 3165 passed, 4 skipped (POSIX modes and symbolic
+  links on Windows); coverage 100%. Two things differ from the plan: the `idna` codec does not refuse
+  unassigned code points, so `_label_to_ascii` checks them with `stringprep.in_table_a1` (ADR-2
+  amended); and the conversion runs label by label. The old tests that pinned `exämple.com` as
+  refused now pin `faß.example`, because that name converts.
 
 ## Stage 2 — One reading for many domains (RF-04, RNF-02, ADR-3, ADR-4)
 

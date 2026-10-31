@@ -7,6 +7,14 @@ All notable changes to MailVigil are written here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **An internationalized domain can be written as it is read** (#79). `bücher.example` in
+  `--domain`, in `domain` and in the `[spf]` keys is converted to its `xn--` form
+  (`xn--bcher-kva.example`) and compared with the reports as they spell it. A name the conversion
+  would change (`faß.example`, a final sigma, the Kelvin sign, an unassigned character) is refused
+  with the advice to write its `xn--` form, never guessed.
+
 ## [1.5.0] - 2026-10-30
 
 ### Added

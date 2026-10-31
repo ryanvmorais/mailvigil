@@ -16,6 +16,7 @@ import difflib
 import ipaddress
 import re
 import stat
+import stringprep
 import tomllib
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -91,7 +92,7 @@ class ConfigReason(StrEnum):
             define.
         MISSING_DOMAIN (str): There is no ``domain``.
         INVALID_DOMAIN (str): Not a string, empty, or not a plausible host name.
-        NON_ASCII_DOMAIN (str): The domain must be written in its ``xn--`` form.
+        NON_ASCII_DOMAIN (str): The name could not be converted as written; write its ``xn--`` form.
         WRONG_TYPE (str): ``senders``, ``spf``, ``ips`` or ``fetch`` is not a table.
         INVALID_SELECTOR (str): A selector key a DKIM selector cannot be.
         DUPLICATE_SELECTOR (str): Two selector keys that differ only by case.
@@ -302,6 +303,55 @@ def _check_keys(table: dict[str, Any]) -> None:
         raise ConfigError(ConfigReason.UNKNOWN_KEY, key, detail)
 
 
+def _fold(char: str) -> str:
+    """
+    Lower-case a character the way the typed name is compared with its conversion (ADR-2).
+
+    An ASCII letter is lower-cased. A non-ASCII one is lower-cased only when the result is one
+    non-ASCII character, so ``Ü`` becomes ``ü`` but the Kelvin sign is not turned into ``k`` and
+    ``İ``, whose lower case is two characters, is left as it is: the conversion then changes it
+    and the name is refused instead of matching another one.
+
+    Args:
+        char (str): One character of the typed name.
+
+    Returns:
+        str: The character as the comparison sees it.
+    """
+    lower = char.lower()
+    if char.isascii() or (len(lower) == 1 and not lower.isascii()):
+        return lower
+    return char
+
+
+def _label_to_ascii(label: str) -> str:
+    """
+    Convert one label with the ``idna`` codec, accepting it only when the name does not change.
+
+    The codec is IDNA 2003: it maps ``ß`` to ``ss``, a final sigma to the ordinary one and the
+    ideographic full stop to a dot, so converting back is compared with what was typed and any
+    difference refuses the label. The codec does not check unassigned code points, so that is done
+    here.
+
+    Args:
+        label (str): One label of the domain, as typed.
+
+    Returns:
+        str: The label unchanged when it is ASCII, otherwise its ``xn--`` form.
+
+    Raises:
+        UnicodeError: The label cannot be converted, or would become a different name.
+    """
+    if label.isascii():
+        return label
+    if any(stringprep.in_table_a1(char) for char in label):
+        raise UnicodeError("unassigned code point")
+    converted = label.encode("idna").decode("ascii")
+    if converted.encode("ascii").decode("idna") != "".join(_fold(char) for char in label):
+        raise UnicodeError("the conversion changes the name")
+    return converted
+
+
 def check_domain(value: object, key: str = "domain") -> str:
     """
     Validate and normalize a domain: the rules of the file, usable on any value (ADR-7).
@@ -321,14 +371,20 @@ def check_domain(value: object, key: str = "domain") -> str:
     """
     if not isinstance(value, str):
         raise ConfigError(ConfigReason.INVALID_DOMAIN, key, "the domain must be a string")
-    # Checked before lower-casing: the Kelvin sign (U+212A) lower-cases to an ASCII ``k``, which
-    # would let a different name through as if it were plain.
-    if not value.strip().isascii():
-        raise ConfigError(
-            ConfigReason.NON_ASCII_DOMAIN, key, "write the domain in its xn-- (punycode) form"
-        )
+    # Checked before lower-casing, which is why it takes the text as typed: the Kelvin sign
+    # (U+212A) lower-cases to an ASCII ``k``, which would let a different name through as plain.
+    typed = value.strip()
+    if not typed.isascii():
+        try:
+            typed = ".".join(_label_to_ascii(label) for label in typed.rstrip(".").split("."))
+        except UnicodeError:
+            raise ConfigError(
+                ConfigReason.NON_ASCII_DOMAIN,
+                key,
+                "the name could not be converted as written; write it in its xn-- (punycode) form",
+            ) from None
 
-    domain = normalize_domain(value)
+    domain = normalize_domain(typed)
     labels = domain.split(".")
     # The label rule excludes spaces, ``:``, ``/``, ``@``, empty labels and control characters in
     # one test; a scheme or a path fails it because ``:`` and ``/`` are not letters or digits.

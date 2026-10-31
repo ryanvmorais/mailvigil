@@ -302,14 +302,25 @@ def test_the_longest_valid_name_is_accepted(tmp_path: Path) -> None:
     assert load_config(write(tmp_path, f'domain = "{name}"\n')).domain == name
 
 
-@pytest.mark.parametrize("raw", ["exämple.com", "日本語.jp", chr(0x212A) + "ample.com"])
-def test_a_non_ascii_domain_is_refused_with_the_punycode_advice(tmp_path: Path, raw: str) -> None:
-    """Reports carry the ``xn--`` form; the Kelvin sign would lower-case to an ASCII ``k``."""
+@pytest.mark.parametrize(
+    "raw", ["faß.example", chr(0x212A) + "ample.com", "a" + chr(0x3002) + "b.example"]
+)
+def test_a_domain_that_changes_in_conversion_is_refused_with_the_punycode_advice(
+    tmp_path: Path, raw: str
+) -> None:
+    """Reports carry the ``xn--`` form; a name that would change on the way is not guessed."""
     error = refusal(write(tmp_path, f'domain = "{raw}"\n'))
 
     assert error.reason is ConfigReason.NON_ASCII_DOMAIN
     assert error.key == "domain"
     assert "xn--" in error.detail
+
+
+def test_an_internationalized_domain_in_the_file_is_stored_in_its_xn_form(tmp_path: Path) -> None:
+    """The name is written as the person reads it and compared as reports spell it (RF-03)."""
+    config = load_config(write(tmp_path, 'domain = "bücher.example"\n'))
+
+    assert config.domain == "xn--bcher-kva.example"
 
 
 # ---------------------------------------------------------------------------
@@ -331,7 +342,7 @@ def test_check_domain_normalizes_like_the_loader() -> None:
         ("a..com", ConfigReason.INVALID_DOMAIN),
         ("localhost", ConfigReason.INVALID_DOMAIN),
         ("a" * 64 + ".com", ConfigReason.INVALID_DOMAIN),
-        ("exämple.com", ConfigReason.NON_ASCII_DOMAIN),
+        ("faß.example", ConfigReason.NON_ASCII_DOMAIN),
         (chr(0x212A) + "ample.com", ConfigReason.NON_ASCII_DOMAIN),
     ],
     ids=[
@@ -341,7 +352,7 @@ def test_check_domain_normalizes_like_the_loader() -> None:
         "empty-label",
         "single-label",
         "label-64",
-        "non-ascii",
+        "sharp-s",
         "kelvin-sign",
     ],
 )
@@ -351,6 +362,119 @@ def test_check_domain_refuses_what_the_loader_refuses(value: object, reason: Con
         check_domain(value)
 
     assert caught.value.reason is reason
+
+
+# Written as code points so the source stays readable: the Kelvin sign lower-cases to an ASCII
+# ``k``, and the Cyrillic letter looks exactly like the Latin ``a`` (the look-alike of ADR-2).
+_KELVIN = chr(0x212A)
+_CYRILLIC_A = chr(0x0430)
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("bücher.example", "xn--bcher-kva.example"),
+        ("BÜCHER.example", "xn--bcher-kva.example"),
+        ("xn--bcher-kva.example", "xn--bcher-kva.example"),
+        ("  bücher.example.  ", "xn--bcher-kva.example"),
+        ("日本語.jp", "xn--wgv71a119e.jp"),
+        ("mail.bücher.example", "mail.xn--bcher-kva.example"),
+        ("bücher.xn--80ak6aa92e.com", "xn--bcher-kva.xn--80ak6aa92e.com"),
+    ],
+    ids=["lower", "upper", "xn-form", "spaces-and-dot", "cjk", "subdomain", "mixed-labels"],
+)
+def test_check_domain_converts_an_internationalized_name(value: str, expected: str) -> None:
+    """The name is stored as reports spell it; the ``xn--`` form is left as it is."""
+    assert check_domain(value) == expected
+
+
+def test_both_spellings_of_one_name_are_the_same_domain() -> None:
+    """What the person types and what reports carry compare equal after conversion (RF-03)."""
+    assert check_domain("bücher.example") == check_domain("xn--bcher-kva.example")
+
+
+@pytest.mark.parametrize(
+    ("value", "reason"),
+    [
+        ("faß.example", ConfigReason.NON_ASCII_DOMAIN),
+        ("fa" + chr(0x3C2) + ".example", ConfigReason.NON_ASCII_DOMAIN),
+        (_KELVIN + "ample.example", ConfigReason.NON_ASCII_DOMAIN),
+        (chr(0x130) + "stanbul.example", ConfigReason.NON_ASCII_DOMAIN),
+        ("a" + chr(0x3002) + "b.example", ConfigReason.NON_ASCII_DOMAIN),
+        ("a" + chr(0x378) + ".example", ConfigReason.NON_ASCII_DOMAIN),
+        ("a" + chr(0x1F600) + ".example", ConfigReason.NON_ASCII_DOMAIN),
+        ("a" + chr(0xE000) + ".example", ConfigReason.NON_ASCII_DOMAIN),
+        ("a" + chr(0x200D) + "b.example", ConfigReason.NON_ASCII_DOMAIN),
+        ("a" + chr(0xA0) + "b.example", ConfigReason.NON_ASCII_DOMAIN),
+        ("a" * 64 + "ü.example", ConfigReason.NON_ASCII_DOMAIN),
+        ("ü" * 60 + ".example", ConfigReason.NON_ASCII_DOMAIN),
+        ("ü..example", ConfigReason.INVALID_DOMAIN),
+        ("ü b.example", ConfigReason.INVALID_DOMAIN),
+        ("ü.", ConfigReason.INVALID_DOMAIN),
+    ],
+    ids=[
+        "sharp-s",
+        "final-sigma",
+        "kelvin-sign",
+        "dotted-capital-i",
+        "ideographic-full-stop",
+        "unassigned",
+        "newer-than-unicode-3.2",
+        "private-use",
+        "joiner",
+        "no-break-space",
+        "label-64",
+        "label-too-long-once-converted",
+        "empty-label",
+        "space-inside",
+        "single-label",
+    ],
+)
+def test_check_domain_refuses_a_name_that_cannot_be_converted_as_written(
+    value: str, reason: ConfigReason
+) -> None:
+    """A name that would change, or fail, in conversion is refused, never guessed (ADR-2)."""
+    with pytest.raises(ConfigError) as caught:
+        check_domain(value, key="--domain")
+
+    assert caught.value.reason is reason
+    assert caught.value.key == "--domain"
+
+
+def test_a_look_alike_from_another_script_converts_to_a_different_name() -> None:
+    """A Cyrillic a in ``example`` is not the Latin one: it must not match the real domain."""
+    converted = check_domain(f"ex{_CYRILLIC_A}mple.com")
+
+    assert converted != "example.com"
+    assert converted.startswith("xn--")
+
+
+def test_the_refusal_of_a_name_that_changes_gives_the_xn_advice() -> None:
+    """The detail tells the person what to do, in the one form that is accepted as typed."""
+    with pytest.raises(ConfigError) as caught:
+        check_domain("faß.example")
+
+    assert "xn--" in caught.value.detail
+
+
+def test_an_internationalized_spf_key_is_converted_and_checked_against_the_domain(
+    tmp_path: Path,
+) -> None:
+    """The ``[spf]`` keys go through the same rule, and must be within the converted domain."""
+    text = 'domain = "bücher.example"\n[spf]\n"mail.bücher.example" = "Example Relay"\n'
+
+    config = load_config(write(tmp_path, text))
+
+    assert dict(config.spf) == {"mail.xn--bcher-kva.example": "Example Relay"}
+
+
+def test_an_internationalized_spf_key_outside_the_domain_is_foreign(tmp_path: Path) -> None:
+    """After conversion the key is not below the domain, so it is refused as any foreign key."""
+    text = 'domain = "bücher.example"\n[spf]\n"mail.münchen.example" = "Example Relay"\n'
+
+    error = refusal(write(tmp_path, text))
+
+    assert error.reason is ConfigReason.FOREIGN_SPF_DOMAIN
 
 
 def test_check_domain_reports_the_key_it_was_given() -> None:
@@ -762,7 +886,7 @@ def test_the_apex_domain_is_a_valid_spf_key(tmp_path: Path) -> None:
         ("a b.example.com", ConfigReason.INVALID_SPF_DOMAIN),
         ("https://x.example.com", ConfigReason.INVALID_SPF_DOMAIN),
         ("a..example.com", ConfigReason.INVALID_SPF_DOMAIN),
-        ("exämple.com", ConfigReason.NON_ASCII_DOMAIN),
+        ("faß.example.com", ConfigReason.NON_ASCII_DOMAIN),
     ],
 )
 def test_a_bad_spf_key_is_refused_with_its_reason_and_the_key(

@@ -283,7 +283,7 @@ def test_a_different_domain_in_the_flag_is_refused_naming_both(
         ("https://example.com", "invalid_domain"),
         ("localhost", "invalid_domain"),
         ("", "invalid_domain"),
-        ("exämple.com", "non_ascii_domain"),
+        ("faß.example", "non_ascii_domain"),
     ],
 )
 def test_an_invalid_domain_is_refused_with_the_loaders_reason(
