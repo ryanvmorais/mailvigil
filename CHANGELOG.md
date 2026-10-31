@@ -7,6 +7,8 @@ All notable changes to MailVigil are written here. The format follows
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-10-31
+
 ### Changed
 
 - **The Portuguese text has its accents** (#149). `--lang pt-BR` prints `não`, `domínio` and
@@ -204,7 +206,8 @@ The first release. It gathers the milestones `v0.1` to `v0.9` described in the R
   certificate checked, read-only (it changes, moves and deletes nothing and does not mark mail as
   read), with the password asked on the terminal or read from a file.
 
-[Unreleased]: https://github.com/ryanvmorais/mailvigil/compare/v1.6.0...HEAD
+[Unreleased]: https://github.com/ryanvmorais/mailvigil/compare/v1.7.0...HEAD
+[1.7.0]: https://github.com/ryanvmorais/mailvigil/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/ryanvmorais/mailvigil/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/ryanvmorais/mailvigil/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/ryanvmorais/mailvigil/compare/v1.3.1...v1.4.0
