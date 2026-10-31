@@ -228,8 +228,11 @@ that document reads each element with no change, and tells the two shapes apart 
   input is lower-cased; a non-ASCII character is lower-cased only if its lower case is still
   non-ASCII (so `Ü` is `ü` but the Kelvin sign is **not** turned into `k`, and a character whose
   lower case has several characters, like `İ`, is left as it is). Anything the codec raises on
-  (`UnicodeError`: a label over 63 characters, an empty label, a prohibited character, a character
-  unassigned in Unicode 3.2) is refused. Both refusals use `NON_ASCII_DOMAIN`, whose phrase says the
+  (`UnicodeError`: a label over 63 characters, an empty label, a prohibited character) is refused.
+  The codec does not check unassigned code points (Python's `nameprep` skips table A.1), so the
+  code checks them with `stringprep.in_table_a1` before converting; a character unassigned in
+  Unicode 3.2, an emoji among them, is refused. The conversion and the comparison are made label by
+  label, so an `xn--` label and a Unicode one may share a name. Both refusals use `NON_ASCII_DOMAIN`, whose phrase says the
   name could not be converted as written and to write it in its `xn--` form. The result is the
   ASCII name, and then the label and length rules of today apply to it.
 - **Alternatives:** (a) accept whatever the codec returns — silently turns `faß.example` into
