@@ -147,18 +147,24 @@ The largest stage: the file and the command that reads it are tested together, i
 
 ## Stage 5 — `--json` with several domains (RF-07, ADR-7)
 
-- [ ] `tests/test_render_json_domains.py`, `tests/test_cli_domains.py`, `tests/test_json_schema_doc.py`,
+- [x] `tests/test_render_json_domains.py`, `tests/test_cli_domains.py`, `tests/test_json_schema_doc.py`,
   written first: `summaries_document` and `verdicts_document` produce the envelope with the keys in
   the documented order; each element equals the one-domain document of the same data, byte for byte
   after `dumps`; `answer` is the worst one and matches the exit code; `--top N` trims inside each
   element and each carries its own `top` key; one domain still prints today's document (no
   `domains` key); the examples of `docs/json-schema.md` for the envelope are built by the code and
   compared with the page. — RF-07
-- [ ] `src/mailvigil/render_json.py` and `cli.py`: the two envelope functions, used when the run has
+- [x] `src/mailvigil/render_json.py` and `cli.py`: the two envelope functions, used when the run has
   two or more domains. — RF-07, ADR-7
-- [ ] `docs/json-schema.md`: the envelope for `summary` and `verdict`, the rule "look for `domains`",
+- [x] `docs/json-schema.md`: the envelope for `summary` and `verdict`, the rule "look for `domains`",
   the examples. — RF-07
-- [ ] Quality gate of the stage (as above). Record the result here. — RNF-01, RNF-06
+- [x] Quality gate of the stage (as above). Record the result here. — RNF-01, RNF-06
+  Result (2026-10-31): ruff, black and mypy clean; 3355 collected, 4 skipped (POSIX modes and
+  symbolic links on Windows), the rest passed; coverage 100%. Two things differ from the plan:
+  (1) `tests/test_json_schema_doc.py` also walks the two envelopes (`summaries`, `verdicts`) against
+  the tables of the page, and the page has two examples, `Several summaries` and `Several verdicts`,
+  with a sentence under each block because the test reads the block right below the heading; (2) the
+  temporary guard of stage 4 now refuses `--html` only, with its own line, and stage 6 deletes it.
 
 ## Stage 6 — `--html` with several domains (RF-07, RNF-05, ADR-8)
 

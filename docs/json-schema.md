@@ -2,13 +2,16 @@
 
 `mailvigil summary --json`, `mailvigil verdict --json` and `mailvigil fetch --json` print one JSON
 document on standard output, a newline, and nothing on standard error. This page lists every field,
-the promise about how the fields may change, and one example per command. The examples are the real
-output for invented data, and a test compares them with the code, so this page cannot drift from it.
+the promise about how the fields may change, and one example per command, plus one for a run of
+several domains. The examples are the real output for invented data, and a test compares them with
+the code, so this page cannot drift from it.
 
 ## The promise
 
 - Every document starts with `schema_version` (an integer, `1` today) and `command`. The `summary`
   and `verdict` documents go on with `domain`; the `fetch` document is about a mailbox and has none.
+  A run of **two or more domains** prints the envelope of "Several domains in one run" instead: look
+  for a `domains` key to tell the two shapes apart.
 - A field is only **added** inside a `schema_version`; a consumer must ignore keys it does not know.
 - A field is **renamed, removed or given another type** only with a new `schema_version`.
 - Keys come in a fixed order, and lists come in the order stated below; the same reports give the
@@ -24,7 +27,7 @@ output for invented data, and a test compares them with the code, so this page c
 
 | Code | Meaning | Commands |
 |---|---|---|
-| `0` | An answer was printed; for `verdict`, the answer is `ready`; for `fetch`, the run finished, even with nothing new | all |
+| `0` | An answer was printed; for `verdict`, the answer is `ready` (for every domain of the run); for `fetch`, the run finished, even with nothing new | all |
 | `1` | The run was refused: invalid configuration or domain, no report kept, or (for `fetch`) a connection or login refusal | all |
 | `2` | Usage error | all |
 | `3` | `verdict` printed `too early` | `verdict` |
@@ -33,8 +36,10 @@ output for invented data, and a test compares them with the code, so this page c
 | `130` | Interrupted with Ctrl+C; no document | all |
 | `141` | The output pipe was closed | all |
 
-A refused run (`1`) prints no document: standard output is empty and the one line goes to standard
-error. A `too early` or `not ready` verdict still prints the full document.
+With several domains, `verdict` exits with the worst answer of the run: `4` if any domain is
+`not ready`, else `3` if any is `too early`, else `0`. A refused run (`1`) prints no document:
+standard output is empty and the one line goes to standard error. A `too early` or `not ready`
+verdict still prints the full document.
 
 ## The `summary` document
 
@@ -237,6 +242,40 @@ code are computed from everything the reports said.
 "top": {"limit": 2, "left_out": {"senders": 4, "failing": 4}}
 ```
 
+## Several domains in one run
+
+A run covers several domains when the configuration file has a `[[domains]]` list and no `--domain`
+narrows it to one, or when `--domain` is repeated. With **one** domain the document is the one
+described above, with no `domains` key. With **two or more** it is an envelope: a `domains` list
+holding, in the order of the run (the order of the file, or of the `--domain` values), the document
+of each domain exactly as a run of that one domain prints it. The shape depends on the number of
+domains in the run, not on how they were named, so a script that handles both looks for `domains`.
+
+`schema_version` stays `1`: the envelope is a new shape that only a run of several domains reaches,
+and no field of an existing document changes. `--top N` trims inside each element, and each element
+carries its own `top` key; the envelope has none.
+
+### `summaries`
+
+The keys, in order. `mailvigil summary --json` with two or more domains.
+
+| Key | Type | Meaning |
+|---|---|---|
+| `schema_version` | integer | `1` |
+| `command` | string | `"summary"` |
+| `domains` | list of `summary` | One `summary` document per domain |
+
+### `verdicts`
+
+The keys, in order. `mailvigil verdict --json` with two or more domains.
+
+| Key | Type | Meaning |
+|---|---|---|
+| `schema_version` | integer | `1` |
+| `command` | string | `"verdict"` |
+| `answer` | string | The worst answer of the run: `not_ready` if any domain is, else `too_early` if any is, else `ready`. It is the answer the exit code stands for |
+| `domains` | list of `verdict` | One `verdict` document per domain |
+
 ## The `fetch` document
 
 `mailvigil fetch --json` replaces the text of a finished run with this document. A refused run
@@ -261,7 +300,8 @@ skipped + left`.
 
 ## Examples
 
-All three use invented data: `example.com`, a made-up service and the documentation address ranges.
+All five use invented data: `example.com`, `example.net`, a made-up service and the documentation
+address ranges.
 
 ### A summary
 
@@ -557,3 +597,305 @@ All three use invented data: `example.com`, a made-up service and the documentat
   "left": 1
 }
 ```
+
+### Several summaries
+
+```json
+{
+  "schema_version": 1,
+  "command": "summary",
+  "domains": [
+    {
+      "schema_version": 1,
+      "command": "summary",
+      "domain": "example.com",
+      "config": {
+        "source": "mailvigil.toml",
+        "selectors": 1,
+        "spf_domains": 0,
+        "ip_ranges": 0
+      },
+      "reports": {
+        "count": 3,
+        "reporters": 2
+      },
+      "period": {
+        "first_day": "2026-09-01",
+        "last_day": "2026-09-03",
+        "days_spanned": 3,
+        "days_with_reports": 3
+      },
+      "policy": {
+        "p": "none",
+        "sp": null,
+        "np": null,
+        "pct": 100
+      },
+      "earlier_p": [],
+      "totals": {
+        "ok": 120,
+        "dkim_only": 0,
+        "spf_only": 0,
+        "failing": 0,
+        "total": 120
+      },
+      "recognized_messages": 120,
+      "senders": [
+        {
+          "outcome": "known",
+          "service": "Example Mailer",
+          "source_ip": null,
+          "selectors": [],
+          "spf_domains": [],
+          "counts": {
+            "ok": 120,
+            "dkim_only": 0,
+            "spf_only": 0,
+            "failing": 0,
+            "total": 120
+          }
+        }
+      ],
+      "failing": [],
+      "skipped": [],
+      "skipped_by_reason": [],
+      "duplicates": 0,
+      "other_domain": 0,
+      "passed_over": 0
+    },
+    {
+      "schema_version": 1,
+      "command": "summary",
+      "domain": "example.net",
+      "config": {
+        "source": "mailvigil.toml",
+        "selectors": 0,
+        "spf_domains": 0,
+        "ip_ranges": 0
+      },
+      "reports": {
+        "count": 0,
+        "reporters": 0
+      },
+      "period": null,
+      "policy": null,
+      "earlier_p": [],
+      "totals": {
+        "ok": 0,
+        "dkim_only": 0,
+        "spf_only": 0,
+        "failing": 0,
+        "total": 0
+      },
+      "recognized_messages": 0,
+      "senders": [],
+      "failing": [],
+      "skipped": [],
+      "skipped_by_reason": [],
+      "duplicates": 0,
+      "other_domain": 0,
+      "passed_over": 0
+    }
+  ]
+}
+```
+
+`example.com` has three days of reports and `example.net` has none yet.
+
+### Several verdicts
+
+```json
+{
+  "schema_version": 1,
+  "command": "verdict",
+  "answer": "not_ready",
+  "domains": [
+    {
+      "schema_version": 1,
+      "command": "verdict",
+      "domain": "example.com",
+      "answer": "not_ready",
+      "enforcing": "none",
+      "deciding": "unrecognized_failures",
+      "rules": [
+        {
+          "id": "period_covered",
+          "kind": "data",
+          "measured": 29,
+          "whole": 0,
+          "needed": 28,
+          "unit": "days",
+          "comparison": "at_least",
+          "passed": true,
+          "missing": 0
+        },
+        {
+          "id": "days_with_report",
+          "kind": "data",
+          "measured": 29,
+          "whole": 29,
+          "needed": 80,
+          "unit": "percent_of_days",
+          "comparison": "at_least",
+          "passed": true,
+          "missing": 0
+        },
+        {
+          "id": "messages_seen",
+          "kind": "data",
+          "measured": 7006,
+          "whole": 0,
+          "needed": 100,
+          "unit": "messages",
+          "comparison": "at_least",
+          "passed": true,
+          "missing": 0
+        },
+        {
+          "id": "recognized_failures",
+          "kind": "problem",
+          "measured": 0,
+          "whole": 0,
+          "needed": 0,
+          "unit": "messages",
+          "comparison": "at_most",
+          "passed": true,
+          "missing": 0
+        },
+        {
+          "id": "unrecognized_failures",
+          "kind": "problem",
+          "measured": 56,
+          "whole": 7006,
+          "needed": 5,
+          "unit": "per_mille_of_messages",
+          "comparison": "at_most",
+          "passed": false,
+          "missing": 0
+        }
+      ],
+      "recognized_failing": [],
+      "unrecognized_failing": [
+        {
+          "outcome": "unknown",
+          "service": null,
+          "source_ip": "203.0.113.5",
+          "messages": 56,
+          "selectors": [],
+          "spf_domains": [],
+          "dkim": [
+            "fail"
+          ],
+          "spf": [
+            "fail"
+          ],
+          "override_reasons": [
+            "forwarded"
+          ]
+        }
+      ],
+      "notes": [
+        {
+          "kind": "fragile",
+          "numbers": [
+            950,
+            0,
+            7006
+          ],
+          "texts": []
+        },
+        {
+          "kind": "subdomain_policy",
+          "numbers": [],
+          "texts": [
+            "reject",
+            null
+          ]
+        }
+      ],
+      "left_out": {
+        "skipped": 0,
+        "duplicates": 0,
+        "other_domain": 2,
+        "passed_over": 0
+      }
+    },
+    {
+      "schema_version": 1,
+      "command": "verdict",
+      "domain": "example.net",
+      "answer": "too_early",
+      "enforcing": null,
+      "deciding": "period_covered",
+      "rules": [
+        {
+          "id": "period_covered",
+          "kind": "data",
+          "measured": 0,
+          "whole": 0,
+          "needed": 28,
+          "unit": "days",
+          "comparison": "at_least",
+          "passed": false,
+          "missing": 28
+        },
+        {
+          "id": "days_with_report",
+          "kind": "data",
+          "measured": 0,
+          "whole": 0,
+          "needed": 80,
+          "unit": "percent_of_days",
+          "comparison": "at_least",
+          "passed": false,
+          "missing": 0
+        },
+        {
+          "id": "messages_seen",
+          "kind": "data",
+          "measured": 0,
+          "whole": 0,
+          "needed": 100,
+          "unit": "messages",
+          "comparison": "at_least",
+          "passed": false,
+          "missing": 100
+        },
+        {
+          "id": "recognized_failures",
+          "kind": "problem",
+          "measured": 0,
+          "whole": 0,
+          "needed": 0,
+          "unit": "messages",
+          "comparison": "at_most",
+          "passed": true,
+          "missing": 0
+        },
+        {
+          "id": "unrecognized_failures",
+          "kind": "problem",
+          "measured": 0,
+          "whole": 0,
+          "needed": 5,
+          "unit": "per_mille_of_messages",
+          "comparison": "at_most",
+          "passed": true,
+          "missing": 0
+        }
+      ],
+      "recognized_failing": [],
+      "unrecognized_failing": [],
+      "notes": [],
+      "left_out": {
+        "skipped": 0,
+        "duplicates": 0,
+        "other_domain": 0,
+        "passed_over": 0
+      }
+    }
+  ]
+}
+```
+
+`example.com` is not ready and `example.net` has no reports, so the worst answer is `not_ready`.
