@@ -7,6 +7,8 @@ All notable changes to MailVigil are written here. The format follows
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-10-31
+
 ### Added
 
 - **Several domains in one run, in text** (#79). The configuration file takes an array of tables,
@@ -192,7 +194,8 @@ The first release. It gathers the milestones `v0.1` to `v0.9` described in the R
   certificate checked, read-only (it changes, moves and deletes nothing and does not mark mail as
   read), with the password asked on the terminal or read from a file.
 
-[Unreleased]: https://github.com/ryanvmorais/mailvigil/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/ryanvmorais/mailvigil/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/ryanvmorais/mailvigil/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/ryanvmorais/mailvigil/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/ryanvmorais/mailvigil/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/ryanvmorais/mailvigil/compare/v1.3.0...v1.3.1
