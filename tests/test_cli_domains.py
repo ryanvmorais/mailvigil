@@ -11,6 +11,7 @@ one domain over the same reports, which is the promise of ADR-4 and of RNF-01.
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -497,18 +498,147 @@ def test_a_refused_entry_names_its_place_in_the_line(
 
 
 # ---------------------------------------------------------------------------
-# The formats of the stages that follow (spec 010, stages 5 and 6)
+# --json: the envelope (RF-07, ADR-7)
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("flag", ["--json", "--html"])
-def test_json_and_html_of_several_domains_are_refused_before_any_report_is_read(
+def test_summary_json_of_two_domains_is_an_envelope_of_the_one_domain_documents(
+    tmp_path: Path,
+    make_report_xml: ReportXml,
+    make_record_xml: RecordXml,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Each element is the document of a run of that one domain (RNF-01, RF-07)."""
+    first = windows(tmp_path / "a", make_report_xml, make_record_xml, {_COM: LONG})
+    second = windows(tmp_path / "b", make_report_xml, make_record_xml, {_NET: LONG})
+    config = str(write_domains_config(tmp_path / "c.toml", [_COM, _NET]))
+
+    code, out, err = run(capsys, "summary", str(first), str(second), "--config", config, "--json")
+
+    assert (code, err) == (0, "")
+    document = json.loads(out)
+    assert list(document) == ["schema_version", "command", "domains"]
+    assert document["command"] == "summary"
+    alone = [
+        json.loads(
+            run(capsys, "summary", str(folder), "--config", config, "--domain", domain, "--json")[1]
+        )
+        for folder, domain in ((first, _COM), (second, _NET))
+    ]
+    assert document["domains"] == alone
+    assert all("domains" not in element for element in alone)
+
+
+def test_summary_json_of_one_domain_is_the_document_of_today(
+    tmp_path: Path,
+    make_report_xml: ReportXml,
+    make_record_xml: RecordXml,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A file of two domains narrowed to one by ``--domain`` prints no envelope (ADR-7)."""
+    folder = windows(tmp_path / "reports", make_report_xml, make_record_xml, {_COM: LONG})
+    config = str(write_domains_config(tmp_path / "c.toml", [_COM, _NET]))
+
+    code, out, _err = run(
+        capsys, "summary", str(folder), "--config", config, "--domain", _COM, "--json"
+    )
+
+    assert code == 0
+    document = json.loads(out)
+    assert "domains" not in document
+    assert document["domain"] == _COM
+
+
+@pytest.mark.parametrize(
+    ("days", "failing", "code", "answer"),
+    [
+        ({_COM: LONG, _NET: LONG, _ORG: LONG}, [], 0, "ready"),
+        ({_COM: LONG, _NET: 2, _ORG: LONG}, [], 3, "too_early"),
+        ({_COM: LONG, _NET: 2, _ORG: LONG}, [_ORG], 4, "not_ready"),
+    ],
+    ids=["all ready", "one too early", "not ready beats too early"],
+)
+def test_verdict_json_of_three_domains_carries_the_answer_the_exit_code_stands_for(
+    tmp_path: Path,
+    make_report_xml: ReportXml,
+    make_record_xml: RecordXml,
+    capsys: pytest.CaptureFixture[str],
+    days: dict[str, int],
+    failing: list[str],
+    code: int,
+    answer: str,
+) -> None:
+    """The document and the code say the same thing, in the order of the file (RF-06, RF-07)."""
+    folder = tmp_path / "reports"
+    for domain, span in days.items():
+        write_window(
+            folder,
+            make_report_xml,
+            make_record_xml,
+            days=span,
+            domain=domain,
+            failing=domain in failing,
+        )
+    config = str(write_domains_config(tmp_path / "c.toml", list(days)))
+
+    got, out, err = run(capsys, "verdict", str(folder), "--config", config, "--json")
+
+    assert (got, err) == (code, "")
+    document = json.loads(out)
+    assert list(document) == ["schema_version", "command", "answer", "domains"]
+    assert document["answer"] == answer
+    assert [element["domain"] for element in document["domains"]] == list(days)
+
+
+def test_json_of_several_domains_with_top_trims_each_element(
+    tmp_path: Path,
+    make_report_xml: ReportXml,
+    make_record_xml: RecordXml,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Each element carries its own ``top`` key; the envelope has none (RF-07)."""
+    folder = windows(
+        tmp_path / "reports", make_report_xml, make_record_xml, {_COM: LONG, _NET: LONG}
+    )
+
+    for command in ("summary", "verdict"):
+        _code, out, _err = run(
+            capsys, command, str(folder), "--domain", _COM, "--domain", _NET, "--json", "--top", "1"
+        )
+
+        document = json.loads(out)
+        assert "top" not in document
+        assert [element["top"]["limit"] for element in document["domains"]] == [1, 1]
+
+
+def test_json_of_several_domains_is_ascii_and_the_same_in_portuguese(
+    tmp_path: Path,
+    make_report_xml: ReportXml,
+    make_record_xml: RecordXml,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The document has no language: ``--lang`` changes neither a byte nor the code (RF-07)."""
+    folder = windows(tmp_path / "reports", make_report_xml, make_record_xml, {_COM: LONG, _NET: 2})
+    argv = ("verdict", str(folder), "--domain", _COM, "--domain", _NET, "--json")
+
+    english = run(capsys, *argv)
+    portuguese = run(capsys, *argv, "--lang", "pt-BR")
+
+    assert english == portuguese
+    assert english[1].isascii()
+
+
+# ---------------------------------------------------------------------------
+# --html: refused until its stage is built (spec 010, stage 6)
+# ---------------------------------------------------------------------------
+
+
+def test_html_of_several_domains_is_refused_before_any_report_is_read(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
-    flag: str,
 ) -> None:
-    """Until their stages are built, asking for one is a refusal, never one domain's answer."""
+    """Until stage 6, asking for it is a refusal, never the page of one domain."""
 
     def forbidden(*args: object, **kwargs: object) -> None:
         """Fail the test if a report is read."""
@@ -516,7 +646,9 @@ def test_json_and_html_of_several_domains_are_refused_before_any_report_is_read(
 
     monkeypatch.setattr("mailvigil.cli.ingest_many", forbidden)
 
-    code, out, err = run(capsys, "verdict", str(tmp_path), "--domain", _COM, "--domain", _NET, flag)
+    code, out, err = run(
+        capsys, "verdict", str(tmp_path), "--domain", _COM, "--domain", _NET, "--html"
+    )
 
     assert (code, out) == (1, "")
-    assert err == "mailvigil: --json and --html do not cover several domains yet\n"
+    assert err == "mailvigil: --html does not cover several domains yet\n"

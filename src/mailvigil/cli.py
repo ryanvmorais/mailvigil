@@ -56,7 +56,13 @@ from mailvigil.config import (
 from mailvigil.messages import ENGLISH, Messages, language_by_code
 from mailvigil.render import join_blocks, no_reports_message, render_summary
 from mailvigil.render_html import render_html
-from mailvigil.render_json import dumps, summary_document, verdict_document
+from mailvigil.render_json import (
+    dumps,
+    summaries_document,
+    summary_document,
+    verdict_document,
+    verdicts_document,
+)
 from mailvigil.render_verdict import render_tally, render_verdict
 from mailvigil.reports import IngestionResult, ingest_many
 from mailvigil.summary import summarize
@@ -407,10 +413,10 @@ def _load(
         write(sys.stderr, f"mailvigil: {refusal.message}")
         return None
 
-    # The two structured formats of several domains are built in the stages that follow (spec 010,
-    # stages 5 and 6); until then a run that asks for one is refused, not answered with one domain.
-    if len(configs) > 1 and (args.json or getattr(args, "html", False)):
-        write(sys.stderr, "mailvigil: --json and --html do not cover several domains yet")
+    # The page of several domains is built in the stage that follows (spec 010, stage 6); until
+    # then a run that asks for it is refused, not answered with the page of one domain.
+    if len(configs) > 1 and getattr(args, "html", False):
+        write(sys.stderr, "mailvigil: --html does not cover several domains yet")
         return None
 
     domains = [config.domain for config in configs]
@@ -440,7 +446,13 @@ def _run_summary(args: argparse.Namespace) -> int:
 
     summaries = [summarize(results[config.domain], config) for config in configs]
     if args.json:
-        write(sys.stdout, dumps(summary_document(summaries[0], source, args.top)))
+        # One domain prints the document of today; the envelope exists for two or more (ADR-7).
+        document = (
+            summary_document(summaries[0], source, args.top)
+            if len(summaries) == 1
+            else summaries_document(summaries, source, args.top)
+        )
+        write(sys.stdout, dumps(document))
     else:
         blocks = [render_summary(summary, source, args.lang) for summary in summaries]
         write(sys.stdout, join_blocks(blocks))
@@ -469,7 +481,12 @@ def _run_verdict(args: argparse.Namespace) -> int:
     summaries = [summarize(results[config.domain], config) for config in configs]
     verdicts = [judge(summary, now) for summary in summaries]
     if args.json:
-        write(sys.stdout, dumps(verdict_document(verdicts[0], args.top)))
+        document = (
+            verdict_document(verdicts[0], args.top)
+            if len(verdicts) == 1
+            else verdicts_document(verdicts, args.top)
+        )
+        write(sys.stdout, dumps(document))
     elif args.html and args.output is not None:
         try:
             _write_page(args.output, render_html(summaries[0], verdicts[0], args.lang, args.top))
