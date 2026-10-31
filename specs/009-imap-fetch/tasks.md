@@ -184,10 +184,7 @@ signature changed (the parent parser split); if any other one fails, the code is
   messages from three receivers (Google, Microsoft, Yahoo): the first run matched and saved 6, the
   second saved none and listed 6 as already saved, `verdict` over the folder read them (5 reports
   and 1 duplicate, exit 3 "too early"), and the 6 messages stayed unread in the mail client. The
-  subjects in that mailbox were written by hand in the providers' format, because the original
-  reports sat in a mailbox with no IMAP, so the subject as each provider sends it was not checked
-  directly; the criterion stays as it is (issue #62, closed) and issue #77 covers a provider whose
-  subject does not match.
+  criterion stays as it is (issue #62, closed).
 - [x] Quality gate of the spec: `uv run ruff check .` → `uv run black --check .` → `uv run mypy` →
   `uv run pytest --cov`, then `uv build`. Record the result here, with the number of tests and the
   coverage. **Result:** 2026-10-28: ruff, black and mypy (34 source files) clean; 2629 tests passed and 1

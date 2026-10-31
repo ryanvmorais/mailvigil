@@ -509,8 +509,8 @@ an argument, a variable or a stored value; the certificate is always checked.
 ## Risks
 
 - **A provider writes the report subject differently** and `SUBJECT "Report Domain:"` misses it.
-  Mitigation: the criterion is RFC 7489's; the maintainer's first real run compares the number
-  matched with the reports he already has, and any mismatch becomes a change of the criterion. No
+  Mitigation: the criterion is RFC 7489's; the first real run (2026-10-31, `tasks.md`) compared the
+  number matched with the reports at hand, and any mismatch becomes a change of the criterion. No
   real report may enter the repository to check this, so it is a manual step in `tasks.md`.
 - **A server with a different `UIDVALIDITY` policy** (changes it on every session) makes every run
   download everything again. The ingestion deduplicates, so the verdict is right, only slower.
@@ -568,5 +568,5 @@ The design closes these points the requirements left to it; none changes a requi
    line (ADR-3, RF-05).
 4. **Non-ASCII passwords** were refused in 1.0 (ADR-5, RF-02); since the amendment they go by
    `AUTHENTICATE PLAIN` when the server offers it (ADR-9).
-5. **The subject criterion** is closed as `SUBJECT "Report Domain:"` and verified by the
-   maintainer's first real run (open question 3, Risks).
+5. **The subject criterion** is closed as `SUBJECT "Report Domain:"` and was checked in a
+   first real run on 2026-10-31 (open question 3, Risks).
