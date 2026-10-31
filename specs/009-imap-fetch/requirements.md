@@ -254,7 +254,8 @@ every defense has a test that feeds it the attack.
   and will not do with the password.
 - **Given** the new messages and refusal reasons
   **When** they are listed
-  **Then** each has an English and a Portuguese sentence in the message catalog (ASCII only), and
+  **Then** each has an English and a Portuguese sentence in the message catalog (ASCII only;
+  accented, with an ASCII twin, since spec 006 ADR-9), and
   the `--json` question is settled in the open questions below.
 
 ### RF-09 — The offline commands stay offline

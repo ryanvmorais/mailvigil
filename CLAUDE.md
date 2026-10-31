@@ -152,7 +152,10 @@ src/mailvigil/
                      #   BODY.PEEK reads, bounded reads, every library failure becomes a FetchReason
   messages/          # every sentence of the tool, one Messages per language (spec 006): model.py
                      # (Plural and the frozen dataclasses), en.py (ENGLISH), pt_br.py (PORTUGUESE,
-                     # ASCII only); language_by_code; imports no renderer
+                     # with accents, NFC), fold.py (PORTUGUESE_ASCII = the same without accents,
+                     # one character for one; `catalog_for_streams` picks the catalog from the
+                     # streams: UTF-8 on both and, on Windows, a console); language_by_code;
+                     # imports no renderer
 tests/               # pytest, one test file per module (test_reports_*.py, test_text.py, test_config.py,
                      # test_senders.py, test_summary.py, test_verdict.py, test_render*.py, test_messages.py,
                      # test_json_schema_doc.py, test_cli_*.py, test_htmlkit.py, test_html_*.py,
@@ -220,7 +223,8 @@ uv.lock              # never edit by hand (generated; a hook blocks it)
 
 - **Language:** code, commits, branches, docstrings and docs in English (open source; rule from
   `/idioma`). User-facing CLI text: English (default) and Brazilian Portuguese, chosen only by
-  `--lang` (no locale detection), ASCII in both, decided in the specs. The one documentation
+  `--lang` (no locale detection). English is ASCII; Portuguese has accents on a stream that carries
+  them and the same text folded to ASCII otherwise (spec 006 ADR-9). The one documentation
   exception is `README.pt-BR.md`, the Portuguese README for the Brazilian audience (a user-facing
   text, so the product's audience language): keep it in step with `README.md`, whose headings
   `tests/test_readme_pt_br.py` compares.

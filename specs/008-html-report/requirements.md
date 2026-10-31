@@ -256,7 +256,8 @@ approved.
 - **Given** `--lang pt-BR`
   **When** the HTML is written
   **Then** every sentence is Portuguese from the catalog, `lang="pt-BR"`, and the same ASCII-only
-  rule as the text holds for the catalog (see question 3 for the file itself).
+  rule as the text holds for the catalog (see question 3 for the file itself). *Superseded for the
+  catalog by spec 006 ADR-9: the page always has the accents, as character references.*
 - **Given** the HTML format
   **When** a new sentence is needed
   **Then** it is added to the `Messages` catalog in both languages, and the test that compares the

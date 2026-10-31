@@ -40,6 +40,16 @@ def fixed_clock(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("mailvigil.cli._now", lambda: CLOCK)
 
 
+@pytest.fixture(autouse=True)
+def windows_pipe(monkeypatch: pytest.MonkeyPatch) -> None:
+    """
+    Pin the platform the Portuguese catalog is chosen for: a test runs as on Windows, with
+    ``capsys`` for a pipe, so it gets the ASCII text on every machine (spec 006 ADR-9). A test of
+    the accents sets the platform itself.
+    """
+    monkeypatch.setattr("mailvigil.messages.fold._on_windows", lambda: True)
+
+
 # ---------------------------------------------------------------------------
 # Builders
 # ---------------------------------------------------------------------------

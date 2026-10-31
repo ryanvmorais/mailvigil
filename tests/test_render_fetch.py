@@ -16,11 +16,11 @@ import pytest
 
 from mailvigil.fetch.errors import FetchReason, FetchRefused
 from mailvigil.fetch.model import FetchOutcome
-from mailvigil.messages import ENGLISH, PORTUGUESE, Messages
+from mailvigil.messages import ENGLISH, PORTUGUESE_ASCII, Messages
 from mailvigil.render_fetch import refusal_line, render_fetch
 
 # The two languages every text test runs over.
-_BOTH = pytest.mark.parametrize("messages", [ENGLISH, PORTUGUESE], ids=["en", "pt-BR"])
+_BOTH = pytest.mark.parametrize("messages", [ENGLISH, PORTUGUESE_ASCII], ids=["en", "pt-BR"])
 
 # ---------------------------------------------------------------------------
 # Builders
@@ -90,7 +90,7 @@ def test_the_text_is_english_by_default() -> None:
 
 def test_the_two_languages_do_not_write_the_same_words() -> None:
     assert render_fetch(_OUTCOME, _DIRECTORY, ENGLISH) != render_fetch(
-        _OUTCOME, _DIRECTORY, PORTUGUESE
+        _OUTCOME, _DIRECTORY, PORTUGUESE_ASCII
     )
 
 

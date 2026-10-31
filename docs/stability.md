@@ -27,7 +27,10 @@ These can change in any version. When one changes in a way a user would notice, 
 
 - **The words.** Every sentence of the text output, in English and in Brazilian Portuguese, and
   the wording of the refusal lines, can be reworded. A script reads the exit code or `--json`, never
-  the text.
+  the text. The Portuguese is written with accents and reaches a stream with them only when the
+  stream carries them (UTF-8; on Windows, a terminal), otherwise as the same words without accents
+  (`não` / `nao`): a script that matches Portuguese text would see both, which is one more reason to
+  read the exit code or `--json`.
 - **The HTML page.** Its markup, its look and the order of its parts.
 - **The thresholds of the verdict.** The five rules are the tool's judgment of "safe to move to
   `p=reject`", not a promise of fixed numbers. A threshold can change in a minor version; the

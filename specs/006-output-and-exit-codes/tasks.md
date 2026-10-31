@@ -195,3 +195,40 @@ Behavior-neutral: the output is byte-equal to today's. No Portuguese is written 
 - [x] `docs/json-schema.md` (the `--top` section, the two list rows), `docs/stability.md`, `README.md`
   and `README.pt-BR.md`, `CHANGELOG.md` `[Unreleased]`, `CLAUDE.md`, `docs/stack.md`. — ADR-8
 - [x] Quality gate. — ruff, black and mypy strict clean; `pytest --cov` green, 100% coverage (2026-10-30).
+
+## Amendment (2026-10-31, issue #149) — Accents in the Portuguese text (RF-06, ADR-9)
+
+- [x] Measure the consoles and write ADR-9, Resolved decision 8 and the notes on RF-06 and decision
+      4. — ADR-9
+- [x] `docs/stability.md`, `specs/008-html-report` and `specs/009-imap-fetch`: a one-line note where
+  each says "ASCII" for the Portuguese text, pointing at ADR-9 (the old text is superseded, not
+  rewritten). `specs/004-summary` RF-09 says ASCII for the *layout characters* and stays true.
+  — ADR-9
+- [x] Tests first. `tests/test_messages_fold.py`: `PORTUGUESE` is in NFC and uses only the allowed
+  letters and really carries accents; `PORTUGUESE_ASCII` is `PORTUGUESE` folded, with the same
+  widths and placeholders; a catalog without accents folds to itself; the stream rule as a function
+  of fake streams and a platform name (UTF-8 on both gives the accents off Windows and, on Windows,
+  only when both are a console; a UTF-8 pipe on Windows, `cp1252`, `cp437`, `ascii`, an unknown
+  encoding and a mixed pair give the folded one). `tests/test_render_accents.py`: every text of
+  both commands, `fetch` and the page renders, with the accented catalog, the lines of the folded
+  one, within 80 columns where it is laid out in columns, on the stress inputs of the English
+  tests. `tests/test_cli_accents.py`: the run through `main`, the refusal line, a legacy standard
+  error, `--json` and English unchanged, the page with accents on a pipe and in a file. — RF-06,
+  ADR-9
+- [x] `src/mailvigil/messages/pt_br.py` (accents, NFC; the module docstring changes),
+  `src/mailvigil/messages/fold.py` (`fold_ascii`, `PORTUGUESE_ASCII`, the rule) and the choice in
+  `src/mailvigil/cli.py` `main` (`args.lang` is the catalog of the streams, `args.page_lang` the
+  accented one for the page; `cli_fetch.py` reads `args.lang` and needed no change).
+  `cli_common.write` is not touched. The folded catalog is byte-equal to 1.6.0's Portuguese text
+  (247 templates, compared once against the old file). — ADR-9
+- [x] The tests that carry the Portuguese text: the ASCII goldens (`test_render_pt.py`,
+  `test_render_verdict.py`, `test_render_fetch.py`, `test_messages.py`) point at `PORTUGUESE_ASCII`
+  and are otherwise unchanged; `conftest.py` pins "Windows, with a pipe" so the `test_cli_*` suites
+  keep their ASCII text on every machine; the chart tests accept the accents in a fragment, which
+  `page` turns into references. — ADR-9
+- [x] `README.md` and `README.pt-BR.md` (the Portuguese examples, the "plain ASCII" sentences, and
+  a note on which streams get the accents: a console on Windows, any UTF-8 stream elsewhere),
+  `CLAUDE.md` (language convention and architecture lines), `docs/stability.md`, `CHANGELOG.md`
+  `[Unreleased]`, `docs/stack.md`. — ADR-9
+- [x] Quality gate. — ruff, black and mypy strict clean; `pytest --cov` 3414 passed, 4 skipped, 100%
+      coverage (2026-10-31).
