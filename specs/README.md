@@ -67,19 +67,17 @@ spec still to be built has no milestone yet (`—`).
 | [`008-html-report`](008-html-report/) | a single static HTML file with the summary and the verdict (`--html` on `verdict`): no server, no script, no network. Interface decided on 2026-10-28 from a mockup: the verdict first, then each rule as a meter against its limit (alternative B), with the stacked bar of the message mix (from C); WebVigil's visual language (slate palette, 0.5 rem radius, icon plus text on every badge, 4.5:1 contrast, dark mode from the system); a per-day timeline drawn from the reports' own dates, in inline SVG | `v0.7` | **done** |
 | [`009-imap-fetch`](009-imap-fetch/) | `mailvigil fetch`: download the report messages from a mailbox into a folder, opt-in; `summary` and `verdict` stay offline | `v0.8` | **done** |
 | [`010-multiple-domains`](010-multiple-domains/) | more than one domain per run, one summary and one verdict per domain, what the `verdict` exit code means for several answers, and internationalized domains typed as written (issue #79) | `v0.10` | **done** |
-| `011-oauth-login` | the full OAuth 2 flow of `fetch` (XOAUTH2) for providers that turned passwords off, with its own secrets model and `/auditoria-seguranca` (issue #73); the first step, a token read from a file, is an amendment of 009, not this spec | — | **planned** |
 
 Specs 007 to 009 were planned on 2026-10-28, after the first six were done. 009 depends on 007: the
-fetch only saves raw messages and leaves the reading to the ingestion. Specs 010 and later were
-planned after the first release (2026-10-30), each one opened only when its turn comes.
+fetch only saves raw messages and leaves the reading to the ingestion. Spec 010 was planned after
+the first release (2026-10-30); a spec is opened only when a need for it appears.
 
 ### When an issue gets a spec
 
 A spec is for a feature, or for several changes that together are significant: here, one that crosses
-many modules and public contracts at once (010) or opens a new security surface (011). Everything
+many modules and public contracts at once (010) or opens a new security surface. Everything
 else is **an amendment**: an ADR and a stage in the spec that already owns the contract, as 002 did
-for the XML ceiling (ADR-8) and for `--recursive` (ADR-9). The amendment planned from the open
-issues is the OAuth token read from a file (#73, spec 009). The sender by SPF domain or address range (#78, spec 003, ADR-8) is built and shipped in 1.5.0. `[fetch]` in the configuration
+for the XML ceiling (ADR-8) and for `--recursive` (ADR-9). The sender by SPF domain or address range (#78, spec 003, ADR-8) is built and shipped in 1.5.0. `[fetch]` in the configuration
 and `fetch --json` (#75, specs 003 and 009) are built and shipped in 1.3.0, and the size of the HTML
 page and the JSON top-N (`--top N`, #71, specs 006 and 008) in 1.4.0. A bug fix, a refactor, a test or a documentation change gets no spec at all.
 
