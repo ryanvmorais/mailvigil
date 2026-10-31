@@ -16,7 +16,7 @@ not guess intent.
 from __future__ import annotations
 
 import textwrap
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from functools import partial
 
 from mailvigil.messages import ENGLISH, Messages
@@ -692,3 +692,29 @@ def render_verdict(verdict: Verdict, messages: Messages = ENGLISH) -> str:
         _wrap(messages.verdict.caveat),
     ]
     return "\n\n".join("\n".join(lines) for lines in sections if lines)
+
+
+def render_tally(verdicts: Iterable[Verdict], messages: Messages = ENGLISH) -> str:
+    """
+    Count the answers of several domains in one line (spec 010, RF-05, ADR-5).
+
+    Args:
+        verdicts (Iterable[Verdict]): The verdicts of the run.
+        messages (Messages, optional): The language. Default: English.
+
+    Returns:
+        str: The number of domains and, for each answer that someone has, how many, ready first and
+            not ready last, with no trailing newline.
+    """
+    text = messages.verdict
+    answers = [verdict.answer for verdict in verdicts]
+    parts = [
+        phrase.of(answers.count(answer))
+        for answer, phrase in (
+            (Answer.READY, text.tally_ready),
+            (Answer.TOO_EARLY, text.tally_early),
+            (Answer.NOT_READY, text.tally_not_ready),
+        )
+        if answer in answers
+    ]
+    return text.tally.of(len(answers), parts=", ".join(parts))

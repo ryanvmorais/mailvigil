@@ -233,6 +233,10 @@ _VERDICT = VerdictMessages(
         "This reads only the reports you gave it: mail that no receiver reports on, and "
         "senders that were quiet in this period, are not covered."
     ),
+    tally=Plural("{n} domain: {parts}", "{n} domains: {parts}"),
+    tally_ready=Plural("{n} ready", "{n} ready"),
+    tally_early=Plural("{n} too early", "{n} too early"),
+    tally_not_ready=Plural("{n} not ready", "{n} not ready"),
 )
 
 # ---------------------------------------------------------------------------
@@ -250,6 +254,10 @@ _REFUSALS = RefusalMessages(
     no_file_found="No report file was found. A folder is searched only for names like",
     no_file_hint="provider!domain!begin!end.zip; try --recursive, or name the file itself.",
     output_failed="could not write {path}: {reason}",
+    domain_not_listed="--domain {wanted} is not one of the domains of {path}",
+    no_reports_many="No DMARC report for any of the {count} domains was kept.",
+    html_needs_folder="--html of {count} domains writes one page each: pass --output FOLDER",
+    output_not_folder="--output {path} is not an existing folder",
 )
 
 # ---------------------------------------------------------------------------

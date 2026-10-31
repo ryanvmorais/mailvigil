@@ -81,7 +81,7 @@ The release (1.6.0) is the maintainer's act and is prepared apart, with `/prepar
 
 ## Stage 3 — Vocabulary: worst answer, joining, tally, sentences (RF-05, RF-06, ADR-5, ADR-6, ADR-11)
 
-- [ ] `tests/test_verdict.py`, `tests/test_render.py`, `tests/test_render_verdict.py`,
+- [x] `tests/test_verdict.py`, `tests/test_render.py`, `tests/test_render_verdict.py`,
   `tests/test_messages.py`, written first: `worst_answer` over every combination of the three
   answers and an empty input (`ValueError`); `join_blocks` returns one block unchanged and joins
   several with a blank line, the 80-character rule and a blank line; `render_tally` in both
@@ -89,11 +89,17 @@ The release (1.6.0) is the maintainer's act and is prepared apart, with `/prepar
   `no_reports_message` for one domain is today's text byte for byte and for several names the count
   and keeps the diagnostic lines; every new sentence exists in both languages and is ASCII. — RF-05,
   RF-06, ADR-11
-- [ ] `src/mailvigil/verdict.py`, `render.py`, `render_verdict.py`, `messages/model.py`, `en.py`,
+- [x] `src/mailvigil/verdict.py`, `render.py`, `render_verdict.py`, `messages/model.py`, `en.py`,
   `pt_br.py`: `worst_answer`, `RULE`, `join_blocks`, `render_tally`, `no_reports_message(result,
   domains, messages)` and the sentences `domain_not_listed`, `no_reports_many`, `html_needs_folder`,
   `output_not_folder` and `tally`. Nothing calls them yet except the tests. — RF-05, RF-06
-- [ ] Quality gate of the stage (as above). Record the result here. — RNF-01, RNF-06
+- [x] Quality gate of the stage (as above). Record the result here. — RNF-01, RNF-06
+  Result (2026-10-30): ruff, black and mypy clean; 3251 passed, 4 skipped (POSIX modes and symbolic
+  links on Windows); coverage 100%. Two things differ from the plan: the `tally` sentence is a
+  `Plural` plus three parts (`tally_ready`, `tally_early`, `tally_not_ready`), because a zero count
+  has to be left out and one template with three placeholders cannot do that; and
+  `no_reports_message` takes a sequence of domains (the callers and the old tests pass a list of
+  one), which is the only edit to an old test.
 
 ## Stage 4 — The configuration and the command (RF-01, RF-02, RF-04 to RF-06, RF-08, ADR-1, ADR-9 to ADR-11)
 

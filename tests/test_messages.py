@@ -63,6 +63,7 @@ _PLACEHOLDERS: dict[str, frozenset[str]] = {
     "verdict.next_recognized": frozenset({"who"}),
     "verdict.next_data": frozenset({"marker"}),
     "verdict.left_out": frozenset({"parts"}),
+    "verdict.tally": frozenset({"parts"}),
     "html.page_title": frozenset({"domain"}),
     "html.at_least": frozenset({"value"}),
     "html.at_most": frozenset({"value"}),
@@ -76,7 +77,11 @@ _PLACEHOLDERS: dict[str, frozenset[str]] = {
     "fetch.password_file_exposed": frozenset({"path"}),
     "refusals.no_domain": frozenset({"default"}),
     "refusals.domain_mismatch": frozenset({"wanted", "domain", "path"}),
+    "refusals.domain_not_listed": frozenset({"wanted", "path"}),
     "refusals.no_reports": frozenset({"domain"}),
+    "refusals.no_reports_many": frozenset({"count"}),
+    "refusals.html_needs_folder": frozenset({"count"}),
+    "refusals.output_not_folder": frozenset({"path"}),
     "refusals.output_failed": frozenset({"path", "reason"}),
 }
 

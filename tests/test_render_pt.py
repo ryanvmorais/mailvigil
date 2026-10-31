@@ -26,11 +26,11 @@ from tests.test_render import (
 )
 from tests.test_render import known as summary_known
 from tests.test_render import other as summary_other
-from tests.test_render_verdict import known, make_verdict, other
+from tests.test_render_verdict import known, make_verdict, other, verdicts_of
 
 from mailvigil.messages import ENGLISH, PORTUGUESE
 from mailvigil.render import no_reports_message, render_summary
-from mailvigil.render_verdict import render_verdict
+from mailvigil.render_verdict import render_tally, render_verdict
 from mailvigil.reports import IngestionResult, PolicyPublished, Reason
 from mailvigil.senders import Outcome
 from mailvigil.summary import FailingSource, Summary
@@ -295,7 +295,7 @@ def test_no_reports_message_names_the_domain_and_what_was_left_out() -> None:
         duplicates=2,
         other_domain=3,
     )
-    lines = no_reports_message(result, "example.com", PORTUGUESE).split("\n")
+    lines = no_reports_message(result, ["example.com"], PORTUGUESE).split("\n")
     assert lines[0] == "Nenhum relatorio DMARC de example.com foi mantido."
     assert lines[2:4] == ["    a.xml: grande demais", "    b.txt: nao e um relatorio DMARC"]
     assert [cells(line) for line in (lines[1], lines[4], lines[5])] == [
@@ -306,7 +306,7 @@ def test_no_reports_message_names_the_domain_and_what_was_left_out() -> None:
 
 
 def test_no_reports_message_for_nothing_found_says_where_to_look() -> None:
-    lines = no_reports_message(IngestionResult(), "example.com", PORTUGUESE).split("\n")
+    lines = no_reports_message(IngestionResult(), ["example.com"], PORTUGUESE).split("\n")
     assert lines[0] == "Nenhum relatorio DMARC de example.com foi mantido."
     assert lines[1].startswith("Nenhum arquivo de relatorio foi")
     assert "provider!domain!begin!end.zip" in lines[2]
@@ -320,7 +320,7 @@ def test_no_reports_message_for_nothing_found_says_where_to_look() -> None:
 
 def test_no_reports_message_is_short_enough_and_ends_without_a_newline() -> None:
     result = IngestionResult(skipped=(skipped("n" * 100 + ".xml"),))
-    message = no_reports_message(result, "d" * 80 + ".example.com", PORTUGUESE)
+    message = no_reports_message(result, ["d" * 80 + ".example.com"], PORTUGUESE)
     assert not message.endswith("\n")
     assert max(len(line) for line in message.split("\n")) <= 80
     assert message.isascii()
@@ -691,3 +691,29 @@ def test_the_same_input_rendered_twice_is_the_same_text() -> None:
     assert summary_pt(summary) == summary_pt(summary)
     verdict = make_verdict(sources=(known(3), other(40)), pct=50)
     assert verdict_pt(verdict) == verdict_pt(verdict)
+
+
+@pytest.mark.parametrize(
+    ("counts", "line"),
+    [
+        ((1, 0, 0), "1 dominio: 1 pronto"),
+        ((3, 0, 0), "3 dominios: 3 prontos"),
+        ((0, 2, 0), "2 dominios: 2 cedo demais"),
+        ((0, 0, 1), "1 dominio: 1 nao pronto"),
+        ((2, 1, 2), "5 dominios: 2 prontos, 1 cedo demais, 2 nao prontos"),
+    ],
+)
+def test_the_tally_is_in_portuguese(counts: tuple[int, int, int], line: str) -> None:
+    assert render_tally(verdicts_of(*counts), PORTUGUESE) == line
+
+
+def test_the_no_reports_message_counts_several_domains_in_portuguese() -> None:
+    result = IngestionResult(duplicates=2, other_domain=3)
+    domains = ["example.com", "example.net", "example.org"]
+    first, *rest = no_reports_message(result, domains, PORTUGUESE).split("\n")
+    assert first == "Nenhum relatorio DMARC dos 3 dominios foi mantido."
+    assert [cells(line)[0] for line in rest] == [
+        "arquivos ignorados",
+        "duplicados",
+        "outros dominios",
+    ]

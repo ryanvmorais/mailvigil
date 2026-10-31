@@ -231,6 +231,10 @@ _VERDICT = VerdictMessages(
         "Isto le apenas os relatorios que voce deu: email que nenhum receptor reporta, e "
         "remetentes que ficaram quietos neste periodo, nao sao cobertos."
     ),
+    tally=Plural("{n} dominio: {parts}", "{n} dominios: {parts}"),
+    tally_ready=Plural("{n} pronto", "{n} prontos"),
+    tally_early=Plural("{n} cedo demais", "{n} cedo demais"),
+    tally_not_ready=Plural("{n} nao pronto", "{n} nao prontos"),
 )
 
 # ---------------------------------------------------------------------------
@@ -278,6 +282,12 @@ _REFUSALS = RefusalMessages(
     # The pattern is the one the providers use (RFC 7489), so its words stay as they are.
     no_file_hint="provider!domain!begin!end.zip; use --recursive ou informe o proprio arquivo.",
     output_failed="nao foi possivel gravar {path}: {reason}",
+    domain_not_listed="--domain {wanted} nao esta entre os dominios de {path}",
+    no_reports_many="Nenhum relatorio DMARC dos {count} dominios foi mantido.",
+    html_needs_folder=(
+        "--html de {count} dominios grava uma pagina por dominio: informe --output PASTA"
+    ),
+    output_not_folder="--output {path} nao e uma pasta existente",
 )
 
 # ---------------------------------------------------------------------------

@@ -240,6 +240,11 @@ class VerdictMessages:
         passed_over (Plural): ``{n}`` files passed over by name.
         left_out (str): The sentence about what was not counted; ``{parts}``.
         caveat (str): The sentence that closes every verdict.
+        tally (Plural): The line that counts the answers of several domains; ``{n}`` domains and
+            ``{parts}``, the counts below joined by a comma.
+        tally_ready (Plural): ``{n}`` domains ready.
+        tally_early (Plural): ``{n}`` domains too early.
+        tally_not_ready (Plural): ``{n}`` domains not ready.
     """
 
     title: str
@@ -280,6 +285,10 @@ class VerdictMessages:
     passed_over: Plural
     left_out: str
     caveat: str
+    tally: Plural
+    tally_ready: Plural
+    tally_early: Plural
+    tally_not_ready: Plural
 
 
 @dataclass(frozen=True, slots=True)
@@ -300,6 +309,13 @@ class RefusalMessages:
         no_file_hint (str): How a folder is searched, and how to read a renamed file or a subfolder.
         output_failed (str): ``--output`` could not write the page; ``{path}`` and ``{reason}``,
             the system's own words for it.
+        domain_not_listed (str): ``--domain`` names a domain the file of several does not have;
+            ``{wanted}`` and ``{path}``.
+        no_reports_many (str): The first line of the no-reports explanation for several domains;
+            ``{count}``.
+        html_needs_folder (str): ``--html`` of several domains without ``--output``; ``{count}``.
+        output_not_folder (str): ``--output`` of several domains is not an existing folder;
+            ``{path}``.
     """
 
     no_domain: str
@@ -310,6 +326,10 @@ class RefusalMessages:
     no_file_found: str
     no_file_hint: str
     output_failed: str
+    domain_not_listed: str
+    no_reports_many: str
+    html_needs_folder: str
+    output_not_folder: str
 
 
 @dataclass(frozen=True, slots=True)

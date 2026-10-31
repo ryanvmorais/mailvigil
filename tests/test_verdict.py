@@ -15,7 +15,7 @@ import subprocess
 import sys
 from dataclasses import FrozenInstanceError
 from datetime import UTC, date, datetime, timedelta
-from itertools import permutations
+from itertools import permutations, product
 from pathlib import Path
 from types import MappingProxyType
 
@@ -55,6 +55,7 @@ from mailvigil.verdict import (
     RuleKind,
     Verdict,
     judge,
+    worst_answer,
 )
 
 # ---------------------------------------------------------------------------
@@ -811,3 +812,39 @@ def test_left_out_is_frozen_and_a_hand_built_verdict_need_not_pass_one() -> None
         notes=verdict.notes,
     )
     assert hand_built.left_out == LeftOut()
+
+
+# ---------------------------------------------------------------------------
+# The worst answer of several domains (spec 010, RF-06, ADR-6)
+# ---------------------------------------------------------------------------
+
+
+def _answering(answer: Answer) -> Verdict:
+    """Build a verdict that carries the answer, whatever its rules say: only the answer is read."""
+    return dataclasses.replace(judge(make_summary()), answer=answer)
+
+
+@pytest.mark.parametrize(
+    "answers", [mix for size in (1, 2, 3) for mix in product(Answer, repeat=size)]
+)
+def test_the_worst_answer_is_not_ready_then_too_early_then_ready(
+    answers: tuple[Answer, ...],
+) -> None:
+    """Every sequence of up to three answers gives the one the exit code ranks worst."""
+    if Answer.NOT_READY in answers:
+        expected = Answer.NOT_READY
+    elif Answer.TOO_EARLY in answers:
+        expected = Answer.TOO_EARLY
+    else:
+        expected = Answer.READY
+    assert worst_answer(_answering(answer) for answer in answers) is expected
+
+
+def test_the_worst_answer_of_one_verdict_is_its_own() -> None:
+    for answer in Answer:
+        assert worst_answer([_answering(answer)]) is answer
+
+
+def test_the_worst_answer_of_nothing_is_a_callers_mistake() -> None:
+    with pytest.raises(ValueError, match="at least one"):
+        worst_answer([])

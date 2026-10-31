@@ -378,7 +378,7 @@ def _load(
 
     result = ingest(args.paths, config.domain, _now(), args.recursive)
     if not result.reports:
-        write(sys.stderr, no_reports_message(result, config.domain, messages))
+        write(sys.stderr, no_reports_message(result, [config.domain], messages))
         return None
     return config, source, result
 

@@ -18,9 +18,11 @@ import pytest
 
 from mailvigil.render import (
     _REASON_PHRASES,
+    RULE,
     _label,
     fit,
     format_share,
+    join_blocks,
     no_reports_message,
     render_summary,
     share_tenths,
@@ -597,7 +599,7 @@ def test_the_files_passed_over_by_name_print_only_when_there_are_some() -> None:
 
 
 def test_the_files_passed_over_by_name_show_in_the_no_reports_message() -> None:
-    lines = no_reports_message(IngestionResult(passed_over=2), "example.com").split("\n")
+    lines = no_reports_message(IngestionResult(passed_over=2), ["example.com"]).split("\n")
 
     assert lines[-1] == "  passed over by name  2"
     assert "  provider!domain!begin!end.zip; try --recursive, or name the file itself." in lines
@@ -747,7 +749,7 @@ def test_no_reports_message_names_the_domain_and_what_was_left_out() -> None:
         duplicates=2,
         other_domain=3,
     )
-    assert no_reports_message(result, "example.com").split("\n") == [
+    assert no_reports_message(result, ["example.com"]).split("\n") == [
         "No DMARC report for example.com was kept.",
         "  skipped files  2 (1 too large, 1 not a DMARC report)",
         "    a.xml: too large",
@@ -759,7 +761,7 @@ def test_no_reports_message_names_the_domain_and_what_was_left_out() -> None:
 
 def test_no_reports_message_for_nothing_found_says_where_to_look() -> None:
     """A folder only yields the providers' names, so the message says so and how to bypass it."""
-    lines = no_reports_message(IngestionResult(), "example.com").split("\n")
+    lines = no_reports_message(IngestionResult(), ["example.com"]).split("\n")
     assert lines[0] == "No DMARC report for example.com was kept."
     assert lines[1] == "No report file was found. A folder is searched only for names like"
     assert lines[2] == "  provider!domain!begin!end.zip; try --recursive, or name the file itself."
@@ -769,9 +771,67 @@ def test_no_reports_message_for_nothing_found_says_where_to_look() -> None:
 
 def test_no_reports_message_is_short_enough_and_ends_without_a_newline() -> None:
     result = IngestionResult(skipped=(skipped("n" * 100 + ".xml"),))
-    message = no_reports_message(result, "d" * 80 + ".example.com")
+    message = no_reports_message(result, ["d" * 80 + ".example.com"])
     assert not message.endswith("\n")
     assert max(len(line) for line in message.split("\n")) <= 80
+
+
+def test_no_reports_message_for_several_domains_counts_them_and_keeps_the_diagnostic() -> None:
+    """The first line says how many; the lines under it are the shared ones, as for one domain."""
+    result = IngestionResult(
+        skipped=(skipped("b.txt"), skipped("a.xml", Reason.FILE_TOO_LARGE)),
+        duplicates=2,
+        other_domain=3,
+    )
+    lines = no_reports_message(result, ["example.com", "example.net", "example.org"]).split("\n")
+    assert lines == [
+        "No DMARC report for any of the 3 domains was kept.",
+        "  skipped files  2 (1 too large, 1 not a DMARC report)",
+        "    a.xml: too large",
+        "    b.txt: not a DMARC report",
+        "  duplicates     2",
+        "  other domains  3",
+    ]
+
+
+def test_no_reports_message_for_several_domains_says_where_to_look_when_nothing_was_found() -> None:
+    lines = no_reports_message(IngestionResult(), ["example.com", "example.net"]).split("\n")
+    assert lines[0] == "No DMARC report for any of the 2 domains was kept."
+    assert lines[1] == "No report file was found. A folder is searched only for names like"
+    assert lines[3:] == ["  skipped files  0", "  duplicates     0", "  other domains  0"]
+
+
+def test_no_reports_message_needs_a_domain() -> None:
+    with pytest.raises(ValueError, match="at least one"):
+        no_reports_message(IngestionResult(), [])
+
+
+# ---------------------------------------------------------------------------
+# Joining the blocks of several domains (spec 010, RF-05, ADR-5)
+# ---------------------------------------------------------------------------
+
+
+def test_the_rule_is_eighty_equal_signs() -> None:
+    assert RULE == "=" * 80
+
+
+def test_one_block_is_returned_unchanged() -> None:
+    block = render_summary(make_summary(), None)
+    assert join_blocks([block]) == block
+
+
+def test_several_blocks_are_set_apart_by_a_blank_line_the_rule_and_a_blank_line() -> None:
+    assert join_blocks(["a\nb", "c", "d"]) == f"a\nb\n\n{RULE}\n\nc\n\n{RULE}\n\nd"
+
+
+def test_joined_blocks_split_back_into_the_blocks() -> None:
+    blocks = [
+        render_summary(make_summary(domain=name), None) for name in ("a.example", "b.example")
+    ]
+    joined = join_blocks(blocks)
+    assert joined.split(f"\n\n{RULE}\n\n") == blocks
+    assert max(len(line) for line in joined.split("\n")) <= 80
+    assert not joined.endswith("\n")
 
 
 # ---------------------------------------------------------------------------
