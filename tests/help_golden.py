@@ -12,7 +12,7 @@ from __future__ import annotations
 # Recorded before the parent parser was split; test_cli_fetch compares it byte for byte.
 SUMMARY_HELP = (
     "usage: mailvigil summary [-h] [--config FILE] [--domain DOMAIN] [--recursive]\n"
-    "                         [--json] [--lang {en,pt-BR}]\n"
+    "                         [--json] [--top N] [--lang {en,pt-BR}]\n"
     "                         PATH [PATH ...]\n"
     "\n"
     "Sum up DMARC aggregate reports per sender and per situation.\n"
@@ -31,6 +31,9 @@ SUMMARY_HELP = (
     "                     levels, links not followed)\n"
     "  --json             print one JSON document instead of the text (see\n"
     "                     docs/json-schema.md)\n"
+    "  --top N            with --json, keep only the N worst entries of each list\n"
+    "                     and say what was left out; with --html, show N rows of\n"
+    "                     the senders table instead of 50; needs one of them\n"
     "  --lang {en,pt-BR}  language of the text and of the refusal lines (default:\n"
     "                     en); the JSON has none\n"
 )
@@ -38,7 +41,8 @@ SUMMARY_HELP = (
 # Same as above, for the command that also has --html.
 VERDICT_HELP = (
     "usage: mailvigil verdict [-h] [--config FILE] [--domain DOMAIN] [--recursive]\n"
-    "                         [--json] [--lang {en,pt-BR}] [--html] [--output FILE]\n"
+    "                         [--json] [--top N] [--lang {en,pt-BR}] [--html]\n"
+    "                         [--output FILE]\n"
     "                         PATH [PATH ...]\n"
     "\n"
     "Say if the domain is ready for p=reject, from DMARC aggregate reports. The\n"
@@ -58,6 +62,9 @@ VERDICT_HELP = (
     "                     levels, links not followed)\n"
     "  --json             print one JSON document instead of the text (see\n"
     "                     docs/json-schema.md)\n"
+    "  --top N            with --json, keep only the N worst entries of each list\n"
+    "                     and say what was left out; with --html, show N rows of\n"
+    "                     the senders table instead of 50; needs one of them\n"
     "  --lang {en,pt-BR}  language of the text and of the refusal lines (default:\n"
     "                     en); the JSON has none\n"
     "  --html             print one self-contained HTML page instead of the text;\n"

@@ -51,6 +51,11 @@ _VALUE_MAX = 30
 # limit); the senders table shows every row (RF-05).
 _LIMIT = 10
 
+# Senders rows the table shows when ``--top`` does not say (spec 008, ADR-12): the rest is counted
+# in one line after the table, so a spoofed domain with thousands of senders cannot make the page
+# megabytes long.
+_SENDERS_LIMIT = 50
+
 # The symbol of the tool, drawn on a 64-unit grid as one filled path (``evenodd``): a solid envelope
 # with the flap and an open eye cut out. ``docs/images/mailvigil-dmarc-analyzer-logo.svg`` holds
 # the same path, and a test keeps the two equal.
@@ -378,21 +383,26 @@ def _sender_cell(row: SenderRow, messages: Messages) -> Safe:
     return el("th", *parts, scope="row")
 
 
-def _senders(summary: Summary, messages: Messages) -> Safe:
+def _senders(summary: Summary, messages: Messages, top: int | None) -> Safe:
     """
     Write the senders table, with a total row.
 
     Args:
         summary (Summary): The summary.
         messages (Messages): The language.
+        top (int | None): How many rows to show; ``None`` shows ``_SENDERS_LIMIT``.
 
     Returns:
-        Safe: The section; a sentence instead of the table when no message was counted.
+        Safe: The section; a sentence instead of the table when no message was counted. When rows
+            are left out, the total row still counts all of them and a line after the table says
+            how many senders and messages are not listed.
     """
     words = messages.summary
     title = words.senders_title
     if not summary.senders:
         return _section(title, "h-senders", el("p", text(words.no_messages), class_="sub"))
+    limit = _SENDERS_LIMIT if top is None else top
+    shown, rest = summary.senders[:limit], summary.senders[limit:]
     columns = (words.col_ok, words.col_fragile, words.col_failing, words.col_total)
     head = el(
         "tr",
@@ -413,7 +423,7 @@ def _senders(summary: Summary, messages: Messages) -> Safe:
                 )
             ],
         )
-        for row in summary.senders
+        for row in shown
     ]
     totals = summary.totals
     foot = el(
@@ -433,7 +443,13 @@ def _senders(summary: Summary, messages: Messages) -> Safe:
         aria_label=messages.html.senders_region,
         tabindex="0",
     )
-    return _section(title, "h-senders", box)
+    if not rest:
+        return _section(title, "h-senders", box)
+    more = messages.html.senders_more.format(
+        senders=messages.html.other_sender.of(len(rest)),
+        messages=messages.common.message.of(sum(row.counts.total for row in rest)),
+    )
+    return _section(title, "h-senders", box, el("p", text(more), class_="sub"))
 
 
 # ---------------------------------------------------------------------------
@@ -594,7 +610,9 @@ def _columns(verdict: Verdict, messages: Messages) -> Safe:
 # ---------------------------------------------------------------------------
 
 
-def render_html(summary: Summary, verdict: Verdict, messages: Messages = ENGLISH) -> str:
+def render_html(
+    summary: Summary, verdict: Verdict, messages: Messages = ENGLISH, top: int | None = None
+) -> str:
     """
     Turn a summary and its verdict into one HTML page.
 
@@ -602,6 +620,8 @@ def render_html(summary: Summary, verdict: Verdict, messages: Messages = ENGLISH
         summary (Summary): What the reports say.
         verdict (Verdict): What ``judge`` made of the summary.
         messages (Messages, optional): The language. Default: English.
+        top (int | None, optional): How many rows of the senders table to show (``--top``).
+            Default: ``_SENDERS_LIMIT``.
 
     Returns:
         str: The whole document, ASCII only (numeric character references for the rest), ending in
@@ -615,7 +635,7 @@ def render_html(summary: Summary, verdict: Verdict, messages: Messages = ENGLISH
         _rules(verdict, messages),
         _mix(summary, messages),
         _days(summary, messages),
-        _senders(summary, messages),
+        _senders(summary, messages, top),
         _columns(verdict, messages),
     )
     footer = el("footer", text(messages.html.footer.format(version=__version__)))

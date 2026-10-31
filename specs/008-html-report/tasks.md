@@ -277,3 +277,18 @@ maintainer, not decided here.
   lists `--output`; `CHANGELOG.md` `[Unreleased]`; `CLAUDE.md` (commands, the `cli.py` line);
   `specs/README.md` if it lists the flags. — RF-01
 - [x] Quality gate. **Result:** ruff, black and mypy strict clean; `pytest --cov` green, 100% coverage (2026-10-30). Run by hand in Windows PowerShell 5.1: `>` wrote UTF-16 (BOM, 56 200 bytes), `--output` wrote 27 984 ASCII bytes and the exit code stayed 4.
+
+## Amendment (2026-10-30, issue #71) — the senders table stops at 50 rows (RF-05, ADR-12)
+
+- [x] `tests/test_render_html_top.py`, first: 50 senders are all there and no line follows; 57 give
+  50 rows and "Not listed here: 7 other senders (14 messages)."; one over says it in the singular;
+  the total row still counts every message; `top` moves the stop down and up past 50; 20 000
+  senders stay under 200 000 characters; the line is in both languages and the page stays ASCII.
+  — RF-05, ADR-12
+- [x] `src/mailvigil/render_html.py` (`_SENDERS_LIMIT`, `top`) and the `messages/` catalog
+  (`other_sender`, `senders_more` in `HtmlMessages`, `ENGLISH` and `PORTUGUESE`; the placeholder
+  table of `tests/test_messages.py` follows). — ADR-12
+- [x] Measured on 20 000 distinct failing sources (synthetic): `summary --json` 10.6 MB and the
+  page 3.9 MB before; the page is 29 KB after (19 950 senders counted in the line), and
+  `summary --json --top 50` is 27 KB.
+- [x] Quality gate. — ruff, black and mypy strict clean; `pytest --cov` green, 100% coverage (2026-10-30).

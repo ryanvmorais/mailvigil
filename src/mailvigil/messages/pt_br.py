@@ -359,6 +359,11 @@ _HTML = HtmlMessages(
     show_numbers="Mostrar os numeros",
     numbers_region="Mensagens por dia",
     senders_region="Tabela de remetentes",
+    other_sender=Plural("{n} outro remetente", "{n} outros remetentes"),
+    senders_more=(
+        "Fora desta lista: {senders} ({messages}). "
+        "mailvigil summary --json lista todos os remetentes."
+    ),
     failing_heading="Fontes que falham",
     next_each_service="cada servico listado abaixo",
     next_unrecognized=(

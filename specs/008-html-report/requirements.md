@@ -186,8 +186,9 @@ approved.
 
 - **Given** the senders of the summary
   **When** the page lists them
-  **Then** every row of the summary is there, in the summary's order, with its situations; the
-  list is a real table with header cells, and a wide table scrolls inside its own box at phone
+  **Then** the rows of the summary are there, in the summary's order, with their situations, up to
+  50 (or the `--top` given; ADR-12), and a line says how many senders and messages were left out;
+  the list is a real table with header cells, and a wide table scrolls inside its own box at phone
   width instead of breaking the page.
 - **Given** failing sources
   **When** the page lists them

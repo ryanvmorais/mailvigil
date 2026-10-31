@@ -274,6 +274,9 @@ mailvigil verdict --config mailvigil.toml reports/ --html > report.html
   file already there, never creates the folder, prints nothing when it works and needs `--html`.
   Use it in **Windows PowerShell 5.1**, whose `>` writes UTF-16, which browsers do not read as the
   page intends. The page is ASCII, so any other shell's `>` is fine too.
+- **The senders table stops at 50 rows**, so a domain under heavy spoofing does not make a page of
+  megabytes. A line after the table says how many senders and messages are not listed, and the total
+  row still counts everything. `--top N` moves the stop; `mailvigil summary --json` lists every sender.
 
 ### Fetch
 
@@ -389,6 +392,11 @@ failing source, without the limits the text keeps, and a value that may not exis
 no `sp`) is `null`. A refused run prints no document: the one line goes to standard error, as
 without `--json`, and the exit code is `1`. `docs/json-schema.md` lists every field and the
 compatibility promise. The `fetch` document is only the six numbers of the run.
+
+A domain under heavy spoofing can have tens of thousands of failing sources. `--top N` keeps the
+first `N` entries of each long list and adds a last key, `top`, with the limit and how many entries
+each list left out; without it the document is the complete one, byte for byte. The answer and the
+exit code do not depend on `--top`, which needs `--json` (or `--html`, on `verdict`).
 
 ### Language
 

@@ -212,6 +212,28 @@ def _write_page(path: Path, page: str) -> None:
 # ---------------------------------------------------------------------------
 
 
+def _top(text: str) -> int:
+    """
+    Turn the ``--top`` value into a count of list entries.
+
+    Args:
+        text (str): The value as the user typed it.
+
+    Returns:
+        int: A whole number of 1 or more.
+
+    Raises:
+        argparse.ArgumentTypeError: For text that is not a whole number of 1 or more.
+    """
+    try:
+        number = int(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"invalid number {echo(text)!r}") from None
+    if number < 1:
+        raise argparse.ArgumentTypeError(f"{number} is less than 1")
+    return number
+
+
 def _language(code: str) -> Messages:
     """
     Turn the ``--lang`` value into the catalog of that language.
@@ -283,6 +305,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--json",
         action="store_true",
         help="print one JSON document instead of the text (see docs/json-schema.md)",
+    )
+    reading.add_argument(
+        "--top",
+        type=_top,
+        metavar="N",
+        help="with --json, keep only the N worst entries of each list and say what was left "
+        "out; with --html, show N rows of the senders table instead of 50; needs one of them",
     )
     language = argparse.ArgumentParser(add_help=False)
     language.add_argument(
@@ -360,7 +389,7 @@ def _run_summary(args: argparse.Namespace) -> int:
 
     Args:
         args (argparse.Namespace): The parsed arguments: ``paths``, ``config``, ``domain``,
-            ``json`` and ``lang``.
+            ``json``, ``top`` and ``lang``.
 
     Returns:
         int: ``EXIT_OK`` when the summary was printed, ``EXIT_REFUSED`` when it could not be made.
@@ -372,7 +401,7 @@ def _run_summary(args: argparse.Namespace) -> int:
 
     summary = summarize(result, config)
     if args.json:
-        write(sys.stdout, dumps(summary_document(summary, source)))
+        write(sys.stdout, dumps(summary_document(summary, source, args.top)))
     else:
         write(sys.stdout, render_summary(summary, source, args.lang))
     return EXIT_OK
@@ -384,7 +413,7 @@ def _run_verdict(args: argparse.Namespace) -> int:
 
     Args:
         args (argparse.Namespace): The parsed arguments: ``paths``, ``config``, ``domain``,
-            ``json``, ``html`` and ``lang``.
+            ``json``, ``html``, ``top`` and ``lang``.
 
     Returns:
         int: ``EXIT_OK`` for ready, ``EXIT_TOO_EARLY`` for too early, ``EXIT_NOT_READY`` for not
@@ -398,10 +427,10 @@ def _run_verdict(args: argparse.Namespace) -> int:
     summary = summarize(result, config)
     verdict = judge(summary, _now())
     if args.json:
-        write(sys.stdout, dumps(verdict_document(verdict)))
+        write(sys.stdout, dumps(verdict_document(verdict, args.top)))
     elif args.html and args.output is not None:
         try:
-            _write_page(args.output, render_html(summary, verdict, args.lang))
+            _write_page(args.output, render_html(summary, verdict, args.lang, args.top))
         except OSError as error:
             reason = error.strerror or type(error).__name__
             line = args.lang.refusals.output_failed.format(
@@ -411,7 +440,7 @@ def _run_verdict(args: argparse.Namespace) -> int:
             return EXIT_REFUSED
     elif args.html:
         # ``render_html`` ends in a newline already; ``_write`` adds one, so the last is cut.
-        write(sys.stdout, render_html(summary, verdict, args.lang).rstrip("\n"))
+        write(sys.stdout, render_html(summary, verdict, args.lang, args.top).rstrip("\n"))
     else:
         write(sys.stdout, render_verdict(verdict, args.lang))
     return _VERDICT_EXIT[verdict.answer]
@@ -471,6 +500,12 @@ def _dispatch(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
     # The file is the page's: the text and the JSON stay redirects (spec 008, ADR-11).
     if args.command == "verdict" and args.output is not None and not args.html:
         parser.error("argument --output: requires --html")
+    # Only the two structured formats have a list to trim (spec 006, ADR-8).
+    if args.command in ("summary", "verdict") and args.top is not None and not args.json:
+        if args.command == "summary":
+            parser.error("argument --top: requires --json")
+        if not args.html:
+            parser.error("argument --top: requires --json or --html")
     if args.command == "summary":
         return _run_summary(args)
     if args.command == "verdict":

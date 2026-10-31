@@ -13,6 +13,7 @@ no sentence and no language in a document, so nothing in this module imports a t
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from typing import Final
 
 from mailvigil.fetch.model import FetchOutcome
@@ -241,12 +242,47 @@ def _left_out(left_out: LeftOut) -> dict[str, object]:
     }
 
 
+def _cut[T](items: Sequence[T], top: int | None) -> tuple[Sequence[T], int]:
+    """
+    Keep the first ``top`` items of a list that is already sorted worst first.
+
+    Args:
+        items (Sequence[T]): The whole list.
+        top (int | None): How many to keep; ``None`` keeps all.
+
+    Returns:
+        tuple[Sequence[T], int]: What was kept and how many items were left out.
+    """
+    if top is None:
+        return items, 0
+    return items[:top], max(len(items) - top, 0)
+
+
+def _top(limit: int | None, left_out: dict[str, int]) -> dict[str, object]:
+    """
+    Write the ``top`` key a trimmed document carries (spec 006, ADR-8).
+
+    Args:
+        limit (int | None): The ``--top`` given; ``None`` when the document was not trimmed.
+        left_out (dict[str, int]): For each trimmed list, how many items were left out.
+
+    Returns:
+        dict[str, object]: ``{"top": {...}}`` when trimmed, and nothing when not, so a document made
+            without ``--top`` stays byte-equal to the one that never had the key.
+    """
+    if limit is None:
+        return {}
+    return {"top": {"limit": limit, "left_out": left_out}}
+
+
 # ---------------------------------------------------------------------------
 # The documents (RF-02, RF-03)
 # ---------------------------------------------------------------------------
 
 
-def summary_document(summary: Summary, config_source: str | None) -> dict[str, object]:
+def summary_document(
+    summary: Summary, config_source: str | None, top: int | None = None
+) -> dict[str, object]:
     """
     Write the summary as data, with every row and every source (no display limit).
 
@@ -254,10 +290,14 @@ def summary_document(summary: Summary, config_source: str | None) -> dict[str, o
         summary (Summary): What ``summarize`` produced.
         config_source (str | None): The configuration file as the user typed it, ``None`` when
             there was none.
+        top (int | None, optional): Keep only this many senders and failing sources (``--top``) and
+            say so in a ``top`` key. Default: keep them all, with no such key.
 
     Returns:
         dict[str, object]: The document, its keys in the order of ``docs/json-schema.md``.
     """
+    senders, senders_out = _cut(summary.senders, top)
+    failing, failing_out = _cut(summary.failing, top)
     return {
         "schema_version": SCHEMA_VERSION,
         "command": "summary",
@@ -269,8 +309,8 @@ def summary_document(summary: Summary, config_source: str | None) -> dict[str, o
         "earlier_p": list(summary.earlier_p),
         "totals": _counts(summary.totals),
         "recognized_messages": summary.recognized_messages,
-        "senders": [_sender(row) for row in summary.senders],
-        "failing": [_source(source) for source in summary.failing],
+        "senders": [_sender(row) for row in senders],
+        "failing": [_source(source) for source in failing],
         "skipped": [_skipped(file) for file in summary.skipped],
         "skipped_by_reason": [
             {"reason": reason.value, "count": count} for reason, count in summary.skipped_by_reason
@@ -278,19 +318,25 @@ def summary_document(summary: Summary, config_source: str | None) -> dict[str, o
         "duplicates": summary.duplicates,
         "other_domain": summary.other_domain,
         "passed_over": summary.passed_over,
+        **_top(top, {"senders": senders_out, "failing": failing_out}),
     }
 
 
-def verdict_document(verdict: Verdict) -> dict[str, object]:
+def verdict_document(verdict: Verdict, top: int | None = None) -> dict[str, object]:
     """
     Write the verdict as data, with the five rules and every failing source.
 
     Args:
         verdict (Verdict): What ``judge`` produced.
+        top (int | None, optional): Keep only this many failing sources of each kind (``--top``)
+            and say so in a ``top`` key; the answer and the rules are not touched. Default: keep
+            them all, with no such key.
 
     Returns:
         dict[str, object]: The document, its keys in the order of ``docs/json-schema.md``.
     """
+    recognized, recognized_out = _cut(verdict.recognized_failing, top)
+    unrecognized, unrecognized_out = _cut(verdict.unrecognized_failing, top)
     return {
         "schema_version": SCHEMA_VERSION,
         "command": "verdict",
@@ -299,10 +345,14 @@ def verdict_document(verdict: Verdict) -> dict[str, object]:
         "enforcing": _or_none(verdict.enforcing),
         "deciding": None if verdict.deciding is None else _RULE_WORDS[verdict.deciding],
         "rules": [_rule(rule) for rule in verdict.rules],
-        "recognized_failing": [_source(source) for source in verdict.recognized_failing],
-        "unrecognized_failing": [_source(source) for source in verdict.unrecognized_failing],
+        "recognized_failing": [_source(source) for source in recognized],
+        "unrecognized_failing": [_source(source) for source in unrecognized],
         "notes": [_note(note) for note in verdict.notes],
         "left_out": _left_out(verdict.left_out),
+        **_top(
+            top,
+            {"recognized_failing": recognized_out, "unrecognized_failing": unrecognized_out},
+        ),
     }
 
 

@@ -1017,7 +1017,8 @@ def test_the_offline_commands_have_no_network_option(
     text = _help([command, "--help"], capsys)
 
     for word in ("--host", "--user", "--password", "--port", "--to", "--since", "--folder"):
-        assert word not in text
+        # A whole word: ``--top`` starts with the same letters as ``--to``.
+        assert not re.search(rf"{word}\b", text)
 
 
 # ---------------------------------------------------------------------------

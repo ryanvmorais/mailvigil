@@ -326,6 +326,25 @@ standard output (RF-01).
   redirects them still gets UTF-16; the README says so and points at `--output` for the page only.
   `cli.py` grows by one small function while issue #82 plans to shrink it.
 
+### ADR-12 — The senders table stops at 50 rows, and `--top N` moves the stop (amendment of 2026-10-30, issue #71)
+
+- **Decision:** `_senders` shows the first `N` rows of `summary.senders` (the biggest first), where
+  `N` is `--top` (ADR-8 of 006) or, without it, `_SENDERS_LIMIT = 50`. When rows are left out, the
+  table keeps its total row, which still counts everything, and one line follows the table: how
+  many senders and how many messages are not listed, and that `mailvigil summary --json` lists
+  every sender (new catalog sentence `senders_more` and plural `other_sender` in `HtmlMessages`,
+  both languages). The groups of failing sources keep their limit of 10 (the limit of the text format, spec 004).
+- **Alternatives:** no cap unless `--top` is given; a cap with a "show all" control (needs script,
+  which ADR-8 of this spec forbids); folding the rest into one "other senders" row; capping the
+  failing groups with `--top` as well.
+- **Why:** on 20 000 distinct failing sources the table is the whole size of the page (3.9 MB):
+  it is slow to open and nobody reads row 20 000. Fifty rows cover every real service with room to
+  spare, and the cut is announced with numbers, so nothing is hidden. The failing groups were
+  already bounded, so `--top` keeps one meaning on the page: the senders table.
+- **Trade-off:** RF-05 stops saying "every row": a domain with more than 50 senders gets a page
+  that does not list them all, and the full list is one command away. The look of the page is not
+  public contract (`docs/stability.md`), so the default needs no new `schema_version` or major.
+
 ## Interface record
 
 The interface was decided with the maintainer on 2026-10-28 from a mockup made in the Artifact

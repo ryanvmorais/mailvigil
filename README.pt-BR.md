@@ -285,6 +285,10 @@ mailvigil verdict --config mailvigil.toml reports/ --html > report.html
   um arquivo que já exista, nunca cria a pasta, não imprime nada quando dá certo e exige `--html`.
   Use-o no **Windows PowerShell 5.1**, cujo `>` grava UTF-16, que os navegadores não leem como a
   página espera. A página é ASCII, então o `>` de qualquer outro shell também funciona.
+- **A tabela de remetentes para em 50 linhas**, para que um domínio sob spoofing pesado não gere uma
+  página de megabytes. Uma linha depois da tabela diz quantos remetentes e quantas mensagens ficaram
+  de fora, e a linha de total continua somando tudo. O `--top N` muda esse limite; o
+  `mailvigil summary --json` lista todos os remetentes.
 
 ### Fetch
 
@@ -402,6 +406,12 @@ e todas as origens que falham, sem os limites que o texto mantém, e um valor qu
 vai para a saída de erro, como sem `--json`, e o código de saída é `1`. O
 [docs/json-schema.md](docs/json-schema.md) lista cada campo e a promessa de compatibilidade (em
 inglês). O documento do `fetch` são só os seis números da execução.
+
+Um domínio sob spoofing pesado pode ter dezenas de milhares de origens que falham. O `--top N`
+mantém as `N` primeiras entradas de cada lista longa e acrescenta uma última chave, `top`, com o
+limite e quantas entradas cada lista deixou de fora; sem ele o documento é o completo, byte a byte.
+A resposta e o código de saída não dependem do `--top`, que exige `--json` (ou `--html`, no
+`verdict`).
 
 ### Idioma
 
