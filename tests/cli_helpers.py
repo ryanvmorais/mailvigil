@@ -8,7 +8,7 @@ and addresses are invented (``example.com``, ``example.net``; ``192.0.2.0/24``; 
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from mailvigil.verdict import MIN_DAYS_SPANNED, MIN_MESSAGES
@@ -55,12 +55,14 @@ def write_window(
     count: int = _PER_DAY,
     failing: bool = False,
     policy: str = "none",
+    domain: str = "example.com",
 ) -> Path:
     """
-    Write one daily report of ``example.com`` for each day of a window.
+    Write one daily report of a domain for each day of a window.
 
     Args:
-        folder (Path): The folder to create and fill.
+        folder (Path): The folder to fill; created when it does not exist, so the windows of
+            several domains can share one.
         make_report_xml (ReportXml): The report factory of ``conftest.py``.
         make_record_xml (RecordXml): The record factory of ``conftest.py``.
         days (int): How many consecutive days to cover, one report each.
@@ -69,25 +71,47 @@ def write_window(
             ``s1`` signature itself passes, so the configuration of ``write_config`` recognizes the
             sender. Default: ``False``.
         policy (str, optional): The ``p`` the reports publish. Default: ``none``.
+        domain (str, optional): The domain the reports are about. Default: ``example.com``.
 
     Returns:
         Path: The folder.
     """
-    folder.mkdir()
+    folder.mkdir(exist_ok=True)
     result = "fail" if failing else "pass"
     record = make_record_xml(
         count=count,
         dkim_evaluated=result,
         spf_evaluated=result,
-        dkim=(("example.com", "s1", "pass"),),
-        spf=(("example.com", result),),
+        dkim=((domain, "s1", "pass"),),
+        spf=((domain, result),),
     )
     for day in range(days):
         begin = _START + day * _DAY
         end = begin + _DAY - 1
-        name = f"example.net!example.com!{begin}!{end}.xml"
+        name = f"example.net!{domain}!{begin}!{end}.xml"
         report = make_report_xml(
-            report_id=f"r{day}", begin=begin, end=end, records=[record], p=policy
+            report_id=f"r{day}", begin=begin, end=end, records=[record], p=policy, domain=domain
         )
         (folder / name).write_bytes(report)
     return folder
+
+
+def write_domains_config(path: Path, domains: Sequence[str]) -> Path:
+    """
+    Write a ``[[domains]]`` file in which every domain names the selector of the synthetic reports.
+
+    Args:
+        path (Path): Where to write the file.
+        domains (Sequence[str]): The domains, in the order of the file.
+
+    Returns:
+        Path: The file written.
+    """
+    path.write_text(
+        "".join(
+            f'[[domains]]\ndomain = "{domain}"\n[domains.senders]\ns1 = "Example Mail"\n'
+            for domain in domains
+        ),
+        encoding="utf-8",
+    )
+    return path

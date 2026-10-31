@@ -45,15 +45,22 @@ from mailvigil.cli_common import (
     write,
 )
 from mailvigil.cli_fetch import add_fetch_parser, run_fetch
-from mailvigil.config import Config, ConfigError, check_domain, load_config
+from mailvigil.config import (
+    MAX_DOMAINS,
+    Config,
+    ConfigError,
+    ConfigReason,
+    check_domain,
+    load_configs,
+)
 from mailvigil.messages import ENGLISH, Messages, language_by_code
-from mailvigil.render import no_reports_message, render_summary
+from mailvigil.render import join_blocks, no_reports_message, render_summary
 from mailvigil.render_html import render_html
 from mailvigil.render_json import dumps, summary_document, verdict_document
-from mailvigil.render_verdict import render_verdict
-from mailvigil.reports import IngestionResult, ingest
+from mailvigil.render_verdict import render_tally, render_verdict
+from mailvigil.reports import IngestionResult, ingest_many
 from mailvigil.summary import summarize
-from mailvigil.verdict import Answer, judge
+from mailvigil.verdict import Answer, judge, worst_answer
 
 # The file read from the current folder when --config is not given (Resolved decision 10).
 DEFAULT_CONFIG = Path("mailvigil.toml")
@@ -100,35 +107,44 @@ class _Refusal(Exception):
 # ---------------------------------------------------------------------------
 
 
-def resolve_config(
-    config_path: Path | None, domain: str | None, messages: Messages = ENGLISH
-) -> tuple[Config, str | None]:
+def resolve_configs(
+    config_path: Path | None, domains: Sequence[str] | None, messages: Messages = ENGLISH
+) -> tuple[tuple[Config, ...], str | None]:
     """
-    Decide the domain and the selector map of a run.
+    Decide the domains and the selector maps of a run (spec 010, ADR-9).
 
-    The order is fixed: the ``--domain`` value is validated first, then the file is chosen
+    The order is fixed: every ``--domain`` value is validated first, then the file is chosen
     (``--config``, else ``mailvigil.toml`` in the current folder; no parent and no home directory is
-    searched), then the two are compared. With no file the selector map is empty, which is a
-    legitimate first run.
+    searched), then the two are compared. ``--domain`` selects: with a file it narrows the run to
+    the listed domains of the file, in the order of the file, and a value the file does not have is
+    refused. With no file each distinct value is a domain with an empty selector map, which is a
+    legitimate first run, in the order given.
 
     Args:
         config_path (Path | None): The ``--config`` value, ``None`` when not given.
-        domain (str | None): The ``--domain`` value, ``None`` when not given.
+        domains (Sequence[str] | None): The ``--domain`` values, ``None`` when not given.
         messages (Messages, optional): The language of the refusal lines. Default: English.
 
     Returns:
-        tuple[Config, str | None]: The configuration and the path of the file used as it should be
-            shown, ``None`` when there is no file.
+        tuple[tuple[Config, ...], str | None]: One configuration per domain of the run, and the path
+            of the file used as it should be shown, ``None`` when there is no file.
 
     Raises:
-        _Refusal: For an invalid or conflicting domain, a refused file, or no domain at all.
+        _Refusal: For an invalid, conflicting or too many ``--domain`` values, a refused file, or no
+            domain at all.
     """
-    wanted: str | None = None
-    if domain is not None:
-        try:
-            wanted = check_domain(domain, key="--domain")
-        except ConfigError as error:
-            raise _Refusal(config_line(error, messages)) from error
+    wanted: list[str] = []
+    try:
+        for value in domains or ():
+            name = check_domain(value, key="--domain")
+            if name not in wanted:
+                wanted.append(name)
+        if len(wanted) > MAX_DOMAINS:
+            raise ConfigError(
+                ConfigReason.TOO_MANY_DOMAINS, "--domain", f"more than {MAX_DOMAINS} domains"
+            )
+    except ConfigError as error:
+        raise _Refusal(config_line(error, messages)) from error
 
     # ``exists``, not ``is_file``: a folder with that name is refused as unreadable by the loader
     # instead of being silently ignored.
@@ -139,21 +155,29 @@ def resolve_config(
     )
 
     if path is None:
-        if wanted is None:
+        if not wanted:
             raise _Refusal(messages.refusals.no_domain.format(default=DEFAULT_CONFIG))
-        return Config(wanted, MappingProxyType({})), None
+        return tuple(Config(name, MappingProxyType({})) for name in wanted), None
 
     try:
-        config = load_config(path)
+        configs = load_configs(path)
     except ConfigError as error:
         raise _Refusal(f"{echo(path)}: {config_line(error, messages)}") from error
-    if wanted is not None and wanted != config.domain:
-        raise _Refusal(
-            messages.refusals.domain_mismatch.format(
-                wanted=wanted, domain=config.domain, path=echo(path)
+    if not wanted:
+        return configs, str(path)
+    listed = {config.domain for config in configs}
+    for name in wanted:
+        if name in listed:
+            continue
+        # A file of one domain keeps the sentence it always had; the list is for several.
+        if len(configs) == 1:
+            raise _Refusal(
+                messages.refusals.domain_mismatch.format(
+                    wanted=name, domain=configs[0].domain, path=echo(path)
+                )
             )
-        )
-    return config, str(path)
+        raise _Refusal(messages.refusals.domain_not_listed.format(wanted=name, path=echo(path)))
+    return tuple(config for config in configs if config.domain in wanted), str(path)
 
 
 # ---------------------------------------------------------------------------
@@ -293,8 +317,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     reading.add_argument(
         "--domain",
+        action="append",
         metavar="DOMAIN",
-        help="the domain the reports are about (required when there is no configuration file)",
+        help="a domain the reports are about; repeat it for several (required when there is no "
+        "configuration file; with one, it picks the domains of the file to cover)",
     )
     reading.add_argument(
         "--recursive",
@@ -356,9 +382,13 @@ def build_parser() -> argparse.ArgumentParser:
 
 def _load(
     args: argparse.Namespace, messages: Messages = ENGLISH
-) -> tuple[Config, str | None, IngestionResult] | None:
+) -> tuple[tuple[Config, ...], str | None, dict[str, IngestionResult]] | None:
     """
-    Resolve the configuration and read the reports, the part both commands share.
+    Resolve the configurations and read the reports, the part both commands share.
+
+    The reports are read once for all the domains of the run (spec 010, ADR-3). The run is refused
+    only when no domain kept a report: a domain that has none among others gets a result that says
+    so (ADR-11).
 
     Args:
         args (argparse.Namespace): The parsed arguments: ``paths``, ``config``, ``domain``,
@@ -366,21 +396,30 @@ def _load(
         messages (Messages, optional): The language of the refusal lines. Default: English.
 
     Returns:
-        tuple[Config, str | None, IngestionResult] | None: The configuration, the path of the file
-            used as it should be shown and what was read; ``None`` when the run was refused, after
-            the one line on standard error.
+        tuple[tuple[Config, ...], str | None, dict[str, IngestionResult]] | None: The
+            configurations in the order of the run, the path of the file used as it should be shown
+            and what was read for each domain; ``None`` when the run was refused, after the one line
+            on standard error.
     """
     try:
-        config, source = resolve_config(args.config, args.domain, messages)
+        configs, source = resolve_configs(args.config, args.domain, messages)
     except _Refusal as refusal:
         write(sys.stderr, f"mailvigil: {refusal.message}")
         return None
 
-    result = ingest(args.paths, config.domain, _now(), args.recursive)
-    if not result.reports:
-        write(sys.stderr, no_reports_message(result, [config.domain], messages))
+    # The two structured formats of several domains are built in the stages that follow (spec 010,
+    # stages 5 and 6); until then a run that asks for one is refused, not answered with one domain.
+    if len(configs) > 1 and (args.json or getattr(args, "html", False)):
+        write(sys.stderr, "mailvigil: --json and --html do not cover several domains yet")
         return None
-    return config, source, result
+
+    domains = [config.domain for config in configs]
+    results = ingest_many(args.paths, domains, _now(), args.recursive)
+    if not any(result.reports for result in results.values()):
+        # What was refused or passed over is shared, so any one result tells it.
+        write(sys.stderr, no_reports_message(results[domains[0]], domains, messages))
+        return None
+    return configs, source, results
 
 
 def _run_summary(args: argparse.Namespace) -> int:
@@ -397,13 +436,14 @@ def _run_summary(args: argparse.Namespace) -> int:
     loaded = _load(args, args.lang)
     if loaded is None:
         return EXIT_REFUSED
-    config, source, result = loaded
+    configs, source, results = loaded
 
-    summary = summarize(result, config)
+    summaries = [summarize(results[config.domain], config) for config in configs]
     if args.json:
-        write(sys.stdout, dumps(summary_document(summary, source, args.top)))
+        write(sys.stdout, dumps(summary_document(summaries[0], source, args.top)))
     else:
-        write(sys.stdout, render_summary(summary, source, args.lang))
+        blocks = [render_summary(summary, source, args.lang) for summary in summaries]
+        write(sys.stdout, join_blocks(blocks))
     return EXIT_OK
 
 
@@ -417,20 +457,22 @@ def _run_verdict(args: argparse.Namespace) -> int:
 
     Returns:
         int: ``EXIT_OK`` for ready, ``EXIT_TOO_EARLY`` for too early, ``EXIT_NOT_READY`` for not
-            ready and ``EXIT_REFUSED`` when no verdict could be made.
+            ready and ``EXIT_REFUSED`` when no verdict could be made. With several domains it is
+            the worst answer (spec 010, ADR-6).
     """
     loaded = _load(args, args.lang)
     if loaded is None:
         return EXIT_REFUSED
-    config, _source, result = loaded
+    configs, _source, results = loaded
 
-    summary = summarize(result, config)
-    verdict = judge(summary, _now())
+    now = _now()
+    summaries = [summarize(results[config.domain], config) for config in configs]
+    verdicts = [judge(summary, now) for summary in summaries]
     if args.json:
-        write(sys.stdout, dumps(verdict_document(verdict, args.top)))
+        write(sys.stdout, dumps(verdict_document(verdicts[0], args.top)))
     elif args.html and args.output is not None:
         try:
-            _write_page(args.output, render_html(summary, verdict, args.lang, args.top))
+            _write_page(args.output, render_html(summaries[0], verdicts[0], args.lang, args.top))
         except OSError as error:
             reason = error.strerror or type(error).__name__
             line = args.lang.refusals.output_failed.format(
@@ -440,10 +482,14 @@ def _run_verdict(args: argparse.Namespace) -> int:
             return EXIT_REFUSED
     elif args.html:
         # ``render_html`` ends in a newline already; ``_write`` adds one, so the last is cut.
-        write(sys.stdout, render_html(summary, verdict, args.lang, args.top).rstrip("\n"))
+        page = render_html(summaries[0], verdicts[0], args.lang, args.top)
+        write(sys.stdout, page.rstrip("\n"))
     else:
-        write(sys.stdout, render_verdict(verdict, args.lang))
-    return _VERDICT_EXIT[verdict.answer]
+        blocks = [render_verdict(verdict, args.lang) for verdict in verdicts]
+        if len(verdicts) > 1:
+            blocks.append(render_tally(verdicts, args.lang))
+        write(sys.stdout, join_blocks(blocks))
+    return _VERDICT_EXIT[worst_answer(verdicts)]
 
 
 def _internal_error_line(error: Exception) -> str:

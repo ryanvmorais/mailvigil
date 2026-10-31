@@ -133,8 +133,8 @@ def test_no_path_is_a_usage_error_before_any_file_is_read(
         """Fail the test if a file is read."""
         raise AssertionError("a file was read before the usage error")
 
-    monkeypatch.setattr("mailvigil.cli.ingest", forbidden)
-    monkeypatch.setattr("mailvigil.cli.load_config", forbidden)
+    monkeypatch.setattr("mailvigil.cli.ingest_many", forbidden)
+    monkeypatch.setattr("mailvigil.cli.load_configs", forbidden)
 
     with pytest.raises(SystemExit) as exit_info:
         main(["summary", "--domain", "example.com"])

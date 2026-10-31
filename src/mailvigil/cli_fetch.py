@@ -20,7 +20,7 @@ from datetime import date
 from pathlib import Path
 
 from mailvigil.cli_common import EXIT_OK, EXIT_REFUSED, config_line, echo, write
-from mailvigil.config import ConfigError, FetchSettings, load_config
+from mailvigil.config import ConfigError, FetchSettings, load_configs
 from mailvigil.fetch.errors import FetchReason, FetchRefused
 from mailvigil.fetch.model import DEADLINE_SECONDS, DEFAULT_LIMIT, MAX_LIMIT
 from mailvigil.fetch.run import fetch_reports
@@ -326,7 +326,7 @@ def _connection(
     settings = FetchSettings()
     if args.config is not None:
         try:
-            settings = load_config(args.config).fetch
+            settings = load_configs(args.config)[0].fetch
         except ConfigError as error:
             write(sys.stderr, f"mailvigil: {echo(args.config)}: {config_line(error, args.lang)}")
             return None

@@ -1177,6 +1177,23 @@ def test_a_file_in_the_current_folder_is_not_searched_for(
     assert connect.calls == []
 
 
+def test_a_file_of_several_domains_gives_its_fetch_table_and_no_domain(
+    tmp_path: Path, password_file: Path, connect: _Connect, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """``fetch`` has no domain: a ``[[domains]]`` file is accepted, ``[fetch]`` is read (RF-08)."""
+    text = (
+        '[[domains]]\ndomain = "example.com"\n[[domains]]\ndomain = "example.net"\n'
+        + _FILE_FETCH.split("\n", 1)[1]
+    )
+    argv = _only_to(tmp_path, password_file, "--config", str(_config(tmp_path, text)))
+
+    code, _out, _err = _run(argv, capsys)
+
+    assert code == EXIT_OK
+    (call,) = connect.calls
+    assert (call["host"], call["user"], call["port"]) == ("imap.file.invalid", "from-file", 143)
+
+
 def test_a_file_without_a_table_leaves_the_flags_in_charge(
     tmp_path: Path, password_file: Path, connect: _Connect, capsys: pytest.CaptureFixture[str]
 ) -> None:
