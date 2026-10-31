@@ -73,7 +73,7 @@ Planned after the first release (2026-10-30), each one opened only when its turn
 
 | Spec | Scope | Delivery | Status |
 |---|---|---|---|
-| [`010-multiple-domains`](010-multiple-domains/) | more than one domain per run, one summary and one verdict per domain, what the `verdict` exit code means for several answers, and internationalized domains typed as written (issue #79) | after 1.5.0 | **approved** |
+| [`010-multiple-domains`](010-multiple-domains/) | more than one domain per run, one summary and one verdict per domain, what the `verdict` exit code means for several answers, and internationalized domains typed as written (issue #79) | `1.6.0` | **done** |
 | `011-oauth-login` | the full OAuth 2 flow of `fetch` (XOAUTH2) for providers that turned passwords off, with its own secrets model and `/auditoria-seguranca` (issue #73); the first step, a token read from a file, is an amendment of 009, not this spec | after 1.5.0 | **planned** |
 
 ### When an issue gets a spec
@@ -106,6 +106,10 @@ one means writing a spec that answers the reason, not adding a flag.
 
 > ⚠️ **The verdict must state its criterion.** The product is not a parser: it is an answer with a
 > reason. A verdict that cannot say which rule produced it does not ship (spec 005).
+
+> ⚠️ **One domain is the loop of one.** A run of several domains ([010](010-multiple-domains/)) is built on the same
+> code as a run of one, and the text, the `--json` document and the page of one domain stay
+> byte for byte as they were; the envelope and the folder of pages exist only for two or more.
 
 > ⚠️ **Exit codes and `--json` are public contract** once released. Changing them is a breaking
 > change (spec 006).

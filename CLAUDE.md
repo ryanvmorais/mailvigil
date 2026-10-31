@@ -7,12 +7,13 @@ This file guides Claude Code (claude.ai/code) when working in this repository.
 MailVigil is an open-source command-line tool that reads DMARC aggregate reports (RUA, usually
 `.zip`, `.gz` or `.xml`, or still attached to the mail in an `.eml` or `.mbox`) and says, in plain
 language, who is sending mail as a domain and whether it is safe to move the policy to `p=reject`. Python `>=3.12`, standard library only (zero runtime
-dependencies), offline. Version 1.5.0 is on PyPI (1.0.0 was published by the maintainer on 2026-10-29, 1.1.0, 1.1.1, 1.1.2, 1.2.0, 1.3.0, 1.3.1, 1.4.0 and 1.5.0 on 2026-10-30; `v0.1` to `v0.9` are the milestones of the build, see the README): the CLI answers `mailvigil --version`, `mailvigil summary`
+dependencies), offline. Version 1.5.0 is on PyPI (1.0.0 on 2026-10-29, 1.1.0 to 1.5.0 on 2026-10-30; `v0.1` to `v0.9` are the milestones of the build, see the README): the CLI answers `mailvigil --version`, `mailvigil summary`
 and `mailvigil verdict` (report ingestion, configuration, sender identification, the summary, the
 verdict on `p=reject` and their texts are built and wired); `--json`, `--lang en|pt-BR` and the stable
 exit codes (a public contract, `docs/json-schema.md`) are built (spec 006 is done), and so is the
 static HTML page of `verdict --html` (spec 008 is done). `mailvigil fetch` (spec 009, IMAP into a
-folder, opt-in) is built too; it is the only command that touches the network. Everything
+folder, opt-in) is built too; it is the only command that touches the network. Several domains in
+one run (spec 010) are built. Everything
 is specified in [specs/](specs/) first. The repository has been public since
 2026-10-27 (the maintainer made it public, not Claude); releasing and announcing are the
 maintainer's acts (`docs/releasing.md`).
@@ -76,7 +77,8 @@ src/mailvigil/
                      # paths/--config/--domain/--recursive/--json/--top/--lang (`--lang` is parsed to a Messages;
                      # `--top N` needs `--json`, or `--html` on `verdict`, and is refused before any work);
                      # `--html` exists on `verdict` only and is refused together with `--json`;
-                     # `--output FILE` (ADR-11) needs `--html` and `_write_page` writes it atomically;
+                     # `--output FILE` (ADR-11) needs `--html` and `_write_page` writes it atomically,
+                     # and for several domains it is a folder of `mailvigil-<domain>.html` (`_write_pages`);
                      # `fetch` (spec 009) is added by `cli_fetch.add_fetch_parser` and run by
                      # `cli_fetch.run_fetch`
   cli_common.py      # the eight EXIT_* codes (the one table), `echo` (a command-line value made safe to
@@ -102,10 +104,13 @@ src/mailvigil/
     discovery.py     #   paths (files and folders) to an ordered list of `Source`s, deduplicated;
                      #   `--recursive` goes down 8 levels (no link entered) and the report-suffix
                      #   files whose name did not qualify are counted (`passed_over`, ADR-9 of 002)
-    ingest.py        #   ingest(paths, domain, now=None): the entry point; refusals go to `skipped`
+    ingest.py        #   ingest_many(paths, domains): one reading, a result per domain (spec 010);
+                     #   ingest(paths, domain) is the loop of one; refusals go to `skipped`
   text.py            # text and domain rules shared by reports and config (clean_text, normalize_domain…)
-  config.py          # load_config(path) → frozen Config (domain + selector map + the [spf] and [ips]
-                     # maps + the [fetch] settings: host, user, port, folder, never a password);
+  config.py          # load_configs(path) → tuple of frozen Config, one per `domain` or `[[domains]]`
+                     # entry (50 at most; an IDN goes through the `idna` codec and is refused if it
+                     # changes; spec 010): domain + selector map + the [spf] and [ips] maps + the
+                     # [fetch] settings (host, user, port, folder, never a password);
                      # check_domain is shared with the CLI's --domain; ConfigError is typed (spec 003)
   senders.py         # identify_sender(record, config) → Identification: a DKIM selector, an SPF domain
                      # or an address range names a sender only on an authentication aligned with the
@@ -118,13 +123,15 @@ src/mailvigil/
   render.py          # render_summary(summary, config_source, messages) → 80-column ASCII text;
                      # no_reports_message; also the public helpers fit, address, format_share,
                      # share_tenths
-  verdict.py         # judge(summary) → frozen Verdict: Answer (READY/TOO_EARLY/NOT_READY), five Rules
+  verdict.py         # worst_answer(verdicts): the exit code of several domains;
+                     # judge(summary) → frozen Verdict: Answer (READY/TOO_EARLY/NOT_READY), five Rules
                      # with the four threshold constants, Notes, LeftOut (what the summary did not
                      # count; it never changes the answer); integer arithmetic; never imports a
                      # text module (spec 005)
   render_verdict.py  # render_verdict(verdict, messages) → 80-column ASCII text: reason, rules table,
                      # notes, what was left out, next step
-  render_json.py     # summary_document / verdict_document / fetch_document → dict, dumps → ASCII JSON, no language
+  render_json.py     # summary_document / verdict_document / fetch_document (+ the `domains`
+                     # envelopes) → dict, dumps → ASCII JSON, no language
                      # (spec 006); the schema is public contract, see docs/json-schema.md; `top=N`
                      # trims the long lists and adds the last key `top` (ADR-8)
   htmlkit.py         # the ONLY module that builds markup (spec 008): `text()` escapes a str into a `Safe`
@@ -147,18 +154,15 @@ src/mailvigil/
                      # (Plural and the frozen dataclasses), en.py (ENGLISH), pt_br.py (PORTUGUESE,
                      # ASCII only); language_by_code; imports no renderer
 tests/               # pytest, one test file per module (test_reports_*.py, test_text.py, test_config.py,
-                     # test_senders.py, test_summary.py, test_verdict.py, test_render*.py incl. the
-                     # *_top.py ones for `--top`, test_messages.py, test_json_schema_doc.py,
-                     # test_cli_*.py incl. test_cli_top.py, test_htmlkit.py, test_html_*.py,
+                     # test_senders.py, test_summary.py, test_verdict.py, test_render*.py, test_messages.py,
+                     # test_json_schema_doc.py, test_cli_*.py, test_htmlkit.py, test_html_*.py,
                      # test_fetch_*.py, test_smoke.py, test_gitignore.py, test_readme_*.py,
                      # test_properties.py (Hypothesis: the readers only refuse and a parsed report
                      # reaches every output; the `thorough` profile is for a long hunt) and
                      # test_offline_isolation.py, which runs fresh interpreters to prove that
                      # summary and verdict never load the network code); fixtures are synthetic,
-                     # built in conftest.py, cli_helpers.py, mail_helpers.py, schema_examples.py,
-                     # html_helpers.py, render_verdict_golden.py, fetch_helpers.py (FakeMailbox),
-                     # imap_peer.py (a scripted IMAP server on a socket pair), help_golden.py (the
-                     # recorded --help texts) or tmp_path
+                     # built in conftest.py and the *_helpers.py, schema_examples.py, imap_peer.py (a
+                     # scripted IMAP server), help_golden.py (the recorded --help texts) or tmp_path
 specs/               # spec-driven development: requirements → design → tasks per feature
 docs/stack.md        # each technology of the stack, why it was chosen, what to study first
 docs/json-schema.md  # every field of the three --json documents and the compatibility promise
@@ -182,6 +186,9 @@ uv.lock              # never edit by hand (generated; a hook blocks it)
 > declares any `Requires-Dist`. Dev tools go in `[dependency-groups] dev`. Parsing uses the
 > standard library only (`argparse`, `tomllib`, `xml.etree`, `xml.parsers.expat`, `zipfile`,
 > `gzip`, `ipaddress`).
+
+> ⚠️ **The one-domain path is the loop of one** (spec 010): its text, `--json` and `--html` stay
+> byte for byte as they were; the envelope and the folder of pages are for two or more domains.
 
 > ⚠️ **Markup is built in `htmlkit.py` only.** Text from a report reaches the HTML page only through
 > `text()`, which escapes it into a `Safe`; never write a tag, an attribute or a `Safe(...)` anywhere

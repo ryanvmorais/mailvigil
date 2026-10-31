@@ -10,10 +10,10 @@ These are the contract. Each item says where it is specified.
 
 | Part | What is promised | Specified in |
 |---|---|---|
-| Commands | The names `summary`, `verdict` and `fetch`, and the arguments and options each has today (`--config`, `--domain`, `--recursive`, `--json`, `--lang`, `--html`, `--output`, `--top`, `--host`, `--user`, `--to`, `--port`, `--folder`, `--since`, `--limit`, `--password-file`, `--cafile`) keep their meaning. `--version` prints the version. | `mailvigil --help` and the [README](../README.md) |
-| Exit codes | `0`, `1`, `2`, `3`, `4`, `70`, `130` and `141` keep their meaning. A new code is never reused for an old one. | [Exit codes](../README.md#exit-codes) |
-| JSON | The three documents of `--json` (`summary`, `verdict`, `fetch`) follow `schema_version`: a field is only added inside a version, and renamed, removed or retyped only with a new one. | [json-schema.md](json-schema.md) |
-| Configuration | The keys `domain`, `[senders]`, `[spf]`, `[ips]` and `[fetch]` (`host`, `user`, `port`, `folder`; never a password), and the strict reading of the file: an unknown key is an error. | [Configuration](../README.md#configuration) |
+| Commands | The names `summary`, `verdict` and `fetch`, and the arguments and options each has today (`--config`, `--domain`, `--recursive`, `--json`, `--lang`, `--html`, `--output`, `--top`, `--host`, `--user`, `--to`, `--port`, `--folder`, `--since`, `--limit`, `--password-file`, `--cafile`) keep their meaning; `--domain` may be repeated, and with several domains `--output` names a folder for `--html`. `--version` prints the version. | `mailvigil --help` and the [README](../README.md) |
+| Exit codes | `0`, `1`, `2`, `3`, `4`, `70`, `130` and `141` keep their meaning. A new code is never reused for an old one. With several domains, `verdict` exits with the worst answer: `4`, else `3`, else `0`. | [Exit codes](../README.md#exit-codes) |
+| JSON | The three documents of `--json` (`summary`, `verdict`, `fetch`) and the `domains` envelope of a run of two or more domains follow `schema_version`: a field is only added inside a version, and renamed, removed or retyped only with a new one. | [json-schema.md](json-schema.md) |
+| Configuration | The keys `domain`, the `[[domains]]` list (each entry with `domain`, `[domains.senders]`, `[domains.spf]` and `[domains.ips]`; never together with the top-level `domain`), `[senders]`, `[spf]`, `[ips]` and `[fetch]` (`host`, `user`, `port`, `folder`; never a password), and the strict reading of the file: an unknown key is an error. | [Configuration](../README.md#configuration) |
 | Safety of the input | A report is hostile input: the size cap, the refusal of `DOCTYPE` and `ENTITY`, and `fetch` reading a mailbox without changing it, over verified TLS, never take a weaker form. | [SECURITY.md](../SECURITY.md) |
 | Python | The versions in `requires-python`. | `pyproject.toml` |
 

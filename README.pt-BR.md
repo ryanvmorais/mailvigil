@@ -121,6 +121,52 @@ da pasta atual, se houver; sem arquivo e sem `--domain`, ele pede um deles.
 O mesmo arquivo pode trazer também os dados da caixa de correio do `mailvigil fetch`, numa tabela
 `[fetch]` (veja [Fetch](#fetch)); a senha nunca é uma das chaves.
 
+### Vários domínios
+
+Um arquivo pode cuidar de vários domínios: uma lista de tabelas, `[[domains]]`, cada uma com os seus
+próprios mapas de identidade. O arquivo é de uma forma ou da outra, nunca uma mistura: com
+`[[domains]]`, o `domain`, o `[senders]`, o `[spf]` e o `[ips]` do nível de cima são recusados. O
+`[fetch]` continua no nível de cima.
+
+```toml
+[[domains]]
+domain = "example.com"
+
+[domains.senders]
+newsletter = "Example Mailer (newsletters)"
+
+[domains.spf]
+"bounce.example.com" = "Example Relay (SPF only)"
+
+[[domains]]
+domain = "example.org"
+
+[domains.senders]
+shop = "Example Shop (receipts)"
+```
+
+- **Cada domínio guarda os seus mapas.** Um seletor, um domínio SPF ou uma faixa de endereços nomeia
+  um remetente para o domínio sob o qual foi escrito e para nenhum outro; uma chave do `[spf]` tem
+  de estar dentro do próprio domínio.
+- **O `--domain` escolhe, não acrescenta.** Sem ele, a execução cobre todos os domínios do arquivo.
+  Com um ou mais valores de `--domain` (repita a opção), cobre só esses, na ordem do arquivo, e um
+  valor que não está no arquivo é recusado. Sem arquivo, cada `--domain` é um domínio com mapas
+  vazios, como para um domínio só.
+- **Os relatórios são lidos uma vez**, seja qual for o número de domínios, e cada relatório vai para
+  o domínio a que pertence. Um domínio que ainda não tem relatório fica `too early`; a execução só é
+  recusada quando nenhum domínio tem relatório.
+- **No máximo 50 domínios**, e o mesmo domínio duas vezes (até como `bücher.example` e a forma
+  `xn--`) é duplicata e é recusado.
+- **O `summary` e o `verdict` imprimem um bloco por domínio**, separados por uma linha de traços; o
+  `verdict` termina com uma linha que conta as respostas. Não existe resposta combinada, porque uma
+  para uma mistura de domínios não diria nada sobre nenhum deles.
+
+Um domínio internacionalizado pode ser escrito como se lê: `bücher.example` em `domain`, em
+`--domain` ou como chave do `[spf]` vira `xn--bcher-kva.example`, a forma que os relatórios trazem, e
+é essa que é impressa. A conversão é o codec `idna` da biblioteca padrão (IDNA 2003), então um nome
+que ele mudaria (`faß.example` viraria `fass.example`), que não é válido ou que usa um caractere mais
+novo que o Unicode 3.2 é recusado, com o conselho de escrever a forma `xn--`, que é sempre aceita.
+
 ## MailVigil e outras ferramentas
 
 | | MailVigil | [parsedmarc](https://github.com/domainaware/parsedmarc) | Serviços hospedados (dmarcian, EasyDMARC, Postmark) |
@@ -168,6 +214,9 @@ mailvigil summary --domain example.com report.xml.gz
 
 # Pergunte se o domínio está pronto para p=reject (mesmos argumentos do summary)
 mailvigil verdict --config mailvigil.toml reports/
+
+# Vários domínios: [[domains]] no arquivo, ou --domain repetido (um bloco para cada)
+mailvigil verdict --domain example.com --domain example.org reports/
 
 # As mesmas respostas como um documento JSON, para um script ou um job de CI
 mailvigil verdict --config mailvigil.toml reports/ --json
@@ -309,6 +358,12 @@ mailvigil verdict --config mailvigil.toml reports/ --html > report.html
   um arquivo que já exista, nunca cria a pasta, não imprime nada quando dá certo e exige `--html`.
   Use-o no **Windows PowerShell 5.1**, cujo `>` grava UTF-16, que os navegadores não leem como a
   página espera. A página é ASCII, então o `>` de qualquer outro shell também funciona.
+- **Vários domínios gravam uma pasta.** Com dois ou mais domínios, o `--output` nomeia uma pasta que
+  já existe e o comando grava uma página por domínio, `mailvigil-<dominio>.html`
+  (`mailvigil-xn--bcher-kva.example.html` para um internacionalizado), cada uma a página só daquele
+  domínio; sem `--output` a execução é recusada, porque várias páginas não cabem num só fluxo. Uma
+  página que não pode ser gravada encerra a execução nomeando esse arquivo; as anteriores estão
+  completas.
 - **A tabela de remetentes para em 50 linhas**, para que um domínio sob spoofing pesado não gere uma
   página de megabytes. Uma linha depois da tabela diz quantos remetentes e quantas mensagens ficaram
   de fora, e a linha de total continua somando tudo. O `--top N` muda esse limite; o
@@ -395,7 +450,7 @@ rodar" sem ler o texto. O `--json` não o altera.
 
 | Código | Significado | Comandos |
 |---|---|---|
-| `0` | Uma resposta foi impressa; no `verdict`, a resposta é `ready`; no `fetch`, a execução terminou | todos |
+| `0` | Uma resposta foi impressa; no `verdict`, a resposta é `ready` (para todos os domínios, quando são vários); no `fetch`, a execução terminou | todos |
 | `1` | A execução foi recusada: configuração ou domínio inválido, nenhum relatório aproveitado ou (no `fetch`) falha de conexão, login ou pasta | todos |
 | `2` | Erro de uso (uma opção desconhecida, um argumento faltando) | todos |
 | `3` | O `verdict` imprimiu `too early`: espere por mais relatórios | `verdict` |
@@ -403,6 +458,9 @@ rodar" sem ler o texto. O `--json` não o altera.
 | `70` | Erro interno, um bug: uma linha na saída de erro diz onde; por favor, reporte | todos |
 | `130` | Interrompido com Ctrl+C | todos |
 | `141` | O pipe de saída foi fechado (`mailvigil verdict ... \| head`) | todos |
+
+Com vários domínios, o `verdict` sai com a pior resposta: `4` se algum domínio não está pronto, senão
+`3` se algum está cedo demais, senão `0`. Então `0` quer dizer que é seguro mover todos eles.
 
 Repare que `1` é uma recusa e `4` é "não pronto"; um script que trata todo código diferente de zero
 do mesmo jeito confunde os dois:
@@ -430,6 +488,11 @@ e todas as origens que falham, sem os limites que o texto mantém, e um valor qu
 vai para a saída de erro, como sem `--json`, e o código de saída é `1`. O
 [docs/json-schema.md](docs/json-schema.md) lista cada campo e a promessa de compatibilidade (em
 inglês). O documento do `fetch` são só os seis números da execução.
+
+Com um domínio, o documento é o descrito. Com dois ou mais, é um envelope: `schema_version`,
+`command` e uma lista `domains` com o documento de cada domínio exatamente como uma execução só dele
+o imprimiria (no `verdict`, também `answer`, a pior resposta, que é o que o código de saída
+representa). Um script que trata os dois casos procura a chave `domains`.
 
 Um domínio sob spoofing pesado pode ter dezenas de milhares de origens que falham. O `--top N`
 mantém as `N` primeiras entradas de cada lista longa e acrescenta uma última chave, `top`, com o

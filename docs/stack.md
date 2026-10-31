@@ -240,7 +240,8 @@ library and handles IPv4 and IPv6.
 
 ### `tomllib`
 
-Reads the configuration file: the domain, the DKIM selector, SPF domain and address range maps
+Reads the configuration file: the domain (or a `[[domains]]` array of them, each with its own maps,
+spec 010), the DKIM selector, SPF domain and address range maps
 (`[senders]`, `[spf]`, `[ips]`) to service names and the `[fetch]` table (host, user, port and
 folder of the mailbox; never the password).
 `mailvigil/config.py` reads the file as bytes (capped at 64 KiB), decodes it as strict UTF-8,
@@ -256,6 +257,32 @@ line it carries, why a dotted key `a.b = "x"` is a nested table (so a selector w
 quoted), and validating the shape of the loaded dict before using it.
 
 **Docs:** [tomllib](https://docs.python.org/3/library/tomllib.html)
+
+### The `idna` codec
+
+A domain with letters outside ASCII has a second spelling made only of ASCII, the `xn--` form, and
+the reports use that one. The `idna` codec of the standard library converts the first into the second.
+
+`"bücher.example".encode("idna")` gives `b"xn--bcher-kva.example"`: the name as the reports carry it.
+`config.check_domain` uses it so a person can type an internationalized domain as it is read, in
+`domain`, in `--domain` and in an `[spf]` key (spec 010, RF-03). The codec is IDNA 2003, so the
+code accepts a name only when decoding the result gives back what was typed (lower-cased): `faß`
+would become `fass` and the Kelvin sign `k`, which are different names, and the report of a
+different domain would be counted for the person. Characters the codec does not check (unassigned
+in Unicode 3.2) are caught with `stringprep.in_table_a1` before it runs.
+
+**Why this:** it is in the standard library, so the zero-dependency promise holds. The alternative,
+IDNA 2008 (UTS 46), is thousands of lines of tables or a package. The trade-off is that a name the
+two versions treat differently is refused, and the `xn--` form, accepted always, is the way out
+(ADR-2 of spec 010).
+
+**Learn:** the difference between a name and its ASCII-compatible form (punycode, the `xn--`
+prefix), why mapping `ß` to `ss` changes which domain a name is, and why the check compares the
+round trip instead of trusting the conversion. Look-alike letters from another script become a
+different `xn--` name that matches no report, which is correct.
+
+**Docs:** [encodings.idna](https://docs.python.org/3/library/codecs.html#module-encodings.idna),
+[RFC 3490](https://www.rfc-editor.org/rfc/rfc3490)
 
 ### `argparse`
 
