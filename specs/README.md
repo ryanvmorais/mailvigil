@@ -78,9 +78,8 @@ planned after the first release (2026-10-30), each one opened only when its turn
 A spec is for a feature, or for several changes that together are significant: here, one that crosses
 many modules and public contracts at once (010) or opens a new security surface (011). Everything
 else is **an amendment**: an ADR and a stage in the spec that already owns the contract, as 002 did
-for the XML ceiling (ADR-8) and for `--recursive` (ADR-9). The amendments planned from the open
-issues are the `fetch` subject criterion (#77, spec 009) and the OAuth token read from a file (#73,
-spec 009). The sender by SPF domain or address range (#78, spec 003, ADR-8) is built and shipped in 1.5.0. `[fetch]` in the configuration
+for the XML ceiling (ADR-8) and for `--recursive` (ADR-9). The amendment planned from the open
+issues is the OAuth token read from a file (#73, spec 009). The sender by SPF domain or address range (#78, spec 003, ADR-8) is built and shipped in 1.5.0. `[fetch]` in the configuration
 and `fetch --json` (#75, specs 003 and 009) are built and shipped in 1.3.0, and the size of the HTML
 page and the JSON top-N (`--top N`, #71, specs 006 and 008) in 1.4.0. A bug fix, a refactor, a test or a documentation change gets no spec at all.
 

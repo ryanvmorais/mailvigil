@@ -174,13 +174,17 @@ signature changed (the parent parser split); if any other one fails, the code is
   `done`; the memory of the project updated in the same session.
 - [x] Zero dependencies still true: `[project].dependencies` is empty, `uv build` succeeds and the
   CI `package` job passes. — RNF-01
-- [ ] **Manual check by the maintainer, with a real mailbox (not in CI, nothing from it enters the
+- [x] **Manual check by the maintainer, with a real mailbox (not in CI, nothing from it enters the
   repository):** run `mailvigil fetch` against his own mailbox; compare the number matched with the
   DMARC report messages he can count by hand (this closes the risk of the subject criterion, open
   question 3); run it again and confirm that nothing is saved; run `mailvigil verdict` over the
   folder; confirm in the mail client that no message was marked as read. If a provider's subject
   does not match, the criterion changes in `imap.py` with a test, in a new PR. — RF-03, RF-04,
-  RF-07
+  RF-07 **Result:** 2026-10-31, a real Gmail mailbox (`imap.gmail.com`, app password), six report
+  messages from three receivers (Google, Microsoft, Yahoo): the first run matched and saved 6, the
+  second saved none and listed 6 as already saved, `verdict` over the folder read them (5 reports
+  and 1 duplicate, exit 3 "too early"), and the 6 messages stayed unread in the mail client. The
+  criterion stays as it is (issue #62, closed).
 - [x] Quality gate of the spec: `uv run ruff check .` → `uv run black --check .` → `uv run mypy` →
   `uv run pytest --cov`, then `uv build`. Record the result here, with the number of tests and the
   coverage. **Result:** 2026-10-28: ruff, black and mypy (34 source files) clean; 2629 tests passed and 1

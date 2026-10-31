@@ -53,8 +53,8 @@ __all__ = [
 # IMAP wants English month names whatever the locale, so the date is never built by ``strftime``.
 _MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 
-# RFC 7489 asks a report sender to write ``Report Domain:`` in the subject; the maintainer's first
-# real run checks that the providers do (spec 009, open question 3).
+# RFC 7489 asks a report sender to write ``Report Domain:`` in the subject (spec 009, open
+# question 3).
 _SUBJECT = '"Report Domain:"'
 
 # A literal is read in slices of this size, so the deadline is looked at between slices.

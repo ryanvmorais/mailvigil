@@ -357,7 +357,9 @@ recommendation; none was a guess to be left as is.
    check against the subjects of Google, Microsoft, Yahoo and others in the design. The risk is a
    provider that writes the subject differently and is silently missed; the alternative is to fetch
    every message in the date range and let the ingestion pick, which downloads the user's whole
-   mail and is rejected here.
+   mail and is rejected here. *Checked on 2026-10-31 (issue #62) against a real Gmail mailbox: the
+   criterion found all six report messages; the IMAP search ignores letter case (RFC 3501), so
+   `Report domain:` and `Report Domain:` are the same to it.*
 4. **A `--json` outcome for `fetch` (RF-08).** Recommended: no. The outcome is five numbers for a
    person, the exit code is the signal for a script, and every field added to `--json` is a public
    contract (006). Revisit if someone needs it. *Reopened on 2026-10-30 (issue #75) and answered
