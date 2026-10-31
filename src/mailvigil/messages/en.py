@@ -345,6 +345,10 @@ _HTML = HtmlMessages(
     show_numbers="Show the numbers",
     numbers_region="Messages per day",
     senders_region="Senders table",
+    other_sender=Plural("{n} other sender", "{n} other senders"),
+    senders_more=(
+        "Not listed here: {senders} ({messages}). mailvigil summary --json lists every sender."
+    ),
     failing_heading="Failing sources",
     next_each_service="each service listed below",
     next_unrecognized=(

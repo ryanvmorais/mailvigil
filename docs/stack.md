@@ -259,7 +259,7 @@ quoted), and validating the shape of the loaded dict before using it.
 ### `argparse`
 
 The command line: `--version` and the `summary`, `verdict` and `fetch` subcommands. `summary` and
-`verdict` share `PATH...`, `--config`, `--domain`, `--recursive`, `--json` and `--lang`; `--html` and `--output FILE`
+`verdict` share `PATH...`, `--config`, `--domain`, `--recursive`, `--json`, `--top N` and `--lang`; `--html` and `--output FILE`
 exist on `verdict` only, and `fetch` takes only `--lang` from the shared ones. `--lang` is parsed by a `type=` function that returns
 the language's message catalog, so a code that does not exist is argparse's own usage error (exit
 `2`) and the command never sees a string.

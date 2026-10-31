@@ -312,6 +312,30 @@ argparse's text, and the language is only known after parsing (Risk 4).
 - **Trade-off:** the contract has eight codes, not five, and the traceback is not shown. The line
   gives the class, file and line, which is what an issue needs; the message is left out on purpose.
 
+### ADR-8 — `--top N` trims the lists of the JSON, and only when asked (amendment of 2026-10-30, issue #71)
+
+- **Decision:** `--top N` (an integer of 1 or more) on both reading commands, taken from the
+  `reading` parent parser. `main` refuses it without a format that can use it, through
+  `parser.error` (exit 2), before any work: `summary` needs `--json`, `verdict` needs `--json` or
+  `--html` ("argument --top: requires --json or --html"). With `--json`, `summary_document` and
+  `verdict_document` take an optional `top` and keep the first `N` of each long list: `senders` and
+  `failing` of the summary, `recognized_failing` and `unrecognized_failing` of the verdict (they
+  are already sorted worst first). The document then gains one key, `top`, as
+  `{"limit": N, "left_out": {"<list>": k, ...}}` with a count for each trimmed list, zero included.
+  Without `--top` the key is absent and the document is byte-equal to the one of 1.3.x. The totals,
+  the rules, the answer and the exit code are computed from the whole summary before the cut.
+- **Alternatives:** a cut by default (a new `schema_version`, a major release); a `top` key always
+  present as `null`; `--limit`, which `fetch` already uses for mail; a percentage or a message
+  threshold instead of a count; trimming the text output too (it already stops at 10).
+- **Why:** the JSON is a contract and a script wants it whole (RF-04 stays true by default), while
+  a report under heavy spoofing can reach megabytes (10.6 MB of `summary --json` for 20 000
+  distinct failing sources, measured on synthetic data). A key that is only added when the option is used is
+  additive inside `schema_version` 1 and leaves every existing consumer untouched. The cut after
+  the verdict keeps the answer independent of the format, as ADR-6 asks.
+- **Trade-off:** a trimmed document is not the whole truth, so it says so inside itself; a script
+  that passes `--top` must read `top` to know what is missing. The option exists on `summary` and
+  `verdict` alike, one more word in the public contract (`docs/stability.md`).
+
 ## Impact on existing code
 
 - `render.py` and `render_verdict.py`: every English literal moves to the catalog and the functions

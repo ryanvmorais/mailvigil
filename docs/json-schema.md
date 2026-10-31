@@ -54,8 +54,8 @@ The keys, in order.
 | `earlier_p` | list of strings | Other `p` values seen in the period, oldest first |
 | `totals` | object | See `counts`: all the messages |
 | `recognized_messages` | integer | Messages of recognized senders |
-| `senders` | list of `sender` | Every row, the biggest first, with no display limit |
-| `failing` | list of `source` | Every failing source, the worst first, with no display limit |
+| `senders` | list of `sender` | Every row, the biggest first, with no display limit unless `--top` is given |
+| `failing` | list of `source` | Every failing source, the worst first, with no display limit unless `--top` is given |
 | `skipped` | list of `skipped` | The refused files, ordered by path |
 | `skipped_by_reason` | list of `skipped_by_reason` | The refusals per reason, the most frequent first |
 | `duplicates` | integer | Reports dropped as already seen |
@@ -165,8 +165,8 @@ The keys, in order.
 | `enforcing` | string or null | The latest published `p`; null without reports |
 | `deciding` | string or null | The id of the rule that decided the answer; null exactly when `answer` is `ready` |
 | `rules` | list of `rule` | Always five, in the order of the table below |
-| `recognized_failing` | list of `source` | Every failing source of a recognized sender, the worst first |
-| `unrecognized_failing` | list of `source` | Every other failing source, the worst first |
+| `recognized_failing` | list of `source` | Every failing source of a recognized sender, the worst first (unless `--top` is given) |
+| `unrecognized_failing` | list of `source` | Every other failing source, the worst first (unless `--top` is given) |
 | `notes` | list of `note` | What is worth saying and does not change the answer |
 | `left_out` | object | See `left_out` |
 
@@ -215,6 +215,23 @@ What the summary did not count. It never changes the answer.
 | `duplicates` | integer | Reports dropped as already seen |
 | `other_domain` | integer | Reports that belong to another domain |
 | `passed_over` | integer | Files a folder search did not read because of their name |
+
+## Trimming the lists with `--top N`
+
+The document keeps every entry by default. `--top N` (a whole number of 1 or more, with `--json`) keeps the first `N`
+entries of each long list, which are already the biggest or worst first: `senders` and `failing` in
+the `summary` document, `recognized_failing` and `unrecognized_failing` in the `verdict` document.
+
+A trimmed document gains one last key, `top`, an object with two keys: `limit`, the `N` that was
+given, and `left_out`, an object with one integer for each trimmed list (the entries that were
+dropped, `0` when the list was shorter than `N`). Without `--top` the key is absent and the document
+is the same bytes as before the option existed, so a consumer that ignores keys it does not know
+needs no change. Nothing outside the lists changes: the totals, the rules, the answer and the exit
+code are computed from everything the reports said.
+
+```json
+"top": {"limit": 2, "left_out": {"senders": 4, "failing": 4}}
+```
 
 ## The `fetch` document
 

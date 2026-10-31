@@ -31,6 +31,7 @@ uv run mailvigil --version
 uv run mailvigil summary --domain example.com path/to/reports   # or --config FILE
 uv run mailvigil verdict --domain example.com path/to/reports   # exit 0 ready, 3 too early, 4 not ready
 uv run mailvigil verdict --config FILE path/to/reports --json   # one JSON document, same exit code
+uv run mailvigil summary --config FILE path/to/reports --json --top 20   # the 20 worst of each list, and `top` says what was left out
 uv run mailvigil summary --config FILE path/to/reports --lang pt-BR   # the text in Portuguese
 uv run mailvigil verdict --config FILE path/to/reports --html > report.html   # one static page (spec 008)
 uv run mailvigil verdict --config FILE path/to/reports --html --output report.html   # the same, written as ASCII by the tool
@@ -72,7 +73,8 @@ src/mailvigil/
                      # (resolve_config, ingest → summarize → render, exit 0/1/2) and `verdict` (same
                      # load, then judge → render_verdict; exit 0 ready, 3 too early, 4 not ready);
                      # the exit code is decided before the format; a parent parser shares
-                     # paths/--config/--domain/--recursive/--json/--lang (`--lang` is parsed to a Messages);
+                     # paths/--config/--domain/--recursive/--json/--top/--lang (`--lang` is parsed to a Messages;
+                     # `--top N` needs `--json`, or `--html` on `verdict`, and is refused before any work);
                      # `--html` exists on `verdict` only and is refused together with `--json`;
                      # `--output FILE` (ADR-11) needs `--html` and `_write_page` writes it atomically;
                      # `fetch` (spec 009) is added by `cli_fetch.add_fetch_parser` and run by

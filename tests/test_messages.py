@@ -71,6 +71,7 @@ _PLACEHOLDERS: dict[str, frozenset[str]] = {
     "html.timeline_label": frozenset({"first", "last", "failing"}),
     "html.range_label": frozenset({"first", "last"}),
     "html.footer": frozenset({"version"}),
+    "html.senders_more": frozenset({"senders", "messages"}),
     "fetch.password_file_exposed": frozenset({"path"}),
     "refusals.no_domain": frozenset({"default"}),
     "refusals.domain_mismatch": frozenset({"wanted", "domain", "path"}),

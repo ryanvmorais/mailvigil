@@ -179,3 +179,19 @@ Behavior-neutral: the output is byte-equal to today's. No Portuguese is written 
   silent null-device stdout for a closed pipe; the README and `docs/json-schema.md` tables and the
   test that compares them gain the three rows. — RF-04, Resolved decision 7
 - [x] Quality gate. — ruff, black and mypy clean; `pytest --cov` green, 100% coverage (2026-10-29).
+
+## Amendment (2026-10-30, issue #71) — `--top N` (RF-01, ADR-8)
+
+- [x] `tests/test_render_json_top.py` and `tests/test_cli_top.py`, first: no `top` key without the
+  option and the same bytes as before; the first `N` of `senders` and `failing` (summary) and of
+  `recognized_failing` and `unrecognized_failing` (verdict); `top` last, with `limit` and a
+  `left_out` count per list, zero included; nothing outside the lists changes; the exit code is the
+  same with and without it; `summary --top` needs `--json` and `verdict --top` needs `--json` or
+  `--html` (exit 2, nothing printed); `0`, a negative number and text are exit 2. — RF-01, ADR-8
+- [x] `src/mailvigil/render_json.py` (`top` on both documents) and `src/mailvigil/cli.py` (`--top`
+  in the `reading` parent, the check in `_dispatch`); `tests/help_golden.py` and the offline-options
+  test follow the new help (the test now compares whole words, because `--top` starts like `--to`).
+  — ADR-8
+- [x] `docs/json-schema.md` (the `--top` section, the two list rows), `docs/stability.md`, `README.md`
+  and `README.pt-BR.md`, `CHANGELOG.md` `[Unreleased]`, `CLAUDE.md`, `docs/stack.md`. — ADR-8
+- [x] Quality gate. — ruff, black and mypy strict clean; `pytest --cov` green, 100% coverage (2026-10-30).

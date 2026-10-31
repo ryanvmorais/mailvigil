@@ -7,6 +7,22 @@ All notable changes to MailVigil are written here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **`--top N` trims the long lists of `--json` and of the HTML page, and says what it left out.** A
+  domain under heavy spoofing can have tens of thousands of failing sources (10.6 MB of JSON and
+  3.9 MB of page for 20,000, on synthetic data). With `--json`, `--top N` keeps the first `N` entries of
+  each list (`senders` and `failing`, or `recognized_failing` and `unrecognized_failing`) and adds a
+  last key, `top`, with the limit and how many entries each list left out. Without `--top` the
+  document is the same bytes as before. The answer and the exit code do not depend on it.
+
+### Changed
+
+- **The senders table of the `verdict --html` page stops at 50 rows.** A line after the table says
+  how many senders and messages are not listed and that `mailvigil summary --json` lists them all;
+  the total row still counts everything. `--top N` moves the stop. A page with up to 50 senders is
+  unchanged.
+
 ## [1.3.1] - 2026-10-30
 
 ### Fixed
