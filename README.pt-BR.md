@@ -47,7 +47,7 @@ digitados para a gravação e a espera entre as duas execuções foi cortada. A 
 
 O MailVigil é construído marco a marco, cada um desenhado primeiro como uma spec, em
 [`specs/`](specs/). Os marcos são o histórico da construção, não versões publicadas: a `1.0.0` é a
-primeira versão e contém do `v0.1` ao `v0.9`.
+primeira versão e contém do `v0.1` ao `v0.9`; o `v0.10` veio com a `1.6.0`.
 
 | Marco | Foco | Status |
 |---|---|---|
@@ -60,6 +60,7 @@ primeira versão e contém do `v0.1` ao `v0.9`.
 | `v0.7` | `mailvigil verdict --html`: uma página estática com o veredito, cada regra diante do seu limite e as mensagens dia a dia; sem script, sem rede, aberta direto do disco | entregue |
 | `v0.8` | `mailvigil fetch`: baixa as mensagens de relatório de uma caixa de correio por IMAP para uma pasta, opt-in, somente leitura, sempre sobre TLS verificado | entregue |
 | `v0.9` | Endurecimento antes do release: limites para a contagem e o período de um relatório, um dia conta como coberto por tempo, avisos para dados velhos e para um remetente de relatórios que ficou quieto, e códigos de saída distintos para um bug, Ctrl+C e um pipe fechado | entregue |
+| `v0.10` | Vários domínios numa execução: um arquivo com `[[domains]]` ou `--domain` repetido, um resumo e um veredito por domínio, o `--json` como um envelope só, o `--html` como uma pasta de páginas, e domínios internacionalizados escritos como se leem | entregue |
 
 Fora do plano, de propósito: indexar no Elasticsearch, um painel web servido pela ferramenta e o
 envio de e-mail, cada um com o seu motivo em [Não-objetivos permanentes][non-goals] (em inglês).

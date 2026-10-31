@@ -7,7 +7,7 @@ This file guides Claude Code (claude.ai/code) when working in this repository.
 MailVigil is an open-source command-line tool that reads DMARC aggregate reports (RUA, usually
 `.zip`, `.gz` or `.xml`, or still attached to the mail in an `.eml` or `.mbox`) and says, in plain
 language, who is sending mail as a domain and whether it is safe to move the policy to `p=reject`. Python `>=3.12`, standard library only (zero runtime
-dependencies), offline. Version 1.6.0 is on PyPI (1.0.0 on 2026-10-29, 1.1.0 to 1.5.0 on 2026-10-30, 1.6.0 on 2026-10-31; `v0.1` to `v0.9` are the milestones of the build, see the README): the CLI answers `mailvigil --version`, `mailvigil summary`
+dependencies), offline. Version 1.7.0 is on PyPI (1.0.0 on 2026-10-29, 1.1.0 to 1.5.0 on 2026-10-30, 1.6.0 and 1.7.0 on 2026-10-31; `v0.1` to `v0.9` are the milestones of the build, see the README): the CLI answers `mailvigil --version`, `mailvigil summary`
 and `mailvigil verdict` (report ingestion, configuration, sender identification, the summary, the
 verdict on `p=reject` and their texts are built and wired); `--json`, `--lang en|pt-BR` and the stable
 exit codes (a public contract, `docs/json-schema.md`) are built (spec 006 is done), and so is the
@@ -120,7 +120,7 @@ src/mailvigil/
                      # internal: not in `--json`), what each reporter sent (`ReporterActivity`, internal),
                      # the SPF domains that passed on a row not recognized (`spf_domains`, ADR-8);
                      # a day is covered when the merged report periods cover 12 h of it; never imports render
-  render.py          # render_summary(summary, config_source, messages) → 80-column ASCII text;
+  render.py          # render_summary(summary, config_source, messages) → 80-column text;
                      # no_reports_message; also the public helpers fit, address, format_share,
                      # share_tenths
   verdict.py         # worst_answer(verdicts): the exit code of several domains;
@@ -128,7 +128,7 @@ src/mailvigil/
                      # with the four threshold constants, Notes, LeftOut (what the summary did not
                      # count; it never changes the answer); integer arithmetic; never imports a
                      # text module (spec 005)
-  render_verdict.py  # render_verdict(verdict, messages) → 80-column ASCII text: reason, rules table,
+  render_verdict.py  # render_verdict(verdict, messages) → 80-column text: reason, rules table,
                      # notes, what was left out, next step
   render_json.py     # summary_document / verdict_document / fetch_document (+ the `domains`
                      # envelopes) → dict, dumps → ASCII JSON, no language
@@ -157,7 +157,7 @@ src/mailvigil/
                      # streams: UTF-8 on both and, on Windows, a console); language_by_code;
                      # imports no renderer
 tests/               # pytest, one test file per module (test_reports_*.py, test_text.py, test_config.py,
-                     # test_senders.py, test_summary.py, test_verdict.py, test_render*.py, test_messages.py,
+                     # test_senders.py, test_summary.py, test_verdict.py, test_render*.py, test_messages*.py,
                      # test_json_schema_doc.py, test_cli_*.py, test_htmlkit.py, test_html_*.py,
                      # test_fetch_*.py, test_smoke.py, test_gitignore.py, test_readme_*.py,
                      # test_properties.py (Hypothesis: the readers only refuse and a parsed report

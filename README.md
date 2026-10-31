@@ -44,7 +44,7 @@ two runs is cut. The recording is [`docs/demo/verdict.cast`](https://github.com/
 
 MailVigil is built milestone by milestone, each one designed as a spec first, under
 [`specs/`](https://github.com/ryanvmorais/mailvigil/tree/main/specs). The milestones are the history of the build, not published versions: `1.0.0` is
-the first release and contains `v0.1` to `v0.9`.
+the first release and contains `v0.1` to `v0.9`; `v0.10` came with `1.6.0`.
 
 | Milestone | Focus | Status |
 |---|---|---|
@@ -57,6 +57,7 @@ the first release and contains `v0.1` to `v0.9`.
 | `v0.7` | `mailvigil verdict --html`: one static page with the verdict, each rule against its limit and the messages day by day; no script, no network, opened from disk | shipped |
 | `v0.8` | `mailvigil fetch`: download the report messages from a mailbox over IMAP into a folder, opt-in, read-only, always over verified TLS | shipped |
 | `v0.9` | Hardening before the release: bounds on a report's count and period, a day counts as covered by time, notes for old data and for a reporter that went quiet, and distinct exit codes for a bug, Ctrl+C and a closed pipe | shipped |
+| `v0.10` | Several domains in one run: a `[[domains]]` file or a repeated `--domain`, one summary and one verdict per domain, `--json` as one envelope, `--html` as a folder of pages, and internationalized domains written as they are read | shipped |
 
 Not planned, on purpose: indexing in Elasticsearch, a web dashboard served by the tool and sending
 e-mail, each with its reason in [Permanent non-goals][non-goals].

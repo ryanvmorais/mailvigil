@@ -5,6 +5,10 @@ All notable changes to MailVigil are written here. The format follows
 [Semantic Versioning](https://semver.org/); what counts as a breaking change is in
 [docs/stability.md](docs/stability.md).
 
+The `v0.1` to `v0.10` milestones in the README are the steps the project was built in, each
+designed as a spec under [`specs/`](specs/). None of them was released on its own: `1.0.0` is the
+first release and contains `v0.1` to `v0.9`, and `v0.10` (several domains) arrived in `1.6.0`.
+
 ## [Unreleased]
 
 ## [1.7.0] - 2026-10-31

@@ -51,8 +51,9 @@ No phase starts without the maintainer's explicit approval of the previous one.
 ## Roadmap
 
 Delivery is the milestone of the build (`v0.x`), as in the README. No milestone was published: the
-first release is `1.0.0` and contains them all. `v0.9` (hardening before the release) has no spec of
-its own: it amends 002, 004, 005, 006 and 009.
+first release is `1.0.0` and contains `v0.1` to `v0.9`; `v0.10` came with `1.6.0`. `v0.9`
+(hardening before the release) has no spec of its own: it amends 002, 004, 005, 006 and 009. A
+spec still to be built has no milestone yet (`—`).
 
 | Spec | Scope | Delivery | Status |
 |---|---|---|---|
@@ -65,16 +66,12 @@ its own: it amends 002, 004, 005, 006 and 009.
 | [`007-mail-message-input`](007-mail-message-input/) | read `.eml` and `.mbox` files: the report attachment is taken out of the message in memory and goes through the same reader, parser, filter and dedup | `v0.6` | **done** |
 | [`008-html-report`](008-html-report/) | a single static HTML file with the summary and the verdict (`--html` on `verdict`): no server, no script, no network. Interface decided on 2026-10-28 from a mockup: the verdict first, then each rule as a meter against its limit (alternative B), with the stacked bar of the message mix (from C); WebVigil's visual language (slate palette, 0.5 rem radius, icon plus text on every badge, 4.5:1 contrast, dark mode from the system); a per-day timeline drawn from the reports' own dates, in inline SVG | `v0.7` | **done** |
 | [`009-imap-fetch`](009-imap-fetch/) | `mailvigil fetch`: download the report messages from a mailbox into a folder, opt-in; `summary` and `verdict` stay offline | `v0.8` | **done** |
+| [`010-multiple-domains`](010-multiple-domains/) | more than one domain per run, one summary and one verdict per domain, what the `verdict` exit code means for several answers, and internationalized domains typed as written (issue #79) | `v0.10` | **done** |
+| `011-oauth-login` | the full OAuth 2 flow of `fetch` (XOAUTH2) for providers that turned passwords off, with its own secrets model and `/auditoria-seguranca` (issue #73); the first step, a token read from a file, is an amendment of 009, not this spec | — | **planned** |
 
 Specs 007 to 009 were planned on 2026-10-28, after the first six were done. 009 depends on 007: the
-fetch only saves raw messages and leaves the reading to the ingestion.
-
-Planned after the first release (2026-10-30), each one opened only when its turn comes:
-
-| Spec | Scope | Delivery | Status |
-|---|---|---|---|
-| [`010-multiple-domains`](010-multiple-domains/) | more than one domain per run, one summary and one verdict per domain, what the `verdict` exit code means for several answers, and internationalized domains typed as written (issue #79) | `1.6.0` | **done** |
-| `011-oauth-login` | the full OAuth 2 flow of `fetch` (XOAUTH2) for providers that turned passwords off, with its own secrets model and `/auditoria-seguranca` (issue #73); the first step, a token read from a file, is an amendment of 009, not this spec | after 1.5.0 | **planned** |
+fetch only saves raw messages and leaves the reading to the ingestion. Specs 010 and later were
+planned after the first release (2026-10-30), each one opened only when its turn comes.
 
 ### When an issue gets a spec
 
@@ -114,6 +111,6 @@ one means writing a spec that answers the reason, not adding a flag.
 > ⚠️ **Exit codes and `--json` are public contract** once released. Changing them is a breaking
 > change (spec 006).
 > Since stage 1 of 006 the codes are no longer provisional and `--json` exists on `summary` and
-> `verdict`; the table lives in `cli.py` and the schema in `docs/json-schema.md`.
+> `verdict`; the table lives in `cli_common.py` and the schema in `docs/json-schema.md`.
 
 There is no gold-standard spec yet; once `001-foundation` is `done`, use it as the format reference.
