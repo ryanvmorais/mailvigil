@@ -11,6 +11,7 @@ replaces text modules and not these rules. It does no I/O, reads no clock and ne
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import IntEnum, StrEnum
@@ -411,3 +412,28 @@ def judge(summary: Summary, now: datetime | None = None) -> Verdict:
             passed_over=summary.passed_over,
         ),
     )
+
+
+def worst_answer(verdicts: Iterable[Verdict]) -> Answer:
+    """
+    Sum up the verdicts of several domains as the answer the exit code carries (spec 010, ADR-6).
+
+    A problem beats missing data, as it does inside one verdict: ``READY`` means every domain is
+    ready, so it is safe to move all of them.
+
+    Args:
+        verdicts (Iterable[Verdict]): The verdicts of the run; at least one.
+
+    Returns:
+        Answer: ``NOT_READY`` if any verdict is, else ``TOO_EARLY`` if any is, else ``READY``.
+
+    Raises:
+        ValueError: If there is no verdict, which is a caller's mistake.
+    """
+    answers = {verdict.answer for verdict in verdicts}
+    if not answers:
+        raise ValueError("worst_answer needs at least one verdict")
+    for answer in (Answer.NOT_READY, Answer.TOO_EARLY):
+        if answer in answers:
+            return answer
+    return Answer.READY

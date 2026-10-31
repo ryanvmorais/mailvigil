@@ -29,6 +29,7 @@ from mailvigil.render_verdict import (
     next_sentence,
     note_sentence,
     reason_sentence,
+    render_tally,
     render_verdict,
 )
 from mailvigil.reports import PolicyPublished
@@ -1095,3 +1096,62 @@ def test_rule_five_lists_the_spf_domains_that_passed_under_the_owner() -> None:
     lines = lines_of(make_verdict(sources=sources))
     assert "  198.51.100.1  unrecognized: 40 failing messages; SPF domain a.example.com" in lines
     assert "  198.51.100.2  unrecognized: 30 failing messages; SPF domains a.io, b.io" in lines
+
+
+# ---------------------------------------------------------------------------
+# The tally of several domains (spec 010, RF-05, ADR-5)
+# ---------------------------------------------------------------------------
+
+
+def verdicts_of(ready: int, early: int, not_ready: int) -> list[Verdict]:
+    """
+    Judge one domain per answer asked for.
+
+    Args:
+        ready (int): How many domains are ready.
+        early (int): How many are too early.
+        not_ready (int): How many are not ready.
+
+    Returns:
+        list[Verdict]: The verdicts, ready first, then too early, then not ready.
+    """
+    return (
+        [make_verdict() for _ in range(ready)]
+        + [make_verdict(days=10) for _ in range(early)]
+        + [make_verdict(sources=(known(3),)) for _ in range(not_ready)]
+    )
+
+
+@pytest.mark.parametrize(
+    ("counts", "line"),
+    [
+        ((1, 0, 0), "1 domain: 1 ready"),
+        ((3, 0, 0), "3 domains: 3 ready"),
+        ((0, 2, 0), "2 domains: 2 too early"),
+        ((0, 0, 1), "1 domain: 1 not ready"),
+        ((1, 1, 0), "2 domains: 1 ready, 1 too early"),
+        ((1, 0, 1), "2 domains: 1 ready, 1 not ready"),
+        ((0, 1, 1), "2 domains: 1 too early, 1 not ready"),
+        ((2, 1, 2), "5 domains: 2 ready, 1 too early, 2 not ready"),
+    ],
+)
+def test_the_tally_counts_the_answers_and_leaves_out_the_zeros(
+    counts: tuple[int, int, int], line: str
+) -> None:
+    assert render_tally(verdicts_of(*counts), ENGLISH) == line
+
+
+def test_the_tally_does_not_depend_on_the_order_of_the_verdicts() -> None:
+    verdicts = verdicts_of(2, 1, 2)
+    assert render_tally(list(reversed(verdicts)), ENGLISH) == render_tally(verdicts, ENGLISH)
+
+
+def test_the_tally_is_one_ascii_line_inside_the_screen() -> None:
+    line = render_tally(verdicts_of(20, 15, 15), ENGLISH)
+    assert "\n" not in line
+    assert line.isascii()
+    assert len(line) <= 80
+
+
+def test_the_tally_defaults_to_english() -> None:
+    assert render_tally(verdicts_of(1, 1, 0)) == render_tally(verdicts_of(1, 1, 0), ENGLISH)

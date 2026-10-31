@@ -40,6 +40,10 @@ _LIMIT = 10
 _LABEL_MIN = 10
 _LABEL_MAX = len("255.255.255.255 (failing signature)")
 
+# The line between the blocks of two domains: as wide as the screen allows, and plain enough that
+# a person scrolling sees where one domain ends (spec 010, ADR-5).
+RULE = "=" * _WIDTH
+
 # The English phrase of each refusal, under the name the 004 tests know it by. The phrases live in
 # the catalog; the code below reads them from the ``Messages`` it is given.
 _REASON_PHRASES = ENGLISH.summary.reasons
@@ -632,25 +636,53 @@ def render_summary(
     return "\n\n".join("\n".join(lines) for lines in sections)
 
 
-def no_reports_message(result: IngestionResult, domain: str, messages: Messages = ENGLISH) -> str:
+def join_blocks(blocks: Sequence[str]) -> str:
+    """
+    Set the texts of several domains apart by a rule line (spec 010, ADR-5).
+
+    Args:
+        blocks (Sequence[str]): The text of each domain, already rendered, without a trailing
+            newline.
+
+    Returns:
+        str: The blocks in order, each pair separated by a blank line, the rule and a blank line.
+            One block comes back unchanged, so a one-domain run prints what it always printed.
+    """
+    return f"\n\n{RULE}\n\n".join(blocks)
+
+
+def no_reports_message(
+    result: IngestionResult, domains: Sequence[str], messages: Messages = ENGLISH
+) -> str:
     """
     Explain an empty result, for standard error (RF-10).
 
     The counts of what was refused and filtered make the cause visible: a wrong extension, a report
-    of another domain, a folder with nothing in it.
+    of another domain, a folder with nothing in it. What is counted is shared by the whole run, so
+    the same lines serve one domain or many (spec 010, ADR-11).
 
     Args:
-        result (IngestionResult): What ``ingest`` returned, with no report kept.
-        domain (str): The domain the reports were filtered for.
+        result (IngestionResult): What ``ingest`` returned, with no report kept; for several
+            domains, any one of the results, since the shared parts are the same in all.
+        domains (Sequence[str]): The domains the reports were filtered for; at least one.
         messages (Messages, optional): The language. Default: English.
 
     Returns:
-        str: The domain, the skipped files with their reasons, the duplicates and the reports of
-            other domains, without a trailing newline.
+        str: The domain (or how many there are), the skipped files with their reasons, the
+            duplicates and the reports of other domains, without a trailing newline.
+
+    Raises:
+        ValueError: If there is no domain, which is a caller's mistake.
     """
+    if not domains:
+        raise ValueError("no_reports_message needs at least one domain")
     text = messages.refusals
-    summary = summarize(result, Config(domain, MappingProxyType({})))
-    lines = [text.no_reports.format(domain=fit(domain, _room(text.no_reports, domain="")))]
+    summary = summarize(result, Config(domains[0], MappingProxyType({})))
+    if len(domains) == 1:
+        first = text.no_reports.format(domain=fit(domains[0], _room(text.no_reports, domain="")))
+    else:
+        first = text.no_reports_many.format(count=len(domains))
+    lines = [first]
     if not (summary.skipped or summary.duplicates or summary.other_domain):
         # A folder yields only the providers' attachment names, so a renamed file is not "missing
         # from the paths": say how to read it anyway.
