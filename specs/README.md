@@ -73,7 +73,7 @@ Planned after the first release (2026-10-30), each one opened only when its turn
 
 | Spec | Scope | Delivery | Status |
 |---|---|---|---|
-| `010-multiple-domains` | more than one domain per run, one summary and one verdict per domain, what the `verdict` exit code means for several answers, and internationalized domains typed as written (issue #79) | after 1.5.0 | **planned** |
+| [`010-multiple-domains`](010-multiple-domains/) | more than one domain per run, one summary and one verdict per domain, what the `verdict` exit code means for several answers, and internationalized domains typed as written (issue #79) | after 1.5.0 | **approved** |
 | `011-oauth-login` | the full OAuth 2 flow of `fetch` (XOAUTH2) for providers that turned passwords off, with its own secrets model and `/auditoria-seguranca` (issue #73); the first step, a token read from a file, is an amendment of 009, not this spec | after 1.5.0 | **planned** |
 
 ### When an issue gets a spec
