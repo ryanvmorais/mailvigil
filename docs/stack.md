@@ -6,7 +6,7 @@ and the handful of concepts worth learning first if it is new to you.
 This is not exhaustive: the full version graph is pinned in `uv.lock`, and per-feature decisions
 live in the `### ADR-N` blocks of `specs/*/design.md`. This page is the map: the *shape* of the
 project and the reasoning behind each piece. Entries marked **(planned)** are decided but not
-built yet. The project is released (1.4.0, on PyPI): the report-ingestion layer (`mailvigil.reports`), the
+built yet. The project is released (1.5.0, on PyPI): the report-ingestion layer (`mailvigil.reports`), the
 configuration loader, the sender identification, the summary, the verdict and their texts are built
 and tested (it reads `.eml` and `.mbox` too, spec 007), and `mailvigil summary` and `mailvigil
 verdict` run them end to end, in English or Portuguese (`--lang`), as text or as one JSON document
@@ -32,7 +32,7 @@ report files (.zip, .gz, .xml)        mail files (.eml, .mbox)
  Report and Record objects (ipaddress, sanitized text)   ◄── built
         │
         ▼
- sender named from the DKIM selector ◄── a TOML file (tomllib)   ◄── built
+ sender named from a DKIM selector, an SPF domain or an address range ◄── a TOML file (tomllib)   ◄── built
         │
         ▼
  summary per sender and per situation ──► 80-column terminal text   ◄── built
@@ -240,8 +240,9 @@ library and handles IPv4 and IPv6.
 
 ### `tomllib`
 
-Reads the configuration file: the domain, the map from DKIM selector to service name and the
-`[fetch]` table (host, user, port and folder of the mailbox; never the password).
+Reads the configuration file: the domain, the DKIM selector, SPF domain and address range maps
+(`[senders]`, `[spf]`, `[ips]`) to service names and the `[fetch]` table (host, user, port and
+folder of the mailbox; never the password).
 `mailvigil/config.py` reads the file as bytes (capped at 64 KiB), decodes it as strict UTF-8,
 parses it with `tomllib.loads` and then checks the shape of the result by hand. Every refusal is a
 `ConfigError` with a typed reason, never a stack trace.
