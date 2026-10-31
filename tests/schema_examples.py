@@ -1,13 +1,14 @@
 """
 The values behind the examples of ``docs/json-schema.md`` (spec 006, RF-03).
 
-The page shows the real output for these three values, and ``test_json_schema_doc.py`` rebuilds it
+The page shows the real output for these values, and ``test_json_schema_doc.py`` rebuilds it
 from here and compares it field by field. Everything is invented: ``example.com``, the service
 ``Example Mailer`` and the documentation addresses (RNF-06).
 """
 
 from __future__ import annotations
 
+import dataclasses
 from pathlib import Path
 
 from tests.test_render_json import make_summary
@@ -95,3 +96,29 @@ def example_fetch() -> FetchOutcome:
         FetchOutcome: The six numbers.
     """
     return FetchOutcome(matched=12, saved=9, already=2, too_large=0, skipped=0, left=1)
+
+
+def example_summaries() -> tuple[Summary, Summary]:
+    """
+    Build the summaries of the several-domains example: a short run and a domain without reports.
+
+    Returns:
+        tuple[Summary, Summary]: ``example.com`` with three days of reports, and ``example.net``
+            with none.
+    """
+    return (
+        make_summary(days=3, ok=120),
+        dataclasses.replace(make_summary(days=0), domain="example.net"),
+    )
+
+
+def example_verdicts() -> tuple[Verdict, Verdict]:
+    """
+    Build the verdicts of the several-domains example: one not ready and one too early.
+
+    Returns:
+        tuple[Verdict, Verdict]: ``example.com`` (the verdict of the example above) and
+            ``example.net``, which has no reports; the worst answer is ``not_ready``.
+    """
+    empty = dataclasses.replace(make_summary(days=0), domain="example.net")
+    return example_verdict(), judge(empty)

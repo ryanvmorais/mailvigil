@@ -2,7 +2,9 @@
 The JSON documents: ``Summary``, ``Verdict`` and ``FetchOutcome`` as data a script can rely on.
 
 ``summary_document``, ``verdict_document`` and ``fetch_document`` turn the frozen values into plain
-``dict``s, key by key, and ``dumps`` writes one as JSON. The mapping is written by hand, type by
+``dict``s, key by key, and ``dumps`` writes one as JSON. A run of several domains wraps the
+one-domain documents in an envelope (``summaries_document``, ``verdicts_document``; spec 010,
+ADR-7). The mapping is written by hand, type by
 type, so the public shape is a decision and not a by-product of the field names of the model
 (ADR-2): a field renamed inside ``summary.py`` does not change the contract. Nothing is computed
 here: every number is read from the value it came from, a share is never a field (RF-02), and a
@@ -19,7 +21,7 @@ from typing import Final
 from mailvigil.fetch.model import FetchOutcome
 from mailvigil.reports import PolicyPublished, SkippedFile
 from mailvigil.summary import Counts, FailingSource, Period, SenderRow, Summary
-from mailvigil.verdict import LeftOut, Note, Rule, RuleId, Verdict
+from mailvigil.verdict import LeftOut, Note, Rule, RuleId, Verdict, worst_answer
 
 # ---------------------------------------------------------------------------
 # The contract
@@ -360,6 +362,61 @@ def verdict_document(verdict: Verdict, top: int | None = None) -> dict[str, obje
             top,
             {"recognized_failing": recognized_out, "unrecognized_failing": unrecognized_out},
         ),
+    }
+
+
+def summaries_document(
+    summaries: Sequence[Summary], config_source: str | None, top: int | None = None
+) -> dict[str, object]:
+    """
+    Wrap the summaries of a run of several domains in one document (spec 010, ADR-7).
+
+    Each element of ``domains`` is the document a run of that one domain prints, so a script that
+    reads one reads the other; the envelope adds nothing of its own beyond the version and the
+    command. ``schema_version`` stays ``1``: the envelope is a new shape, reached only by naming
+    two or more domains, and no existing document changes.
+
+    Args:
+        summaries (Sequence[Summary]): One summary per domain, in the order of the run.
+        config_source (str | None): The configuration file as the user typed it, ``None`` when
+            there was none; every element carries it.
+        top (int | None, optional): Passed to each element, which then says in its own ``top`` key
+            what it left out. Default: keep every entry.
+
+    Returns:
+        dict[str, object]: ``schema_version``, ``command`` and ``domains``, in that order.
+    """
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "command": "summary",
+        "domains": [summary_document(summary, config_source, top) for summary in summaries],
+    }
+
+
+def verdicts_document(verdicts: Sequence[Verdict], top: int | None = None) -> dict[str, object]:
+    """
+    Wrap the verdicts of a run of several domains in one document (spec 010, ADR-7).
+
+    The envelope carries the worst answer, the one the exit code stands for (ADR-6), so a script
+    reads the meaning of the code from the document.
+
+    Args:
+        verdicts (Sequence[Verdict]): One verdict per domain, in the order of the run.
+        top (int | None, optional): Passed to each element, which then says in its own ``top`` key
+            what it left out. Default: keep every entry.
+
+    Returns:
+        dict[str, object]: ``schema_version``, ``command``, ``answer`` and ``domains``, in that
+            order.
+
+    Raises:
+        ValueError: When ``verdicts`` is empty: a run always has a domain.
+    """
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "command": "verdict",
+        "answer": worst_answer(verdicts).value,
+        "domains": [verdict_document(verdict, top) for verdict in verdicts],
     }
 
 

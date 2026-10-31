@@ -13,9 +13,22 @@ import json
 import re
 from pathlib import Path
 
-from tests.schema_examples import CONFIG_SOURCE, example_fetch, example_summary, example_verdict
+from tests.schema_examples import (
+    CONFIG_SOURCE,
+    example_fetch,
+    example_summaries,
+    example_summary,
+    example_verdict,
+    example_verdicts,
+)
 
-from mailvigil.render_json import fetch_document, summary_document, verdict_document
+from mailvigil.render_json import (
+    fetch_document,
+    summaries_document,
+    summary_document,
+    verdict_document,
+    verdicts_document,
+)
 
 _PAGE = Path(__file__).resolve().parent.parent / "docs" / "json-schema.md"
 
@@ -33,6 +46,8 @@ _CHILDREN: dict[str, dict[str, str | list[str]]] = {
         "skipped_by_reason": ["skipped_by_reason"],
     },
     "sender": {"counts": "counts"},
+    "summaries": {"domains": ["summary"]},
+    "verdicts": {"domains": ["verdict"]},
     "verdict": {
         "rules": ["rule"],
         "recognized_failing": ["source"],
@@ -129,6 +144,20 @@ def test_the_fetch_example_is_the_real_output() -> None:
     assert _example("A fetch") == json.loads(json.dumps(real))
 
 
+def test_the_several_summaries_example_is_the_real_output() -> None:
+    """The page shows what ``summaries_document`` writes for the example values."""
+    real = summaries_document(example_summaries(), CONFIG_SOURCE)
+
+    assert _example("Several summaries") == json.loads(json.dumps(real))
+
+
+def test_the_several_verdicts_example_is_the_real_output() -> None:
+    """The page shows what ``verdicts_document`` writes for the example values."""
+    real = verdicts_document(example_verdicts())
+
+    assert _example("Several verdicts") == json.loads(json.dumps(real))
+
+
 def test_every_key_of_the_summary_document_is_documented_in_order() -> None:
     """No key can reach the summary document, at any level, without a row on the page."""
     documented = _documented_keys()
@@ -160,6 +189,26 @@ def test_every_key_of_the_verdict_document_is_documented_in_order() -> None:
     assert seen == {"verdict", "rule", "source", "note", "left_out"}
 
 
+def test_every_key_of_the_summaries_envelope_is_documented_in_order() -> None:
+    """The envelope and, under it, every element are checked against the page."""
+    documented = _documented_keys()
+    seen: set[str] = set()
+
+    _walk(summaries_document(example_summaries(), CONFIG_SOURCE), "summaries", documented, seen)
+
+    assert {"summaries", "summary", "summary.config", "counts"} <= seen
+
+
+def test_every_key_of_the_verdicts_envelope_is_documented_in_order() -> None:
+    """The envelope and, under it, every element are checked against the page."""
+    documented = _documented_keys()
+    seen: set[str] = set()
+
+    _walk(verdicts_document(example_verdicts()), "verdicts", documented, seen)
+
+    assert {"verdicts", "verdict", "rule", "left_out"} <= seen
+
+
 def test_every_key_of_the_fetch_document_is_documented_in_order() -> None:
     """No key can reach the fetch document without a row on the page."""
     documented = _documented_keys()
@@ -189,6 +238,8 @@ def test_the_page_documents_nothing_the_documents_do_not_use() -> None:
         "rule",
         "note",
         "left_out",
+        "summaries",
+        "verdicts",
         "fetch",
     }
 
