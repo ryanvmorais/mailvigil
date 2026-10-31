@@ -336,6 +336,88 @@ argparse's text, and the language is only known after parsing (Risk 4).
   that passes `--top` must read `top` to know what is missing. The option exists on `summary` and
   `verdict` alike, one more word in the public contract (`docs/stability.md`).
 
+### ADR-9 — The Portuguese text has accents when the stream is UTF-8, and is folded to ASCII otherwise (amendment of 2026-10-31, issue #149)
+
+Supersedes Resolved decision 4 ("the Portuguese text is ASCII only"). What was measured comes first,
+because the decision rests on it.
+
+**What the streams do with an accented letter** (Python 3.12.13 on Windows 11 in Brazilian
+Portuguese: OEM code page 850, ANSI 1252; Windows PowerShell 5.1; the text `não domínio relatório`):
+
+| Where the text goes | `sys.stdout.encoding` | What the reader sees |
+| --- | --- | --- |
+| Console, run directly (cmd.exe, PowerShell, Windows Terminal) | `utf-8` (the console API, PEP 528), `isatty` true | Correct, whatever `chcp` says. Measured by the maintainer on Python 3.15.2 in cmd.exe, chcp 850. |
+| Python 3.15 (UTF-8 mode on by default), cmd.exe `> file` then `type file`, chcp 850 | `utf-8`, `isatty` false | The file holds correct UTF-8 (`c3 a3`), but the reader decodes in cp850: `n├úo dom├¡nio`. A UTF-8 stream is not a reader that agrees. |
+| cmd.exe `>` or `\| more`, `chcp` 850, 437, 1252 or 65001 | `cp1252` in all four | The file holds cp1252; read as cp850 it shows `nÒo domÝnio`. `chcp` changes nothing. |
+| PowerShell 5.1 `>` | `cp1252` | PowerShell decodes the pipe with the OEM page and writes UTF-16: `nÒo domÝnio`. |
+| PowerShell 5.1 `\| Out-File -Encoding utf8` | `cp1252` | `nÒo domÝnio` |
+| PowerShell 5.1 with `PYTHONUTF8=1`, OEM 850 | `utf-8` | `n├úo dom├¡nio`; right only when `[Console]::OutputEncoding` is UTF-8 too |
+| Git Bash `\| cat` | `cp1252` | Bytes `6e e3 6f`; a UTF-8 terminal shows `n�o` |
+| Git Bash with `PYTHONUTF8=1` | `utf-8` | Correct |
+| A stream the code page cannot hold (cp437 lacks `ã õ Á À Â Ã Ê Í Ó Ô Õ Ú`; ASCII lacks all) | any | `cli_common.write` turns the letter into `?` (the layout keeps its width; the word reads wrong) |
+
+Two findings. **Layout never breaks**: every width in `render.py`, `render_verdict.py` and
+`render_fetch.py` is `len()` of a `str`, so it counts characters, and a precomposed `ã` is one; a
+letter replaced by `?` is one as well. **Text can still be wrong**: off the console, Python writes
+in the locale's ANSI page while the reader decodes in the OEM page or in UTF-8, and nothing in the
+stream says which reader is on the other end. "The encoding can hold `ã`" (cp1252) is therefore not
+the same as "the reader will show `ã`", and on Windows neither is "the stream is UTF-8": Python 3.15
+(UTF-8 mode by default), `PYTHONUTF8=1` and `PYTHONIOENCODING` all make a pipe or a file UTF-8 while
+`cmd.exe`, `more` and `type` still decode with the OEM page. The one case where the two ends agree
+is a **console** (a tty), where Python talks to the console API. On Linux and macOS a UTF-8 stream
+is the norm for both ends, a pipe included.
+
+- **Decision:**
+  1. `PORTUGUESE` is written with accents, in NFC, using only the letters `á à â ã é ê í ó ô õ ú ü
+     ç` and their capitals; no other character outside ASCII (no typographic quote, dash or
+     ellipsis).
+  2. A new `messages/fold.py` holds `fold_ascii(messages)`: the same catalog with every accent
+     removed (NFD, then the combining marks dropped). The fold is one character for one, so no
+     width changes, and it walks the frozen dataclasses, the `Plural` pairs and the mappings, so a
+     new field is covered without a line of code. `PORTUGUESE_ASCII = fold_ascii(PORTUGUESE)`.
+  3. The CLI picks the catalog once per run, after parsing: the accented one when **both** standard
+     output and standard error report the encoding `utf-8` (`codecs.lookup(name).name`) **and**,
+     on Windows (`sys.platform == "win32"`), are a console (`isatty()`); the folded one otherwise.
+     So on Windows only a console gets the accents, and a pipe or a file gets 1.6.0's text whatever
+     the Python version; on Linux and macOS a UTF-8 stream is enough. The rule is one small
+     function of the two streams and the platform, so a test passes it fakes. English has no
+     accents and is not touched. Both streams, because a refusal line goes to standard error and
+     the text to standard output, and `args.lang` is one catalog.
+  4. `--html` always uses the accented catalog. The page is ASCII bytes with numeric character
+     references (`htmlkit.py`), written by the tool (`--output`) or redirected, and never goes
+     through the console encoding. It carries the full text even when the terminal got the folded
+     one.
+  5. `cli_common.write` is unchanged: `errors="replace"` stays the net for what the catalog does not
+     control (a service name, a path). The fold applies to the catalog only, never to text from a
+     report or a configuration file.
+  6. No new option, no new language code, no environment variable: `--lang pt-BR` is the same
+     command, and the stream decides.
+- **Answers to the seven questions of the issue:** (1) the table above; (2) `?` is good enough for a
+  name, not for the catalog's own words, so the catalog is chosen by what the stream carries; (3)
+  accents by default, folded unless the stream is UTF-8 and, on Windows, a console; (4) the page
+  stays ASCII with references and gets the accents; (5) widths already count characters, a test
+  makes it a rule for both catalogs; (6) `--json`, English, exit codes and the dependency list do
+  not change; (7) the wording is not public (`docs/stability.md`, "The words"), so the change ships
+  in a minor release (1.7.0) and the stability page gains one line on which catalog a stream gets.
+- **Alternatives:** keep ASCII and explain it (the text stays "wrong" for a native speaker on the
+  console, where it would be right); accents whenever the encoding can encode them (cp1252 in a
+  pipe passes the test and the reader still shows `nÒo`); accents whenever the stream is UTF-8
+  (Python 3.15 and `PYTHONUTF8=1` make a Windows pipe UTF-8 and `type` or `more` still shows
+  `n├úo`); reading the console's output code page with `ctypes` to allow a pipe under `chcp 65001`
+  (platform code for a gain that is rare); a separate language code such as
+  `pt-BR-ascii` or an option (every user must know a flag to get a correct console, and the default
+  stays the odd one out); `PYTHONUTF8` detection or reading the console's code page (platform code
+  for a guess); two hand-written catalogs (they drift, RNF-05).
+- **Why:** it fixes the case that matters, a person running the tool in a terminal, with no flag;
+  everywhere the two ends may disagree it prints exactly what 1.6.0 printed, so no output gets
+  worse. One catalog is the single source and the ASCII one is derived, so the two cannot say
+  different things.
+- **Trade-off:** on Windows a pipe, a file and Git Bash (a pipe to a native Python) still read
+  `nao`, even when the stream is UTF-8 and the reader would have coped; that is 1.6.0's text, so
+  nothing gets worse, and `--html` is the way to a file with the accents. A script that matches the
+  Portuguese text sees two spellings of it; the stability page already tells scripts to read the
+  exit code or `--json`.
+
 ## Impact on existing code
 
 - `render.py` and `render_verdict.py`: every English literal moves to the catalog and the functions

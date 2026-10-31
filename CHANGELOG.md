@@ -7,6 +7,16 @@ All notable changes to MailVigil are written here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **The Portuguese text has its accents** (#149). `--lang pt-BR` prints `não`, `domínio` and
+  `relatório` where it printed `nao`, `dominio` and `relatorio`. The accents go to a stream that
+  carries them: any UTF-8 stream on Linux and macOS, and a terminal on Windows. A pipe or a file on
+  Windows, and any other encoding, get the same text without accents, letter for letter, so the
+  layout never moves and nothing is shown wrong. The `--html` page always has the accents (it is
+  ASCII with character references). `--json`, the English text, the exit codes and the dependency
+  list do not change; the wording is not part of the public contract (`docs/stability.md`).
+
 ## [1.6.0] - 2026-10-31
 
 ### Added

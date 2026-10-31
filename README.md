@@ -485,32 +485,35 @@ exit code do not depend on `--top`, which needs `--json` (or `--html`, on `verdi
 
 The text of both commands and the one-line refusals are in English by default. `--lang pt-BR`
 (`pt-br` works too) prints them in Brazilian Portuguese; `--lang en` is the default spelled out, and
-any other code is a usage error (exit `2`). The Portuguese is plain ASCII (`nao`, not `não`), so no
-console encoding can break the layout.
+any other code is a usage error (exit `2`). The Portuguese has its accents (`não`) when the output
+goes to a stream that carries them: any UTF-8 stream on Linux and macOS, and a terminal on Windows.
+A pipe or a file on Windows (`> file`, `| more`, Git Bash) and any other encoding get the same text
+without accents (`nao`), letter for letter, so no console can show it wrong and the layout never
+moves. The `--html` page always has the accents. If you want them in a pipe, write the page.
 
 <details>
 <summary>The same invented <code>NOT READY</code> as above, in Portuguese</summary>
 
 ```text
-Veredito do MailVigil para example.com: NAO PRONTO para p=reject
+Veredito do MailVigil para example.com: NÃO PRONTO para p=reject
 
-Motivo: as falhas de origens nao reconhecidas sao 0.8% das mensagens (56 de
-        7056); o limite e 0.5%.
-  203.0.113.5  nao reconhecido: 56 mensagens com falha
+Motivo: as falhas de origens não reconhecidas são 0.8% das mensagens (56 de
+        7056); o limite é 0.5%.
+  203.0.113.5  não reconhecido: 56 mensagens com falha
 
 Regras
-  regra                       medido           necessario  resultado
-  1  periodo coberto          29 dias          >= 28       passa
-  2  dias com relatorio       29 de 29 (100%)  >= 80%      passa
+  regra                       medido           necessário  resultado
+  1  período coberto          29 dias          >= 28       passa
+  2  dias com relatório       29 de 29 (100%)  >= 80%      passa
   3  mensagens vistas         7056             >= 100      passa
   4  falhas reconhecidas      0                <= 0        passa
-  5  falhas nao reconhecidas  56 (0.8%)        <= 0.5%     FALHA
+  5  falhas não reconhecidas  56 (0.8%)        <= 0.5%     FALHA
 
-Proximo: olhe as origens acima e acrescente os seletores das que forem suas a
-         [senders] na configuracao.
+Próximo: olhe as origens acima e acrescente os seletores das que forem suas a
+         [senders] na configuração.
 
-Isto le apenas os relatorios que voce deu: email que nenhum receptor reporta, e
-remetentes que ficaram quietos neste periodo, nao sao cobertos.
+Isto lê apenas os relatórios que você deu: email que nenhum receptor reporta, e
+remetentes que ficaram quietos neste período, não são cobertos.
 ```
 
 </details>

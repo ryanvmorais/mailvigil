@@ -210,7 +210,8 @@ Two things keep the contract honest:
 - **Given** Portuguese text
   **When** it contains accented letters
   **Then** it is still ASCII (`nao`, not `não`), so that no console encoding can break the layout
-  (open question 4 asks whether to relax this for UTF-8 streams).
+  (open question 4 asks whether to relax this for UTF-8 streams). *Superseded by decision 8: the
+  text has accents on a UTF-8 stream (a console, on Windows) and is folded to ASCII otherwise.*
 - **Given** no `--lang`
   **When** the command runs
   **Then** the text is English, whatever the system language: the same command prints the same text
@@ -341,7 +342,8 @@ The maintainer approved the requirements, with the recommendations of questions 
    The `CLAUDE.md` line "locale or `--lang`" is rewritten to match.
 3. **~~An unexpected exception keeps Python's behavior~~** (traceback, exit `1`). Superseded by
    decision 7.
-4. **The Portuguese text is ASCII only** (`nao`, not `não`), so there is one layout rule.
+4. **~~The Portuguese text is ASCII only~~** (`nao`, not `não`), so there is one layout rule.
+   Superseded by decision 8.
 5. **The JSON conversion lives in a new `render_json.py`**; `summary.py` and `verdict.py` are not
    touched and `dataclasses.asdict` is not used (the design makes the mapping explicit, ADR-2).
 6. **One spec, delivered in stages**: the contract (exit codes and JSON) first, the Portuguese text
@@ -371,3 +373,13 @@ Following [specs/README.md](../README.md#how-a-spec-is-tested):
    both without output; on a closed pipe standard output is pointed at the null device so the
    interpreter does not complain at exit. The line stays in English, like argparse's usage errors,
    and there is no flag for the traceback. Reverses decision 3 and open question 3.
+8. **Amendment (2026-10-31, issue #149): the Portuguese text has accents when the stream is UTF-8.**
+   The console measurements (design ADR-9) show the layout cannot break, because every width counts
+   characters, but that off the console the encoding Python writes and the one the reader expects
+   often differ, and on Windows a UTF-8 pipe or file is still read in the OEM page (measured on
+   Python 3.15). So the CLI prints the accented catalog when standard output and standard error both
+   report UTF-8 and, on Windows, are a console, and the same catalog folded to ASCII (`não` to
+   `nao`, one character for one) otherwise; `--html` always gets the accents, as the page is ASCII
+   with character references. `--json`, the English text, the exit codes and the dependency list do
+   not change; no option or language code is added. The wording of the text is not public
+   (`docs/stability.md`), so the release is a minor one. Reverses decision 4.

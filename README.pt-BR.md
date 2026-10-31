@@ -250,27 +250,27 @@ texto sai em inglês, com as mesmas linhas e os mesmos números.
 ```text
 Resumo do MailVigil para example.com
   config      mailvigil.toml (3 seletores)
-  periodo     2026-10-20 a 2026-10-20 (1 de 1 dia com relatorio)
-  relatorios  1 de 1 provedor
-  politica    p=none, sp=none, pct=100
+  período     2026-10-20 a 2026-10-20 (1 de 1 dia com relatório)
+  relatórios  1 de 1 provedor
+  política    p=none, sp=none, pct=100
   mensagens   7335 (7250 de remetentes reconhecidos, 98.8%)
 
-Situacoes
+Situações
   ok       6300  85.9%
-  fragil    975  13.3%
+  frágil    975  13.3%
   falha      60   0.8%
 
 Remetentes
-  remetente                               ok  fragil  falha  total
+  remetente                               ok  frágil  falha  total
   Example Mailer (newsletters)          6300       0      0   6300
   Example Mail (staff mailboxes)           0     950      0    950
-! 203.0.113.5 (nao reconhecido)            0       0     40     40
+! 203.0.113.5 (não reconhecido)            0       0     40     40
   198.51.100.99 (assinatura com falha)     0      25      0     25
-! 203.0.113.9 (nao reconhecido)            0       0     12     12
-! 2001:db8::7 (nao reconhecido)            0       0      8      8
+! 203.0.113.9 (não reconhecido)            0       0     12     12
+! 2001:db8::7 (não reconhecido)            0       0      8      8
 
 ! FALHA: 60 mensagens em 3 origens
-  Origens nao reconhecidas que falham
+  Origens não reconhecidas que falham
   ! 203.0.113.5
       40 mensagens  dkim: fail, spf: fail
   ! 203.0.113.9
@@ -278,10 +278,10 @@ Remetentes
   ! 2001:db8::7
       8 mensagens  dkim: none, spf: none
 
-Fora destes numeros
+Fora destes números
   arquivos ignorados  0
   duplicados          0
-  outros dominios     0
+  outros domínios     0
 ```
 
 Um `!` marca um remetente com mensagens que falharam. Arquivos recusados, duplicados e relatórios de
@@ -295,26 +295,26 @@ O `mailvigil verdict` responde uma de três coisas, cada uma com a regra que dec
 `NAO PRONTO` (dados inventados):
 
 ```text
-Veredito do MailVigil para example.com: NAO PRONTO para p=reject
+Veredito do MailVigil para example.com: NÃO PRONTO para p=reject
 
-Motivo: as falhas de origens nao reconhecidas sao 0.8% das mensagens (56 de
-        7056); o limite e 0.5%.
-  203.0.113.5  nao reconhecido: 56 mensagens com falha
+Motivo: as falhas de origens não reconhecidas são 0.8% das mensagens (56 de
+        7056); o limite é 0.5%.
+  203.0.113.5  não reconhecido: 56 mensagens com falha
 
 Regras
-  regra                       medido           necessario  resultado
-  1  periodo coberto          29 dias          >= 28       passa
-  2  dias com relatorio       29 de 29 (100%)  >= 80%      passa
+  regra                       medido           necessário  resultado
+  1  período coberto          29 dias          >= 28       passa
+  2  dias com relatório       29 de 29 (100%)  >= 80%      passa
   3  mensagens vistas         7056             >= 100      passa
   4  falhas reconhecidas      0                <= 0        passa
-  5  falhas nao reconhecidas  56 (0.8%)        <= 0.5%     FALHA
+  5  falhas não reconhecidas  56 (0.8%)        <= 0.5%     FALHA
 
-Proximo: olhe as origens acima e acrescente as que forem suas a [senders]
-         (seletor DKIM), [spf] (dominio SPF) ou [ips] (faixa de IP) na
-         configuracao.
+Próximo: olhe as origens acima e acrescente as que forem suas a [senders]
+         (seletor DKIM), [spf] (domínio SPF) ou [ips] (faixa de IP) na
+         configuração.
 
-Isto le apenas os relatorios que voce deu: email que nenhum receptor reporta, e
-remetentes que ficaram quietos neste periodo, nao sao cobertos.
+Isto lê apenas os relatórios que você deu: email que nenhum receptor reporta, e
+remetentes que ficaram quietos neste período, não são cobertos.
 ```
 
 `PRONTO` significa que todas as regras passam. `CEDO DEMAIS` significa que as regras de dados (1 a
@@ -504,8 +504,12 @@ A resposta e o código de saída não dependem do `--top`, que exige `--json` (o
 
 O texto dos dois comandos e as recusas de uma linha saem em inglês por padrão. O `--lang pt-BR`
 (`pt-br` também vale) os imprime em português do Brasil; `--lang en` é o padrão escrito por extenso,
-e qualquer outro código é um erro de uso (saída `2`). O português da ferramenta é ASCII puro (`nao`,
-não `não`), para que nenhuma codificação de console possa estragar o layout.
+e qualquer outro código é um erro de uso (saída `2`). O português da ferramenta sai com acentos
+(`não`) quando a saída vai para um destino que os carrega: qualquer fluxo UTF-8 no Linux e no macOS,
+e um terminal no Windows. Um pipe ou um arquivo no Windows (`> arquivo`, `| more`, Git Bash) e
+qualquer outra codificação recebem o mesmo texto sem acentos (`nao`), letra por letra, para que
+nenhum console o mostre errado e o layout nunca se mexa. A página do `--html` sempre tem os acentos.
+Se você quer os acentos num pipe, grave a página.
 
 Os números mantêm o ponto decimal nos dois idiomas, o `--json` não tem idioma (seus identificadores
 não mudam), o `--help` continua em inglês, e nem o idioma nem o `--json` alteram um código de saída.
