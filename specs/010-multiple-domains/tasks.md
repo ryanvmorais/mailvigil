@@ -168,7 +168,7 @@ The largest stage: the file and the command that reads it are tested together, i
 
 ## Stage 6 — `--html` with several domains (RF-07, RNF-05, ADR-8)
 
-- [ ] `tests/test_cli_html_domains.py`, written first: one domain with stdout and with `--output FILE`
+- [x] `tests/test_cli_html_domains.py`, written first: one domain with stdout and with `--output FILE`
   exactly as before; several domains with no `--output` refused before any report is read (the line
   of `html_needs_folder`, exit `1`: it depends on the file, so it is a refusal and not a usage error); with a path that is not a folder or does not
   exist (`output_not_folder`); with a folder — one `mailvigil-<domain>.html` per domain, each equal
@@ -176,9 +176,16 @@ The largest stage: the file and the command that reads it are tested together, i
   `con.example` gets a safe name; an internationalized domain gets its `xn--` name; a read-only
   folder or a failing write ends in `output_failed` naming that file, nothing is printed, and the
   pages written before it are complete; `--json` with `--html` still refused. — RF-07, RNF-05, ADR-8
-- [ ] `src/mailvigil/cli.py`: the decision of where the pages go, right after the configs and before
+- [x] `src/mailvigil/cli.py`: the decision of where the pages go, right after the configs and before
   the reports are read; all pages rendered first, then each written with `_write_page`. — RF-07
-- [ ] Quality gate of the stage (as above). Record the result here. — RNF-01, RNF-06
+- [x] Quality gate of the stage (as above). Record the result here. — RNF-01, RNF-06
+  Result (2026-10-31): ruff, black and mypy clean; 3371 collected, 4 skipped (POSIX modes and
+  symbolic links on Windows), the rest passed (3367); coverage 100%. Three things differ from the
+  plan: (1) the decision lives in `_load` through `_pages_refusal`, which stage 4's temporary guard
+  and its test (`test_cli_domains.py`) gave way to; (2) the write loop is `_write_pages`, shared by
+  the one-file and the folder paths, so the refusal line of `output_failed` is built once; (3) the
+  `--output` metavar is now `FILE|FOLDER` and its help says what the folder gets, so
+  `help_golden.py` was regenerated from the live text.
 
 ## Stage 7 — Documentation and close (RNF-01, RNF-04)
 
