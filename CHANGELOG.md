@@ -7,6 +7,17 @@ All notable changes to MailVigil are written here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Several domains in one run, in text** (#79). The configuration file takes an array of tables,
+  `[[domains]]`, each with its own `domain`, `[domains.senders]`, `[domains.spf]` and
+  `[domains.ips]`; `--domain` can be repeated, with a file to pick domains from it and without one
+  to cover each value with empty maps. `summary` and `verdict` print one block per domain, set apart
+  by a rule line, and `verdict` ends with a line that counts the answers. The exit code of `verdict`
+  is the worst answer (`4`, else `3`, else `0`). The reports are read once whatever the number of
+  domains, and a domain with no report yet is `too early` instead of refusing the run. `--json`
+  and `--html` for several domains come in the next changes.
+
 ### Changed
 
 - **An internationalized domain can be written as it is read** (#79). `bücher.example` in

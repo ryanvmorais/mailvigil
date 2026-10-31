@@ -105,7 +105,7 @@ The release (1.6.0) is the maintainer's act and is prepared apart, with `/prepar
 
 The largest stage: the file and the command that reads it are tested together, in text.
 
-- [ ] `tests/test_config.py`, written first: a `[[domains]]` file of two domains, each with its own
+- [x] `tests/test_config.py`, written first: a `[[domains]]` file of two domains, each with its own
   `senders`, `spf` and `ips`, the same selector mapped to different names; the entries come in file
   order; each refusal of RF-01 — a top-level `domain`, `senders`, `spf` or `ips` beside `domains`
   (`DOMAIN_CONFLICT`, naming the key), an empty array (`NO_DOMAINS`), `domains` not an array of
@@ -115,12 +115,12 @@ The largest stage: the file and the command that reads it are tested together, i
   `[spf]` key that is within another entry's domain but not its own; the key of a refusal is
   prefixed `domains[N].`; the one-domain file is read as before; `[fetch]` at the top level reaches
   every `Config`; a bad entry never yields a partial tuple. — RF-01, ADR-1, ADR-10
-- [ ] `src/mailvigil/config.py`: `load_configs` (replacing `load_config`), the entry reader reusing
+- [x] `src/mailvigil/config.py`: `load_configs` (replacing `load_config`), the entry reader reusing
   `_read_domain`/`_read_senders`/`_read_spf`/`_read_ranges`, `MAX_DOMAINS`, the four reasons in
   `ConfigReason`, their phrases in both languages, `domains` in the allowed keys. `cli_fetch`
   becomes `load_configs(path)[0].fetch`. The 27 test calls of `load_config` move to a `load_one`
   helper, mechanically. — RF-01, RF-08, ADR-1
-- [ ] `tests/test_cli_summary.py`, `tests/test_cli_verdict.py`, `tests/test_cli_domains.py`, written
+- [x] `tests/test_cli_summary.py`, `tests/test_cli_verdict.py`, `tests/test_cli_domains.py`, written
   first: `--domain` repeated with a file (the subset in file order, a repeat once, an unlisted value
   refused with `domain_mismatch` for a one-domain file and `domain_not_listed` for several, a bad
   value refused before the file is read) and without a file (each distinct value with empty maps, in
@@ -132,11 +132,18 @@ The largest stage: the file and the command that reads it are tested together, i
   `no_reports_many`); a report of domain B in the folder is not "other domain" in A's block; a refused
   file appears in each block; `fetch --config` on a `[[domains]]` file; the isolation test still
   green. — RF-02, RF-04, RF-05, RF-06, RF-08, ADR-4, ADR-9, ADR-11
-- [ ] `src/mailvigil/cli.py`: `--domain` repeatable (its help text, and `help_golden.py` regenerated
+- [x] `src/mailvigil/cli.py`: `--domain` repeatable (its help text, and `help_golden.py` regenerated
   only for that line), `resolve_configs` replacing `resolve_config`, `_load` over `ingest_many`, the
   loops in `_run_summary` and `_run_verdict`, `_VERDICT_EXIT[worst_answer(...)]`. The one-domain
   path goes through the same loops. — RF-02, RF-05, RF-06, ADR-6, ADR-9
-- [ ] Quality gate of the stage (as above). Record the result here. — RNF-01, RNF-06
+- [x] Quality gate of the stage (as above). Record the result here. — RNF-01, RNF-06
+  Result (2026-10-31): ruff, black and mypy clean; 3332 collected, 4 skipped (POSIX modes and
+  symbolic links on Windows), the rest passed; coverage 100%. Three things differ from the plan:
+  (1) the key of a refusal inside an entry counts the entries from 1 (`domains[2].spf`), as the
+  person counts the blocks; (2) until stages 5 and 6 exist, `--json` and `--html` with two or more
+  domains are refused before any report is read (`_load`, one English line, no message key), so
+  main never prints one domain's answer for a run of several; stages 5 and 6 delete that guard and
+  its test; (3) the `fetch --config` test lives in `test_cli_fetch.py`, next to its fixtures.
 
 ## Stage 5 — `--json` with several domains (RF-07, ADR-7)
 
