@@ -10,12 +10,13 @@ from __future__ import annotations
 
 from dataclasses import FrozenInstanceError, replace
 from enum import StrEnum
+from ipaddress import ip_network
 from types import MappingProxyType
 
 import pytest
 
 from mailvigil.config import Config
-from mailvigil.reports import DkimResult, Record
+from mailvigil.reports import DkimResult, Record, SpfResult
 from mailvigil.senders import Identification, Outcome, identify_sender
 
 # ---------------------------------------------------------------------------
@@ -301,3 +302,172 @@ def test_other_record_fields_are_ignored(blocks: tuple[DkimResult, ...]) -> None
         disposition="reject",
     )
     assert identify_sender(base, config()) == identify_sender(changed, config())
+
+
+# ---------------------------------------------------------------------------
+# SPF domain and address range (ADR-8)
+# ---------------------------------------------------------------------------
+
+
+def wide_config() -> Config:
+    """
+    Build a configuration with one SPF domain and two nested ranges, for ``example.com``.
+
+    Returns:
+        Config: The configuration; the selectors are the defaults.
+    """
+    return Config(
+        "example.com",
+        MappingProxyType(_SENDERS),
+        spf=MappingProxyType({"bounce.example.com": "Example Relay"}),
+        ranges=MappingProxyType(
+            {
+                ip_network("192.0.2.0/24"): "Example Office",
+                ip_network("192.0.2.64/26"): "Example Lab",
+                ip_network("2001:db8::/32"): "Example v6",
+            }
+        ),
+    )
+
+
+def spf_block(domain: str = "bounce.example.com", result: str = "pass") -> SpfResult:
+    """
+    Build one SPF block.
+
+    Args:
+        domain (str, optional): The domain SPF was checked against. Default: the configured one.
+        result (str, optional): The SPF verdict. Default: ``pass``.
+
+    Returns:
+        SpfResult: The block.
+    """
+    return SpfResult(domain=domain, result=result)
+
+
+def identify_wide(
+    dkim: tuple[DkimResult, ...] = (), spf: tuple[SpfResult, ...] = (), ip: str = "203.0.113.9"
+) -> Identification:
+    """
+    Identify a record against ``wide_config``.
+
+    Args:
+        dkim (tuple[DkimResult, ...], optional): The DKIM blocks. Default: none.
+        spf (tuple[SpfResult, ...], optional): The SPF blocks. Default: none.
+        ip (str, optional): The source address, outside every range by default.
+
+    Returns:
+        Identification: The answer.
+    """
+    return identify_sender(Record(dkim=dkim, spf=spf, source_ip=ip), wide_config())
+
+
+def test_a_passing_spf_block_on_a_configured_domain_is_known() -> None:
+    answer = identify_wide(spf=(spf_block(),))
+
+    assert answer == Identification(Outcome.KNOWN, "Example Relay", "")
+
+
+@pytest.mark.parametrize(
+    "blocks",
+    [
+        (spf_block(result="fail"),),
+        (spf_block(result="softfail"),),
+        (spf_block(domain="other.example.com"),),
+        (spf_block(domain="bounce.example.org"),),
+        (spf_block(domain=""),),
+    ],
+    ids=["fail", "softfail", "not a key", "foreign", "empty"],
+)
+def test_spf_that_failed_or_is_not_a_key_names_nobody(blocks: tuple[SpfResult, ...]) -> None:
+    assert identify_wide(spf=blocks).outcome is Outcome.UNKNOWN
+
+
+def test_the_spf_domain_is_compared_normalized_and_the_result_case_insensitively() -> None:
+    answer = identify_wide(spf=(spf_block("Bounce.Example.COM.", " PASS "),))
+
+    assert answer.service == "Example Relay"
+
+
+@pytest.mark.parametrize(
+    ("ip", "service"),
+    [
+        ("192.0.2.10", "Example Office"),
+        ("192.0.2.70", "Example Lab"),
+        ("2001:db8::7", "Example v6"),
+        ("::ffff:192.0.2.10", "Example Office"),
+    ],
+    ids=["office", "narrowest wins", "ipv6", "mapped ipv4"],
+)
+def test_an_address_in_a_range_with_an_authenticated_record_is_known(ip: str, service: str) -> None:
+    # An unmapped selector under the owner's domain proves the mail authenticated as the owner.
+    answer = identify_wide(dkim=(block("unlisted"),), ip=ip)
+
+    assert answer == Identification(Outcome.KNOWN, service, "")
+
+
+def test_an_owner_spf_pass_on_an_unmapped_domain_also_proves_it() -> None:
+    answer = identify_wide(spf=(spf_block("mail.example.com"),), ip="192.0.2.10")
+
+    assert answer.service == "Example Office"
+
+
+@pytest.mark.parametrize(
+    ("dkim", "spf"),
+    [
+        ((), ()),
+        ((block("unlisted", result="fail"),), ()),
+        ((block("unlisted", domain="example.org"),), ()),
+        ((), (spf_block("mail.example.com", "fail"),)),
+        ((), (spf_block("mail.example.org"),)),
+    ],
+    ids=["no block", "failed dkim", "foreign dkim", "failed spf", "foreign spf"],
+)
+def test_the_address_alone_names_nobody(
+    dkim: tuple[DkimResult, ...], spf: tuple[SpfResult, ...]
+) -> None:
+    assert identify_wide(dkim=dkim, spf=spf, ip="192.0.2.10").outcome is Outcome.UNKNOWN
+
+
+@pytest.mark.parametrize("ip", ["", "not-an-ip", "192.0.2.300", "203.0.113.9", "2001:db9::1"])
+def test_an_address_that_is_invalid_or_outside_every_range_never_matches(ip: str) -> None:
+    assert identify_wide(dkim=(block("unlisted"),), ip=ip).outcome is Outcome.UNKNOWN
+
+
+def test_dkim_wins_over_spf_and_spf_over_the_address() -> None:
+    all_three = identify_wide(dkim=(block(),), spf=(spf_block(),), ip="192.0.2.10")
+    spf_and_ip = identify_wide(dkim=(block("unlisted"),), spf=(spf_block(),), ip="192.0.2.10")
+
+    assert all_three.service == "Example Mailer"
+    assert spf_and_ip.service == "Example Relay"
+
+
+def test_a_known_by_spf_beats_a_foreign_or_failing_selector_on_the_same_record() -> None:
+    foreign = identify_wide(dkim=(block(domain="example.org"),), spf=(spf_block(),))
+    failing = identify_wide(dkim=(block(result="fail"),), spf=(spf_block(),))
+
+    assert foreign.outcome is failing.outcome is Outcome.KNOWN
+
+
+def test_foreign_and_failing_selectors_still_answer_when_nothing_else_names_the_record() -> None:
+    assert identify_wide(dkim=(block(domain="example.org"),)).outcome is Outcome.FOREIGN_DOMAIN
+    assert identify_wide(dkim=(block(result="fail"),)).outcome is Outcome.FAILING_SIGNATURE
+
+
+def test_a_configuration_without_ranges_or_spf_answers_as_before() -> None:
+    record = Record(spf=(spf_block(),), source_ip="192.0.2.10", dkim=(block("unlisted"),))
+
+    assert identify_sender(record, config()).outcome is Outcome.UNKNOWN
+
+
+def test_a_long_map_is_looked_up_by_prefix_length_not_scanned() -> None:
+    """2,000 ranges of one length cost one lookup per record: the derived lengths say so."""
+    many = {ip_network(f"10.{n // 256}.{n % 256}.0/24"): f"S{n}" for n in range(2000)}
+    cfg = Config("example.com", MappingProxyType(_SENDERS), ranges=MappingProxyType(many))
+
+    assert cfg.range_lengths == {4: (24,)}
+    record = Record(dkim=(block("unlisted"),), source_ip="10.7.200.9")
+    assert identify_sender(record, cfg).service == f"S{7 * 256 + 200}"
+
+
+def test_the_range_lengths_are_derived_longest_first_by_version() -> None:
+    assert wide_config().range_lengths == {4: (26, 24), 6: (32,)}

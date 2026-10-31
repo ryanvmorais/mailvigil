@@ -235,10 +235,19 @@ def _header(summary: Summary, config_source: str | None, messages: Messages) -> 
     if config_source is None:
         lines.append(_field(text.key_config, text.config_none, key_width))
     else:
-        suffix = f" ({text.selector.of(summary.selectors_configured)})"
+        counted = [text.selector.of(summary.selectors_configured)]
+        if summary.spf_domains_configured:
+            counted.append(text.spf_domain.of(summary.spf_domains_configured))
+        if summary.ip_ranges_configured:
+            counted.append(text.ip_range.of(summary.ip_ranges_configured))
+        suffix = f" ({', '.join(counted)})"
         room = _WIDTH - len(indent) - len(suffix)
         lines.append(_field(text.key_config, fit(config_source, room) + suffix, key_width))
-    if summary.selectors_configured == 0:
+    if not (
+        summary.selectors_configured
+        or summary.spf_domains_configured
+        or summary.ip_ranges_configured
+    ):
         lines.append(indent + fit(text.no_selectors, _WIDTH - len(indent)))
         lines.append(indent + fit(text.no_selectors_hint, _WIDTH - len(indent)))
 
@@ -412,6 +421,24 @@ def _senders(summary: Summary, messages: Messages) -> list[str]:
     return lines
 
 
+def spf_domains_part(messages: Messages, domains: Sequence[str], width: int = 0) -> str:
+    """
+    Write the SPF domains an unrecognized source passed SPF on, ready to append to a line.
+
+    Args:
+        messages (Messages): The language.
+        domains (Sequence[str]): The domains, sorted.
+        width (int, optional): The most characters of each domain; 0 means no cut. Default: 0.
+
+    Returns:
+        str: ``"; SPF domain a, b"``, or nothing when there are none.
+    """
+    if not domains:
+        return ""
+    names = ", ".join(fit(d, width) if width else d for d in domains)
+    return "; " + messages.common.spf_domains_named.of(len(domains), names=names)
+
+
 def _who(source: FailingSource, messages: Messages) -> str:
     """
     Name the sender of a failing source.
@@ -458,6 +485,7 @@ def _source_lines(source: FailingSource, messages: Messages) -> list[str]:
     )
     if source.override_reasons:
         detail += "; " + ", ".join(source.override_reasons)
+    detail += spf_domains_part(messages, source.spf_domains)
     if source.outcome is Outcome.UNKNOWN:
         who = where
     else:

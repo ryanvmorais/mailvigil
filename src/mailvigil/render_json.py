@@ -101,6 +101,7 @@ def _sender(row: SenderRow) -> dict[str, object]:
         "service": _or_none(row.service),
         "source_ip": _or_none(row.source_ip),
         "selectors": list(row.selectors),
+        "spf_domains": list(row.spf_domains),
         "counts": _counts(row.counts),
     }
 
@@ -121,6 +122,7 @@ def _source(source: FailingSource) -> dict[str, object]:
         "source_ip": source.source_ip,
         "messages": source.messages,
         "selectors": list(source.selectors),
+        "spf_domains": list(source.spf_domains),
         "dkim": list(source.dkim),
         "spf": list(source.spf),
         "override_reasons": list(source.override_reasons),
@@ -302,7 +304,12 @@ def summary_document(
         "schema_version": SCHEMA_VERSION,
         "command": "summary",
         "domain": summary.domain,
-        "config": {"source": config_source, "selectors": summary.selectors_configured},
+        "config": {
+            "source": config_source,
+            "selectors": summary.selectors_configured,
+            "spf_domains": summary.spf_domains_configured,
+            "ip_ranges": summary.ip_ranges_configured,
+        },
         "reports": {"count": summary.reports, "reporters": summary.reporters},
         "period": _period(summary.period),
         "policy": _policy(summary.policy),

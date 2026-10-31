@@ -24,7 +24,7 @@ from mailvigil.html_charts import meter, stacked_bar, timeline
 from mailvigil.html_style import CONTENT_SECURITY_POLICY, STYLESHEET
 from mailvigil.htmlkit import Safe, document, el, finish, fragment, raw, text
 from mailvigil.messages import ENGLISH, Messages
-from mailvigil.render import address, fit
+from mailvigil.render import address, fit, spf_domains_part
 from mailvigil.render_verdict import (
     answer_phrase,
     left_out_parts,
@@ -479,6 +479,7 @@ def _source(source: FailingSource, messages: Messages) -> Safe:
     )
     if source.override_reasons:
         detail += "; " + fit(", ".join(source.override_reasons), _NAME_MAX)
+    detail += spf_domains_part(messages, source.spf_domains, _NAME_MAX)
     if source.outcome is Outcome.KNOWN:
         head = [el("strong", _clean(source.service, _NAME_MAX))]
         detail = f"{fit(where, _ADDRESS_MAX)} \u00b7 {detail}"

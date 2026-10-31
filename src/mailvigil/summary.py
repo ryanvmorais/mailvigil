@@ -20,6 +20,7 @@ from enum import StrEnum
 from mailvigil.config import Config
 from mailvigil.reports import IngestionResult, PolicyPublished, Reason, Record, Report, SkippedFile
 from mailvigil.senders import Outcome, identify_sender
+from mailvigil.text import is_within_domain, normalize_domain
 
 #: A UTC day counts as having a report when the reports cover at least this much of it: half a day,
 #: so one missing report of 24 hours leaves a day uncovered whatever hour the reports start at.
@@ -97,6 +98,9 @@ class SenderRow:
         selectors (tuple[str, ...]): The configured selectors seen on a row that is not ``KNOWN``,
             sorted. Default: none.
         counts (Counts): The messages of the row per situation. Default: all zero.
+        spf_domains (tuple[str, ...]): The SPF domains that passed under the owner's domain on a
+            row that is not ``KNOWN``, sorted: the ones that would go into ``[spf]`` (ADR-8).
+            Default: none.
     """
 
     outcome: Outcome
@@ -104,6 +108,7 @@ class SenderRow:
     source_ip: str = ""
     selectors: tuple[str, ...] = ()
     counts: Counts = Counts()
+    spf_domains: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -124,6 +129,8 @@ class FailingSource:
         spf (tuple[str, ...]): The same vocabulary for SPF. Default: none.
         override_reasons (tuple[str, ...]): The receiver's override types, sorted and unique,
             without their free-text comments. Default: none.
+        spf_domains (tuple[str, ...]): The SPF domains that passed under the owner's domain on this
+            source when it is not ``KNOWN``, sorted. Default: none.
     """
 
     outcome: Outcome
@@ -134,6 +141,7 @@ class FailingSource:
     dkim: tuple[str, ...] = ()
     spf: tuple[str, ...] = ()
     override_reasons: tuple[str, ...] = ()
+    spf_domains: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -198,6 +206,8 @@ class Summary:
     Attributes:
         domain (str): The domain the reports are about.
         selectors_configured (int): How many selectors the configuration maps. Default: 0.
+        spf_domains_configured (int): How many SPF domains the configuration maps. Default: 0.
+        ip_ranges_configured (int): How many address ranges the configuration maps. Default: 0.
         reports (int): The reports kept. Default: 0.
         reporters (int): The distinct reporting organizations, as given. Default: 0.
         period (Period | None): The time covered; ``None`` only without reports. Default: ``None``.
@@ -228,6 +238,8 @@ class Summary:
 
     domain: str
     selectors_configured: int = 0
+    spf_domains_configured: int = 0
+    ip_ranges_configured: int = 0
     reports: int = 0
     reporters: int = 0
     period: Period | None = None
@@ -348,7 +360,7 @@ class _Tally:
 class _Row:
     """One sender row while it is being added up."""
 
-    __slots__ = ("outcome", "selectors", "service", "source_ip", "tally")
+    __slots__ = ("outcome", "selectors", "service", "source_ip", "spf_domains", "tally")
 
     def __init__(self, outcome: Outcome, service: str, source_ip: str) -> None:
         """
@@ -363,13 +375,14 @@ class _Row:
         self.service = service
         self.source_ip = source_ip
         self.selectors: set[str] = set()
+        self.spf_domains: set[str] = set()
         self.tally = _Tally()
 
 
 class _Source:
     """One failing source while it is being added up."""
 
-    __slots__ = ("dkim", "messages", "override_reasons", "row", "selectors", "spf")
+    __slots__ = ("dkim", "messages", "override_reasons", "row", "selectors", "spf", "spf_domains")
 
     def __init__(self, row: _Row) -> None:
         """
@@ -381,9 +394,28 @@ class _Source:
         self.row = row
         self.messages = 0
         self.selectors: set[str] = set()
+        self.spf_domains: set[str] = set()
         self.dkim: set[str] = set()
         self.spf: set[str] = set()
         self.override_reasons: set[str] = set()
+
+
+def _owner_spf_domains(record: Record, domain: str) -> set[str]:
+    """
+    Collect the SPF domains that passed under the owner's domain: the ones ``[spf]`` could name.
+
+    Args:
+        record (Record): The row of the report.
+        domain (str): The configured domain.
+
+    Returns:
+        set[str]: The normalized domains; empty when no SPF block qualifies.
+    """
+    return {
+        normalize_domain(block.domain)
+        for block in record.spf
+        if block.result.strip().lower() == "pass" and is_within_domain(block.domain, domain)
+    }
 
 
 def _reason(results: Iterable[str]) -> str:
@@ -610,10 +642,13 @@ def summarize(result: IngestionResult, config: Config) -> Summary:
             row.tally.add(dkim_ok, spf_ok, record.count)
             totals.add(dkim_ok, spf_ok, record.count)
             day_tally.add(dkim_ok, spf_ok, record.count)
+            spf_domains = set() if known else _owner_spf_domains(record, config.domain)
             if known:
                 recognized += record.count
-            elif identification.selector:
-                row.selectors.add(identification.selector)
+            else:
+                if identification.selector:
+                    row.selectors.add(identification.selector)
+                row.spf_domains.update(spf_domains)
 
             # 2. A failing record also counts for the address it came from.
             if dkim_ok or spf_ok:
@@ -625,6 +660,7 @@ def summarize(result: IngestionResult, config: Config) -> Summary:
             source.messages += record.count
             if not known and identification.selector:
                 source.selectors.add(identification.selector)
+            source.spf_domains.update(spf_domains)
             source.dkim.add(_reason(block.result for block in record.dkim))
             source.spf.add(_reason(block.result for block in record.spf))
             source.override_reasons.update(
@@ -640,6 +676,7 @@ def summarize(result: IngestionResult, config: Config) -> Summary:
                     row.source_ip,
                     tuple(sorted(row.selectors)),
                     row.tally.freeze(),
+                    tuple(sorted(row.spf_domains)),
                 )
                 for row in rows.values()
             ),
@@ -658,6 +695,7 @@ def summarize(result: IngestionResult, config: Config) -> Summary:
                     tuple(sorted(source.dkim)),
                     tuple(sorted(source.spf)),
                     tuple(sorted(source.override_reasons)),
+                    tuple(sorted(source.spf_domains)),
                 )
                 for (_outcome, _service, _row_ip, ip), source in sources.items()
             ),
@@ -677,6 +715,8 @@ def summarize(result: IngestionResult, config: Config) -> Summary:
     return Summary(
         domain=config.domain,
         selectors_configured=len(config.senders),
+        spf_domains_configured=len(config.spf),
+        ip_ranges_configured=len(config.ranges),
         reports=len(result.reports),
         reporters=len({report.reporter for report in result.reports}),
         period=_period(result.reports, covered),

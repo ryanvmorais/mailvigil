@@ -14,6 +14,7 @@ import itertools
 from dataclasses import FrozenInstanceError
 from datetime import UTC, date, datetime
 from enum import StrEnum
+from ipaddress import ip_network
 from pathlib import Path
 from types import MappingProxyType
 
@@ -206,6 +207,8 @@ def test_summary_has_the_fields_of_the_design_and_no_display_text() -> None:
     assert set(fields) == {
         "domain",
         "selectors_configured",
+        "spf_domains_configured",
+        "ip_ranges_configured",
         "reports",
         "reporters",
         "period",
@@ -1089,3 +1092,94 @@ def test_skipped_files_are_counted_per_reason_most_frequent_first() -> None:
 def test_nothing_skipped_has_no_reasons() -> None:
     """An empty tuple, not a missing field."""
     assert summarize(IngestionResult(), config()).skipped_by_reason == ()
+
+
+# ---------------------------------------------------------------------------
+# SPF domains and the configured counts (RF-11, ADR-8)
+# ---------------------------------------------------------------------------
+
+
+def spf_pass(domain: str, result: str = "pass") -> SpfResult:
+    """
+    Build one SPF block.
+
+    Args:
+        domain (str): The domain SPF was checked against.
+        result (str, optional): The SPF verdict. Default: ``pass``.
+
+    Returns:
+        SpfResult: The block.
+    """
+    return SpfResult(domain=domain, result=result)
+
+
+def test_an_unrecognized_row_lists_the_spf_domains_that_passed_under_the_owner_sorted() -> None:
+    """These are the domains the owner could copy into `[spf]`."""
+    summary = summary_of(
+        record(ip="203.0.113.50", spf=(spf_pass("b.example.com"), spf_pass("A.example.com."))),
+        record(ip="203.0.113.50", spf=(spf_pass("c.example.com"),)),
+    )
+
+    assert summary.senders[0].spf_domains == ("a.example.com", "b.example.com", "c.example.com")
+
+
+def test_spf_domains_that_failed_or_are_not_the_owners_are_not_listed() -> None:
+    """A fail cannot be named, and a domain outside the owner's can never align."""
+    summary = summary_of(
+        record(
+            ip="203.0.113.50",
+            spf=(spf_pass("a.example.com", "fail"), spf_pass("mailer.example.net"), spf_pass("")),
+        )
+    )
+
+    assert summary.senders[0].spf_domains == ()
+
+
+def test_a_known_row_lists_no_spf_domains() -> None:
+    """A recognized row has a name instead."""
+    summary = summary_of(record(dkim=(signed(),), spf=(spf_pass("a.example.com"),)))
+
+    assert summary.senders[0].spf_domains == ()
+
+
+def test_a_failing_source_lists_its_own_spf_domains() -> None:
+    """The domain shows up where the failure is listed, not only on the row."""
+    summary = summary_of(
+        failing_record(ip="203.0.113.50", spf=(spf_pass("a.example.com"),)),
+        failing_record(ip="203.0.113.51"),
+    )
+
+    by_ip = {source.source_ip: source for source in summary.failing}
+    assert by_ip["203.0.113.50"].spf_domains == ("a.example.com",)
+    assert by_ip["203.0.113.51"].spf_domains == ()
+
+
+def test_an_spf_domain_of_the_configuration_names_the_row_and_leaves_no_hint() -> None:
+    """Once the domain is in `[spf]` the row is recognized and carries a service."""
+    cfg = Config(
+        "example.com",
+        MappingProxyType({}),
+        spf=MappingProxyType({"bounce.example.com": "Example Relay"}),
+    )
+    summary = summary_of(record(ip="203.0.113.50", spf=(spf_pass("bounce.example.com"),)), cfg=cfg)
+
+    assert summary.senders[0].service == "Example Relay"
+    assert summary.senders[0].spf_domains == ()
+    assert summary.recognized_messages == 10
+
+
+def test_the_summary_counts_what_the_configuration_maps() -> None:
+    """The three counts feed the configuration line and the JSON `config` object."""
+    cfg = Config(
+        "example.com",
+        MappingProxyType({"newsletter": "Example Mailer"}),
+        spf=MappingProxyType({"a.example.com": "A", "b.example.com": "B"}),
+        ranges=MappingProxyType({ip_network("192.0.2.0/24"): "C"}),
+    )
+    summary = summary_of(cfg=cfg)
+
+    assert (
+        summary.selectors_configured,
+        summary.spf_domains_configured,
+        summary.ip_ranges_configured,
+    ) == (1, 2, 1)

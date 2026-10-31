@@ -349,14 +349,14 @@ def test_a_policy_that_changed_names_the_earlier_values() -> None:
 def test_an_empty_selector_map_adds_the_note_and_points_at_the_readme() -> None:
     header = section(render(make_summary(selectors_configured=0), None), "MailVigil")
     assert header[1] == "  config    none"
-    assert header[2] == "            no selectors are configured, so every sender is unrecognized"
+    assert header[2] == "            no sender is mapped, so every sender is unrecognized"
     assert "Configuration section of the README" in header[3]
 
 
 def test_a_file_with_no_selectors_still_gets_the_note() -> None:
     header = section(render(make_summary(selectors_configured=0)), "MailVigil")
     assert header[1] == "  config    mailvigil.toml (0 selectors)"
-    assert "no selectors are configured" in header[2]
+    assert "no sender is mapped" in header[2]
 
 
 def test_the_singular_forms() -> None:
@@ -772,3 +772,38 @@ def test_no_reports_message_is_short_enough_and_ends_without_a_newline() -> None
     message = no_reports_message(result, "d" * 80 + ".example.com")
     assert not message.endswith("\n")
     assert max(len(line) for line in message.split("\n")) <= 80
+
+
+# ---------------------------------------------------------------------------
+# SPF domains and ranges in the text (RF-11, ADR-8)
+# ---------------------------------------------------------------------------
+
+
+def test_the_configuration_line_counts_the_spf_domains_and_ranges_that_exist() -> None:
+    """Only the maps that hold something are counted after the selectors."""
+    summary = make_summary(spf_domains_configured=2, ip_ranges_configured=1)
+
+    header = section(render(summary), "MailVigil")
+    assert header[1] == "  config    mailvigil.toml (2 selectors, 2 SPF domains, 1 address range)"
+
+
+def test_a_file_with_only_spf_or_ranges_does_not_say_that_nothing_is_mapped() -> None:
+    """The note is for an empty configuration, not for one without selectors."""
+    only_spf = make_summary(selectors_configured=0, spf_domains_configured=1)
+    only_ranges = make_summary(selectors_configured=0, ip_ranges_configured=1)
+
+    assert "no sender is mapped" not in render(only_spf)
+    assert "no sender is mapped" not in render(only_ranges)
+
+
+def test_an_unrecognized_failing_source_lists_the_spf_domains_to_copy() -> None:
+    """The second line of a failing source ends with the SPF domains that passed."""
+    source = failing_source(spf_domains=("a.example.com",))
+    text = render(make_summary(failing=(source,)))
+
+    assert "dkim: fail, spf: fail; SPF domain a.example.com" in text
+
+
+def test_a_failing_source_without_spf_domains_has_no_extra_clause() -> None:
+    """Nothing is added when there is nothing to copy."""
+    assert "SPF domain" not in render(make_summary(failing=(failing_source(),)))

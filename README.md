@@ -63,8 +63,8 @@ e-mail, each with its reason in [Permanent non-goals][non-goals].
 
 ## Configuration
 
-MailVigil names a sender from the DKIM selector in its reports, using a map you write. The file is
-TOML, and the names below are invented:
+MailVigil names a sender from what its reports say (a DKIM selector, an SPF domain or the address
+it came from), using maps you write. The file is TOML, and the names below are invented:
 
 ```toml
 domain = "example.com"
@@ -73,6 +73,12 @@ domain = "example.com"
 newsletter = "Example Mailer (newsletters)"
 mailbox = "Example Mail (staff mailboxes)"
 "k1.v2" = "Example Campaigns"
+
+[spf]
+"bounce.example.com" = "Example Relay (SPF only)"
+
+[ips]
+"192.0.2.0/24" = "Example Office (own mail server)"
 ```
 
 - **Start with an empty `[senders]`** and fill it from what the first summary shows as unknown.
@@ -83,6 +89,20 @@ mailbox = "Example Mail (staff mailboxes)"
 - **A selector alone is not trusted.** It names a service only on a passing DKIM signature under
   your domain or one of its subdomains; the same selector under another domain is reported as a
   foreign domain.
+- **`[spf]` names a sender that authenticates by SPF alone.** The key is the domain the report
+  shows under SPF (a `bounce.` subdomain of yours, say), it must be your domain or a subdomain of
+  it, and the match is exact. A domain of a shared service (`amazonses.com`) can never align with
+  your domain, so MailVigil refuses it instead of keeping a line that never matches. When a row is
+  unrecognized, the summary lists the SPF domains that passed under your domain on it.
+- **`[ips]` names a sender by address range** (a CIDR block or a single address, IPv4 or IPv6) and
+  only counts on a record that also passed DKIM or SPF under your domain: the address says who
+  connected, not that the mail is yours. Use it for servers you alone control; a range on shared
+  hosting would name every tenant. A range wider than a `/16` (IPv4) or a `/32` (IPv6) is refused.
+  The narrowest range wins.
+- **Quote the keys of `[spf]` and `[ips]`.** They hold dots, slashes or colons, which TOML reads as
+  nested tables or refuses.
+- **The order is selector, then SPF domain, then address range.** The first that holds names the
+  sender; a failed or foreign selector does not stop an SPF domain or a range from naming it.
 - **The file is strict.** An unknown key (`domian`), a duplicate selector or a control character in
   a name is an error with a reason, never a silent guess, because a typo would change the answer.
 
@@ -229,8 +249,9 @@ Rules
   4  recognized failures    0                <= 0     pass
   5  unrecognized failures  56 (0.8%)        <= 0.5%  FAIL
 
-Next: look at the sources above and add the selectors of the ones that are yours
-      to [senders] in the configuration.
+Next: look at the sources above and add the ones that are yours to [senders]
+      (DKIM selector), [spf] (SPF domain) or [ips] (address range) in the
+      configuration.
 
 This reads only the reports you gave it: mail that no receiver reports on, and
 senders that were quiet in this period, are not covered.

@@ -68,6 +68,8 @@ The keys, in order.
 |---|---|---|
 | `source` | string or null | The configuration file as typed on the command line; null when there was none |
 | `selectors` | integer | How many DKIM selectors the configuration maps |
+| `spf_domains` | integer | How many SPF domains the configuration maps |
+| `ip_ranges` | integer | How many address ranges the configuration maps |
 
 ### `summary.reports`
 
@@ -118,6 +120,7 @@ One row of the senders table.
 | `service` | string or null | The service name when `known`, otherwise null |
 | `source_ip` | string or null | The address when not `known`, otherwise null |
 | `selectors` | list of strings | The configured selectors seen on a row that is not `known`, sorted |
+| `spf_domains` | list of strings | The SPF domains that passed under your domain on a row that is not `known`, sorted: the ones `[spf]` could name |
 | `counts` | object | See `counts` |
 
 ### `source`
@@ -131,6 +134,7 @@ One address whose messages failed. It is the same object in both documents.
 | `source_ip` | string | The address the failing messages came from |
 | `messages` | integer | The failing messages, at least 1 |
 | `selectors` | list of strings | The configured selectors seen on this source when it is not `known`, sorted |
+| `spf_domains` | list of strings | The SPF domains that passed under your domain on this source when it is not `known`, sorted |
 | `dkim` | list of strings | Why DKIM did not count, sorted: `fail`, `unaligned` or `none` |
 | `spf` | list of strings | The same vocabulary for SPF |
 | `override_reasons` | list of strings | The receiver's override types, sorted and unique |
@@ -268,7 +272,9 @@ All three use invented data: `example.com`, a made-up service and the documentat
   "domain": "example.com",
   "config": {
     "source": "mailvigil.toml",
-    "selectors": 1
+    "selectors": 1,
+    "spf_domains": 0,
+    "ip_ranges": 0
   },
   "reports": {
     "count": 29,
@@ -301,6 +307,7 @@ All three use invented data: `example.com`, a made-up service and the documentat
       "service": "Example Mailer",
       "source_ip": null,
       "selectors": [],
+      "spf_domains": [],
       "counts": {
         "ok": 6300,
         "dkim_only": 0,
@@ -314,6 +321,7 @@ All three use invented data: `example.com`, a made-up service and the documentat
       "service": "Example Mail",
       "source_ip": null,
       "selectors": [],
+      "spf_domains": [],
       "counts": {
         "ok": 0,
         "dkim_only": 950,
@@ -327,6 +335,7 @@ All three use invented data: `example.com`, a made-up service and the documentat
       "service": null,
       "source_ip": "203.0.113.5",
       "selectors": [],
+      "spf_domains": [],
       "counts": {
         "ok": 0,
         "dkim_only": 0,
@@ -342,6 +351,7 @@ All three use invented data: `example.com`, a made-up service and the documentat
       "selectors": [
         "s1"
       ],
+      "spf_domains": [],
       "counts": {
         "ok": 0,
         "dkim_only": 25,
@@ -355,6 +365,7 @@ All three use invented data: `example.com`, a made-up service and the documentat
       "service": null,
       "source_ip": "2001:db8::7",
       "selectors": [],
+      "spf_domains": [],
       "counts": {
         "ok": 0,
         "dkim_only": 0,
@@ -371,6 +382,7 @@ All three use invented data: `example.com`, a made-up service and the documentat
       "source_ip": "203.0.113.5",
       "messages": 40,
       "selectors": [],
+      "spf_domains": [],
       "dkim": [
         "fail"
       ],
@@ -387,6 +399,7 @@ All three use invented data: `example.com`, a made-up service and the documentat
       "source_ip": "2001:db8::7",
       "messages": 8,
       "selectors": [],
+      "spf_domains": [],
       "dkim": [
         "none"
       ],
@@ -490,6 +503,7 @@ All three use invented data: `example.com`, a made-up service and the documentat
       "source_ip": "203.0.113.5",
       "messages": 56,
       "selectors": [],
+      "spf_domains": [],
       "dkim": [
         "fail"
       ],

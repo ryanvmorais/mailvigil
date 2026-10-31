@@ -104,13 +104,16 @@ src/mailvigil/
                      #   files whose name did not qualify are counted (`passed_over`, ADR-9 of 002)
     ingest.py        #   ingest(paths, domain, now=None): the entry point; refusals go to `skipped`
   text.py            # text and domain rules shared by reports and config (clean_text, normalize_domain…)
-  config.py          # load_config(path) → frozen Config (domain + selector map + the [fetch] settings:
-                     # host, user, port, folder, never a password); check_domain is shared with the
-                     # CLI's --domain; ConfigError is typed (spec 003)
-  senders.py         # identify_sender(record, config) → Identification; a selector counts only under the domain
+  config.py          # load_config(path) → frozen Config (domain + selector map + the [spf] and [ips]
+                     # maps + the [fetch] settings: host, user, port, folder, never a password);
+                     # check_domain is shared with the CLI's --domain; ConfigError is typed (spec 003)
+  senders.py         # identify_sender(record, config) → Identification: a DKIM selector, an SPF domain
+                     # or an address range names a sender only on an authentication aligned with the
+                     # domain (ADR-8 of spec 003); the address needs a passing block as well
   summary.py         # summarize(result, config) → frozen Summary: rows per sender, failing sources, period,
                      # policy, what was left out (spec 004), the messages per day (`DayCounts`, spec 008,
-                     # internal: not in `--json`), what each reporter sent (`ReporterActivity`, internal);
+                     # internal: not in `--json`), what each reporter sent (`ReporterActivity`, internal),
+                     # the SPF domains that passed on a row not recognized (`spf_domains`, ADR-8);
                      # a day is covered when the merged report periods cover 12 h of it; never imports render
   render.py          # render_summary(summary, config_source, messages) → 80-column ASCII text;
                      # no_reports_message; also the public helpers fit, address, format_share,

@@ -49,6 +49,7 @@ _COMMON = CommonMessages(
         }
     ),
     selectors_named=Plural("seletor {names}", "seletores {names}"),
+    spf_domains_named=Plural("dominio SPF {names}", "dominios SPF {names}"),
     more_failing="... e {sources}: {messages}",
 )
 
@@ -67,7 +68,9 @@ _SUMMARY = SummaryMessages(
     key_messages="mensagens",
     config_none="nenhum",
     selector=Plural("{n} seletor", "{n} seletores"),
-    no_selectors="sem seletores configurados: todo remetente fica nao reconhecido",
+    spf_domain=Plural("{n} dominio SPF", "{n} dominios SPF"),
+    ip_range=Plural("{n} faixa de IP", "{n} faixas de IP"),
+    no_selectors="nenhum remetente mapeado: todo remetente fica nao reconhecido",
     no_selectors_hint="(veja a secao Configuration do README)",
     no_period="sem relatorios",
     # The two forms are alike: "com relatorio" does not agree with the count.
@@ -215,8 +218,8 @@ _VERDICT = VerdictMessages(
         "depois colete outro periodo."
     ),
     next_unrecognized=(
-        "olhe as origens acima e acrescente os seletores das que forem suas a [senders] na "
-        "configuracao."
+        "olhe as origens acima e acrescente as que forem suas a [senders] (seletor DKIM), "
+        "[spf] (dominio SPF) ou [ips] (faixa de IP) na configuracao."
     ),
     next_data="continue coletando relatorios ate que as regras marcadas '{marker}' passem.",
     skipped_file=Plural("{n} arquivo ignorado", "{n} arquivos ignorados"),
@@ -258,6 +261,13 @@ _REFUSALS = RefusalMessages(
             ConfigReason.PASSWORD_NOT_ALLOWED: (
                 "a senha nunca fica no arquivo: use o prompt ou --password-file"
             ),
+            ConfigReason.INVALID_SPF_DOMAIN: "dominio SPF invalido em [spf]",
+            ConfigReason.FOREIGN_SPF_DOMAIN: "dominio SPF fora do seu dominio",
+            ConfigReason.INVALID_IP_RANGE: (
+                "faixa de IP invalida em [ips]: use um bloco CIDR sem bits alem do prefixo, "
+                "nao mais largo que /16 (IPv4) ou /32 (IPv6)"
+            ),
+            ConfigReason.DUPLICATE_KEY: "chave repetida",
         }
     ),
     config_detail=frozenset({ConfigReason.MALFORMED_TOML, ConfigReason.UNKNOWN_KEY}),
@@ -367,8 +377,8 @@ _HTML = HtmlMessages(
     failing_heading="Fontes que falham",
     next_each_service="cada servico listado abaixo",
     next_unrecognized=(
-        "olhe as origens abaixo e acrescente os seletores das que forem suas a [senders] na "
-        "configuracao."
+        "olhe as origens abaixo e acrescente as que forem suas a [senders] (seletor DKIM), "
+        "[spf] (dominio SPF) ou [ips] (faixa de IP) na configuracao."
     ),
     col_day="Dia",
     range_label="{first} a {last}",

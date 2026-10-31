@@ -1,8 +1,9 @@
 """
-The configuration file: the domain the reports are about, the DKIM selector to service map and,
-for ``fetch``, the connection settings of the mailbox.
+The configuration file: the domain the reports are about, the maps from DKIM selector, SPF domain
+and address range to service name and, for ``fetch``, the connection settings of the mailbox.
 
-Only the owner knows which selector is which service, so the answer comes from a short TOML file.
+Only the owner knows which selector, SPF domain or address is which service, so the answer comes
+from a short TOML file.
 Unlike a report, which is third-party text shown despite being dirty, the file is written on purpose
 and feeds a security decision: every problem is a refusal that stops the load, never a repair
 (ADR-1). The loader takes a path and nothing else, prints nothing and reads no environment; where
@@ -12,17 +13,23 @@ the file lives is the command's job (RNF-02, RNF-03).
 from __future__ import annotations
 
 import difflib
+import ipaddress
 import re
 import stat
 import tomllib
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any
 
-from mailvigil.text import clean_text, has_dropped_characters, normalize_domain
+from mailvigil.text import (
+    clean_text,
+    has_dropped_characters,
+    is_within_domain,
+    normalize_domain,
+)
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -39,7 +46,7 @@ MAX_SERVICE_NAME = 100
 _MAX_KEY = 100
 
 # The top-level keys of the format. Anything else is a typo or a feature from the future.
-_ALLOWED_KEYS = ("domain", "senders", "fetch")
+_ALLOWED_KEYS = ("domain", "senders", "spf", "ips", "fetch")
 
 # The keys of the ``[fetch]`` table (ADR-7 of spec 003, ADR-12 of spec 009). The password is not one
 # of them and never will be; ``to``, ``since``, ``limit`` and ``cafile`` stay flags.
@@ -55,6 +62,11 @@ _MAX_FETCH_TEXT = 253
 # DNS limits: 253 characters in all, 63 per label, letters-digits-hyphen with no hyphen at the ends.
 _MAX_DOMAIN = 253
 _LABEL = re.compile(r"[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?")
+
+# The narrowest prefix an ``[ips]`` key may have (ADR-8 of spec 003): a wider range would name a
+# whole network as the owner's, which is almost certainly a mistake. /16 is 65,536 IPv4 addresses.
+MIN_PREFIX_V4 = 16
+MIN_PREFIX_V6 = 32
 
 # What a selector key can hold: enough to keep out whitespace, symbols and control characters.
 _SELECTOR = re.compile(r"[A-Za-z0-9._-]+")
@@ -80,13 +92,18 @@ class ConfigReason(StrEnum):
         MISSING_DOMAIN (str): There is no ``domain``.
         INVALID_DOMAIN (str): Not a string, empty, or not a plausible host name.
         NON_ASCII_DOMAIN (str): The domain must be written in its ``xn--`` form.
-        WRONG_TYPE (str): ``senders`` or ``fetch`` is not a table.
+        WRONG_TYPE (str): ``senders``, ``spf``, ``ips`` or ``fetch`` is not a table.
         INVALID_SELECTOR (str): A selector key a DKIM selector cannot be.
         DUPLICATE_SELECTOR (str): Two selector keys that differ only by case.
         INVALID_SERVICE_NAME (str): Not a string, blank, too long, or a nested value.
         FORBIDDEN_CHARACTER (str): A control, format or separator character in a name.
         INVALID_FETCH_VALUE (str): A ``[fetch]`` value of the wrong type or outside its range.
         PASSWORD_NOT_ALLOWED (str): A ``[fetch]`` key that would hold a password or a token.
+        INVALID_SPF_DOMAIN (str): An ``[spf]`` key that is not a plausible host name.
+        FOREIGN_SPF_DOMAIN (str): An ``[spf]`` key outside the configured domain.
+        INVALID_IP_RANGE (str): An ``[ips]`` key that is no address range, has bits set past its
+            prefix, or is wider than the floor.
+        DUPLICATE_KEY (str): Two keys of ``[spf]`` or ``[ips]`` that mean the same thing.
     """
 
     UNREADABLE = "unreadable"
@@ -104,6 +121,10 @@ class ConfigReason(StrEnum):
     FORBIDDEN_CHARACTER = "forbidden_character"
     INVALID_FETCH_VALUE = "invalid_fetch_value"
     PASSWORD_NOT_ALLOWED = "password_not_allowed"
+    INVALID_SPF_DOMAIN = "invalid_spf_domain"
+    FOREIGN_SPF_DOMAIN = "foreign_spf_domain"
+    INVALID_IP_RANGE = "invalid_ip_range"
+    DUPLICATE_KEY = "duplicate_key"
 
 
 class ConfigError(Exception):
@@ -166,6 +187,12 @@ class FetchSettings:
     folder: str | None = None
 
 
+IpNetwork = ipaddress.IPv4Network | ipaddress.IPv6Network
+
+_NO_NAMES: Mapping[str, str] = MappingProxyType({})
+_NO_RANGES: Mapping[IpNetwork, str] = MappingProxyType({})
+
+
 @dataclass(frozen=True, slots=True)
 class Config:
     """
@@ -176,11 +203,33 @@ class Config:
         senders (Mapping[str, str]): Lower-case DKIM selector to service name, as a read-only view.
             The loader builds it in sorted order, so two loads of the same content are equal.
         fetch (FetchSettings): The ``[fetch]`` table; every field is ``None`` when it is absent.
+        spf (Mapping[str, str]): Lower-case SPF domain, within ``domain``, to service name
+            (ADR-8). Default: empty.
+        ranges (Mapping[IpNetwork, str]): Canonical address range to service name (ADR-8).
+            Default: empty.
+        range_lengths (Mapping[int, tuple[int, ...]]): The prefix lengths present in ``ranges``,
+            longest first, by IP version (4 and 6). Derived, so a lookup masks the address once per
+            length instead of scanning every range.
     """
 
     domain: str
     senders: Mapping[str, str]
     fetch: FetchSettings = FetchSettings()
+    spf: Mapping[str, str] = _NO_NAMES
+    ranges: Mapping[IpNetwork, str] = _NO_RANGES
+    range_lengths: Mapping[int, tuple[int, ...]] = field(
+        init=False, default=MappingProxyType({}), repr=False, compare=False
+    )
+
+    def __post_init__(self) -> None:
+        """Derive ``range_lengths`` from ``ranges``."""
+        lengths: dict[int, set[int]] = {}
+        for network in self.ranges:
+            lengths.setdefault(network.version, set()).add(network.prefixlen)
+        derived = {
+            version: tuple(sorted(found, reverse=True)) for version, found in lengths.items()
+        }
+        object.__setattr__(self, "range_lengths", MappingProxyType(derived))
 
 
 # ---------------------------------------------------------------------------
@@ -338,19 +387,132 @@ def _read_senders(table: dict[str, Any]) -> dict[str, str]:
         if selector in senders:
             raise ConfigError(ConfigReason.DUPLICATE_SELECTOR, key, "differs only by case")
         # A dotted key (``a.b = "x"``) is read by TOML as a nested table, so it lands here.
-        if not isinstance(value, str):
-            raise ConfigError(ConfigReason.INVALID_SERVICE_NAME, key, "the name must be a string")
-        if has_dropped_characters(value):
-            raise ConfigError(ConfigReason.FORBIDDEN_CHARACTER, key, "control or format character")
-        name = value.strip()
-        if not name or len(name) > MAX_SERVICE_NAME:
-            raise ConfigError(
-                ConfigReason.INVALID_SERVICE_NAME,
-                key,
-                f"the name must have 1 to {MAX_SERVICE_NAME} characters",
-            )
-        senders[selector] = name
+        senders[selector] = _service_name(key, value)
     return senders
+
+
+def _service_name(key: str, value: object) -> str:
+    """
+    Validate the service name of one entry of ``[senders]``, ``[spf]`` or ``[ips]``.
+
+    Args:
+        key (str): The name to give a refusal, such as the entry's key or ``spf.<domain>``.
+        value (object): The value the file gave.
+
+    Returns:
+        str: The stripped name.
+
+    Raises:
+        ConfigError: ``INVALID_SERVICE_NAME`` or ``FORBIDDEN_CHARACTER``.
+    """
+    if isinstance(value, dict):
+        # TOML reads an unquoted dotted key as nested tables, the usual way to get here.
+        raise ConfigError(
+            ConfigReason.INVALID_SERVICE_NAME,
+            key,
+            'the name must be a string; write a key with dots in quotes: "a.b" = "name"',
+        )
+    if not isinstance(value, str):
+        raise ConfigError(ConfigReason.INVALID_SERVICE_NAME, key, "the name must be a string")
+    if has_dropped_characters(value):
+        raise ConfigError(ConfigReason.FORBIDDEN_CHARACTER, key, "control or format character")
+    name = value.strip()
+    if not name or len(name) > MAX_SERVICE_NAME:
+        raise ConfigError(
+            ConfigReason.INVALID_SERVICE_NAME,
+            key,
+            f"the name must have 1 to {MAX_SERVICE_NAME} characters",
+        )
+    return name
+
+
+def _read_spf(table: dict[str, Any], domain: str) -> dict[str, str]:
+    """
+    Validate the SPF domain map (step 8, ADR-8).
+
+    Args:
+        table (dict[str, Any]): The parsed file.
+        domain (str): The configured domain: every key must be within it.
+
+    Returns:
+        dict[str, str]: Normalized SPF domain to stripped service name, in sorted key order.
+
+    Raises:
+        ConfigError: ``WRONG_TYPE``, ``INVALID_SPF_DOMAIN``, ``NON_ASCII_DOMAIN``,
+            ``FOREIGN_SPF_DOMAIN``, ``DUPLICATE_KEY``, ``INVALID_SERVICE_NAME`` or
+            ``FORBIDDEN_CHARACTER``.
+    """
+    raw = table.get("spf", {})
+    if not isinstance(raw, dict):
+        raise ConfigError(ConfigReason.WRONG_TYPE, "spf", "spf must be a table")
+
+    spf: dict[str, str] = {}
+    for key, value in sorted(raw.items(), key=lambda item: (item[0].lower(), item[0])):
+        name = f"spf.{key}"
+        # The value first: an unquoted dotted domain arrives as a table under its first label.
+        service = _service_name(name, value)
+        try:
+            spf_domain = check_domain(key, name)
+        except ConfigError as error:
+            if error.reason is ConfigReason.INVALID_DOMAIN:
+                raise ConfigError(
+                    ConfigReason.INVALID_SPF_DOMAIN, name, "not a plausible host name"
+                ) from None
+            raise
+        # The same test as a DKIM signer's: a domain outside the owner's can never align.
+        if not is_within_domain(spf_domain, domain):
+            raise ConfigError(
+                ConfigReason.FOREIGN_SPF_DOMAIN, name, f"not {domain} or a subdomain of it"
+            )
+        if spf_domain in spf:
+            raise ConfigError(ConfigReason.DUPLICATE_KEY, name, "the same domain written twice")
+        spf[spf_domain] = service
+    return spf
+
+
+def _read_ranges(table: dict[str, Any]) -> dict[IpNetwork, str]:
+    """
+    Validate the address range map (step 9, ADR-8).
+
+    Args:
+        table (dict[str, Any]): The parsed file.
+
+    Returns:
+        dict[IpNetwork, str]: Canonical range to stripped service name, in sorted key order.
+
+    Raises:
+        ConfigError: ``WRONG_TYPE``, ``INVALID_IP_RANGE``, ``DUPLICATE_KEY``,
+            ``INVALID_SERVICE_NAME`` or ``FORBIDDEN_CHARACTER``.
+    """
+    raw = table.get("ips", {})
+    if not isinstance(raw, dict):
+        raise ConfigError(ConfigReason.WRONG_TYPE, "ips", "ips must be a table")
+
+    ranges: dict[IpNetwork, str] = {}
+    for key, value in sorted(raw.items(), key=lambda item: (item[0].lower(), item[0])):
+        name = f"ips.{key}"
+        service = _service_name(name, value)
+        try:
+            # Strict: ``192.0.2.1/24`` has bits set past its prefix and is most likely a typo.
+            network = ipaddress.ip_network(key.strip(), strict=True)
+        except ValueError:
+            raise ConfigError(
+                ConfigReason.INVALID_IP_RANGE,
+                name,
+                "not an address range, or it has bits set past its prefix",
+            ) from None
+        floor = MIN_PREFIX_V4 if network.version == 4 else MIN_PREFIX_V6
+        if network.prefixlen < floor:
+            raise ConfigError(ConfigReason.INVALID_IP_RANGE, name, f"wider than the /{floor} floor")
+        # A mapped range would never match: the lookup reads a mapped address as its IPv4 form.
+        if network.version == 6 and network.network_address.ipv4_mapped is not None:
+            raise ConfigError(
+                ConfigReason.INVALID_IP_RANGE, name, "write an IPv4-mapped range as IPv4"
+            )
+        if network in ranges:
+            raise ConfigError(ConfigReason.DUPLICATE_KEY, name, "the same range written twice")
+        ranges[network] = service
+    return ranges
 
 
 def _fetch_text(table: dict[str, Any], key: str, *, spaces: bool) -> str | None:
@@ -390,7 +552,7 @@ def _fetch_text(table: dict[str, Any], key: str, *, spaces: bool) -> str | None:
 
 def _read_fetch(table: dict[str, Any]) -> FetchSettings:
     """
-    Validate the ``[fetch]`` table (step 8).
+    Validate the ``[fetch]`` table (step 10).
 
     The password has no key: a key that looks like one is refused with a reason of its own.
 
@@ -453,7 +615,8 @@ def load_config(path: Path) -> Config:
     Load a configuration file.
 
     The checks run in a fixed order and the first failure is the one reported (RF-07): the file,
-    its bytes, its TOML, the top-level keys, the domain, the selector map, then ``[fetch]``.
+    its bytes, its TOML, the top-level keys, the domain, the selector map, ``[spf]``, ``[ips]``,
+    then ``[fetch]``.
 
     Args:
         path (Path): The TOML file. The loader never searches for one.
@@ -468,5 +631,9 @@ def load_config(path: Path) -> Config:
     _check_keys(table)
     domain = _read_domain(table)
     senders = _read_senders(table)
+    spf = _read_spf(table, domain)
+    ranges = _read_ranges(table)
     fetch = _read_fetch(table)
-    return Config(domain, MappingProxyType(senders), fetch)
+    return Config(
+        domain, MappingProxyType(senders), fetch, MappingProxyType(spf), MappingProxyType(ranges)
+    )

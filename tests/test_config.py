@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from dataclasses import FrozenInstanceError
 from enum import StrEnum
+from ipaddress import ip_network
 from pathlib import Path
 from types import MappingProxyType
 
@@ -74,10 +75,10 @@ def refusal(path: Path) -> ConfigError:
 # ---------------------------------------------------------------------------
 
 
-def test_config_reason_is_a_string_enum_with_the_fifteen_members() -> None:
-    """``ConfigReason`` has exactly the fifteen refusals of the design, each a string."""
+def test_config_reason_is_a_string_enum_with_the_nineteen_members() -> None:
+    """``ConfigReason`` has exactly the nineteen refusals of the design, each a string."""
     assert issubclass(ConfigReason, StrEnum)
-    assert len(ConfigReason) == 15
+    assert len(ConfigReason) == 19
 
 
 def test_config_reason_values_are_unique_lower_snake_strings() -> None:
@@ -706,3 +707,198 @@ def test_the_same_content_in_two_orders_gives_equal_configs(tmp_path: Path) -> N
 
     assert load_config(one) == load_config(other)
     assert list(load_config(one).senders) == ["resend", "zoho"]
+
+
+# ---------------------------------------------------------------------------
+# The [spf] and [ips] tables (RF-09, ADR-8)
+# ---------------------------------------------------------------------------
+
+
+def test_a_file_without_the_new_tables_loads_with_both_maps_empty(tmp_path: Path) -> None:
+    """Every file written before the amendment loads as before."""
+    config = load_config(write(tmp_path, _VALID))
+
+    assert config.spf == {}
+    assert config.ranges == {}
+    assert config.range_lengths == {}
+
+
+def test_both_tables_are_read_normalized_and_read_only(tmp_path: Path) -> None:
+    """Domains are lower case without the dot, ranges canonical, names stripped."""
+    text = (
+        f'{_VALID}[spf]\n"Bounce.Example.COM." = "  Example Relay "\n'
+        '[ips]\n"192.0.2.0/24" = "Example Office"\n"2001:DB8::/32" = "Example v6"\n'
+        '"198.51.100.7" = "Example Host"\n'
+    )
+    config = load_config(write(tmp_path, text))
+
+    assert dict(config.spf) == {"bounce.example.com": "Example Relay"}
+    assert dict(config.ranges) == {
+        ip_network("192.0.2.0/24"): "Example Office",
+        ip_network("2001:db8::/32"): "Example v6",
+        ip_network("198.51.100.7/32"): "Example Host",
+    }
+    assert config.range_lengths == {4: (32, 24), 6: (32,)}
+    with pytest.raises(TypeError):
+        config.spf["x.example.com"] = "x"  # type: ignore[index]  # read-only on purpose
+    with pytest.raises(TypeError):
+        config.ranges[ip_network("192.0.2.0/24")] = "x"  # type: ignore[index]  # read-only
+
+
+def test_the_apex_domain_is_a_valid_spf_key(tmp_path: Path) -> None:
+    """The configured domain itself is an SPF domain of the owner."""
+    config = load_config(write(tmp_path, f'{_VALID}[spf]\n"example.com" = "Example Mail"\n'))
+
+    assert dict(config.spf) == {"example.com": "Example Mail"}
+
+
+@pytest.mark.parametrize(
+    ("key", "reason"),
+    [
+        ("example.org", ConfigReason.FOREIGN_SPF_DOMAIN),
+        ("notexample.com", ConfigReason.FOREIGN_SPF_DOMAIN),
+        ("example.com.evil.net", ConfigReason.FOREIGN_SPF_DOMAIN),
+        ("localhost", ConfigReason.INVALID_SPF_DOMAIN),
+        ("a b.example.com", ConfigReason.INVALID_SPF_DOMAIN),
+        ("https://x.example.com", ConfigReason.INVALID_SPF_DOMAIN),
+        ("a..example.com", ConfigReason.INVALID_SPF_DOMAIN),
+        ("exämple.com", ConfigReason.NON_ASCII_DOMAIN),
+    ],
+)
+def test_a_bad_spf_key_is_refused_with_its_reason_and_the_key(
+    tmp_path: Path, key: str, reason: ConfigReason
+) -> None:
+    """A domain outside the owner's can never align, so it is a refusal, not a dead line."""
+    error = refusal(write(tmp_path, f'{_VALID}[spf]\n"{key}" = "Example Relay"\n'))
+
+    assert error.reason is reason
+    assert error.key == f"spf.{key}"
+
+
+def test_two_spellings_of_one_spf_domain_are_a_duplicate(tmp_path: Path) -> None:
+    """Case and a trailing dot do not make a second domain."""
+    text = f'{_VALID}[spf]\n"Mail.Example.com" = "A"\n"mail.example.com." = "B"\n'
+
+    assert refusal(write(tmp_path, text)).reason is ConfigReason.DUPLICATE_KEY
+
+
+@pytest.mark.parametrize(
+    "key",
+    [
+        "192.0.2.1/24",
+        "10.0.0.0/8",
+        "0.0.0.0/0",
+        "::/0",
+        "2001:db8::/16",
+        "not-an-ip",
+        "192.0.2.0/33",
+    ],
+)
+def test_a_bad_range_is_refused(tmp_path: Path, key: str) -> None:
+    """Host bits, a prefix under the floor and plain text are all `INVALID_IP_RANGE`."""
+    error = refusal(write(tmp_path, f'{_VALID}[ips]\n"{key}" = "Example Office"\n'))
+
+    assert error.reason is ConfigReason.INVALID_IP_RANGE
+    assert error.key == f"ips.{key}"
+
+
+def test_the_floor_prefixes_are_accepted_and_one_wider_is_not(tmp_path: Path) -> None:
+    """/16 for IPv4 and /32 for IPv6 are the widest allowed."""
+    accepted = write(tmp_path, f'{_VALID}[ips]\n"10.1.0.0/16" = "A"\n"2001:db8::/32" = "B"\n')
+    wider = write(tmp_path, f'{_VALID}[ips]\n"10.0.0.0/15" = "A"\n', "wider.toml")
+
+    assert len(load_config(accepted).ranges) == 2
+    assert refusal(wider).key == "ips.10.0.0.0/15"
+
+
+def test_an_ipv4_mapped_range_is_refused_because_it_could_never_match(tmp_path: Path) -> None:
+    """The lookup reads a mapped address as IPv4, so a mapped range would be a dead line."""
+    error = refusal(write(tmp_path, f'{_VALID}[ips]\n"::ffff:192.0.2.0/120" = "A"\n'))
+
+    assert error.reason is ConfigReason.INVALID_IP_RANGE
+    assert "IPv4" in error.detail
+
+
+def test_two_spellings_of_one_range_are_a_duplicate(tmp_path: Path) -> None:
+    """The canonical form decides, not the text."""
+    text = f'{_VALID}[ips]\n"2001:DB8::/32" = "A"\n"2001:db8:0::/32" = "B"\n'
+
+    assert refusal(write(tmp_path, text)).reason is ConfigReason.DUPLICATE_KEY
+
+
+@pytest.mark.parametrize("table", ["spf", "ips"])
+def test_a_table_that_is_not_a_table_is_refused(tmp_path: Path, table: str) -> None:
+    """`spf = "x"` is a mistake the loader names."""
+    error = refusal(write(tmp_path, f'{table} = "x"\n' + _VALID))
+
+    assert error.reason is ConfigReason.WRONG_TYPE
+    assert error.key == table
+
+
+@pytest.mark.parametrize(("table", "key"), [("spf", "mail.example.com"), ("ips", "192.0.2.0/24")])
+@pytest.mark.parametrize(
+    ("value", "reason"),
+    [
+        ("1", ConfigReason.INVALID_SERVICE_NAME),
+        ('""', ConfigReason.INVALID_SERVICE_NAME),
+        ('"   "', ConfigReason.INVALID_SERVICE_NAME),
+        (f'"{"x" * (MAX_SERVICE_NAME + 1)}"', ConfigReason.INVALID_SERVICE_NAME),
+        ('"a\\u202eb"', ConfigReason.FORBIDDEN_CHARACTER),
+    ],
+)
+def test_a_service_name_of_the_new_tables_follows_the_rules_of_senders(
+    tmp_path: Path, table: str, key: str, value: str, reason: ConfigReason
+) -> None:
+    """The three tables share one name check."""
+    error = refusal(write(tmp_path, f'{_VALID}[{table}]\n"{key}" = {value}\n'))
+
+    assert error.reason is reason
+    assert error.key == f"{table}.{key}"
+
+
+def test_an_unquoted_dotted_key_gets_a_hint_about_quotes(tmp_path: Path) -> None:
+    """TOML reads `a.b = "x"` as nested tables; the refusal says to quote the key."""
+    error = refusal(write(tmp_path, f'{_VALID}[spf]\nmail.example.com = "Example Relay"\n'))
+
+    assert error.reason is ConfigReason.INVALID_SERVICE_NAME
+    assert "quotes" in error.detail
+
+
+def test_the_new_tables_are_allowed_keys_and_a_typo_is_still_suggested(tmp_path: Path) -> None:
+    """`ip` is not `ips`, and the refusal says which one was meant."""
+    error = refusal(write(tmp_path, f'{_VALID}[ip]\n"192.0.2.0/24" = "A"\n'))
+
+    assert error.reason is ConfigReason.UNKNOWN_KEY
+    assert "ips" in error.detail
+
+
+def test_the_loader_checks_senders_then_spf_then_ranges_then_fetch(tmp_path: Path) -> None:
+    """The first problem found follows the fixed order of the steps."""
+    ranges_and_fetch = f'{_VALID}[fetch]\nport = 0\n[ips]\n"1.2.3.4/8" = "A"\n'
+    spf_ranges_fetch = ranges_and_fetch + '[spf]\n"x.example.org" = "B"\n'
+    all_four = spf_ranges_fetch + '[senders]\n"bad key" = "C"\n'
+
+    assert refusal(write(tmp_path, all_four)).reason is ConfigReason.INVALID_SELECTOR
+    assert refusal(write(tmp_path, spf_ranges_fetch)).reason is ConfigReason.FOREIGN_SPF_DOMAIN
+    assert refusal(write(tmp_path, ranges_and_fetch)).reason is ConfigReason.INVALID_IP_RANGE
+
+
+def test_the_same_content_in_two_orders_gives_equal_configs_with_the_new_tables(
+    tmp_path: Path,
+) -> None:
+    """Equal values whatever the order of the keys and of the tables (RNF-05)."""
+    one = write(
+        tmp_path,
+        f'{_VALID}[spf]\n"b.example.com" = "B"\n"a.example.com" = "A"\n'
+        '[ips]\n"198.51.100.0/24" = "D"\n"192.0.2.0/24" = "C"\n',
+        "one.toml",
+    )
+    other = write(
+        tmp_path,
+        f'{_VALID}[ips]\n"192.0.2.0/24" = "C"\n"198.51.100.0/24" = "D"\n'
+        '[spf]\n"a.example.com" = "A"\n"b.example.com" = "B"\n',
+        "other.toml",
+    )
+
+    assert load_config(one) == load_config(other)
+    assert list(load_config(one).spf) == ["a.example.com", "b.example.com"]

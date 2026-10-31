@@ -47,6 +47,7 @@ _COMMON = CommonMessages(
         }
     ),
     selectors_named=Plural("selector {names}", "selectors {names}"),
+    spf_domains_named=Plural("SPF domain {names}", "SPF domains {names}"),
     more_failing="... and {sources}: {messages}",
 )
 
@@ -65,7 +66,9 @@ _SUMMARY = SummaryMessages(
     key_messages="messages",
     config_none="none",
     selector=Plural("{n} selector", "{n} selectors"),
-    no_selectors="no selectors are configured, so every sender is unrecognized",
+    spf_domain=Plural("{n} SPF domain", "{n} SPF domains"),
+    ip_range=Plural("{n} address range", "{n} address ranges"),
+    no_selectors="no sender is mapped, so every sender is unrecognized",
     no_selectors_hint="(see the Configuration section of the README)",
     no_period="no reports",
     period=Plural(
@@ -217,8 +220,8 @@ _VERDICT = VerdictMessages(
         "another period."
     ),
     next_unrecognized=(
-        "look at the sources above and add the selectors of the ones that are yours to "
-        "[senders] in the configuration."
+        "look at the sources above and add the ones that are yours to [senders] (DKIM selector), "
+        "[spf] (SPF domain) or [ips] (address range) in the configuration."
     ),
     next_data="keep collecting reports until the rules marked '{marker}' pass.",
     skipped_file=Plural("{n} file skipped", "{n} files skipped"),
@@ -352,8 +355,8 @@ _HTML = HtmlMessages(
     failing_heading="Failing sources",
     next_each_service="each service listed below",
     next_unrecognized=(
-        "look at the sources below and add the selectors of the ones that are yours to "
-        "[senders] in the configuration."
+        "look at the sources below and add the ones that are yours to [senders] (DKIM selector), "
+        "[spf] (SPF domain) or [ips] (address range) in the configuration."
     ),
     col_day="Day",
     range_label="{first} to {last}",

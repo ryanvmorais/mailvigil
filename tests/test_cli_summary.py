@@ -237,7 +237,7 @@ def test_no_file_gives_config_none_and_an_empty_map(
 
     out = capsys.readouterr().out
     assert "config    none\n" in out
-    assert "no selectors are configured" in out
+    assert "no sender is mapped" in out
     assert "Example Mail" not in out
 
 
@@ -517,3 +517,40 @@ def test_the_json_counts_the_files_passed_over(
     assert main(["summary", str(reports), "--domain", "example.com", "--json"]) == 0
 
     assert json.loads(capsys.readouterr().out)["passed_over"] == 1
+
+
+# ---------------------------------------------------------------------------
+# Naming a sender by SPF domain or address range (ADR-8 of spec 003)
+# ---------------------------------------------------------------------------
+
+
+def test_a_config_with_spf_and_ranges_names_senders_end_to_end(
+    tmp_path: Path,
+    make_report_xml: Callable[..., bytes],
+    make_record_xml: Callable[..., str],
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """SPF-only mail and a signed mail from an owned range are named."""
+    record_xml = make_record_xml
+    folder = tmp_path / "reports"
+    folder.mkdir()
+    records = [
+        record_xml(ip="203.0.113.5", dkim=(), spf=(("bounce.example.com", "pass"),)),
+        record_xml(ip="198.51.100.7", dkim=(("example.com", "unlisted", "pass"),), spf=()),
+        record_xml(ip="192.0.2.99", dkim=(), spf=(("mail.example.com", "pass"),)),
+    ]
+    (folder / _ATTACHMENT).write_bytes(make_report_xml(records=records))
+    config = tmp_path / "mailvigil.toml"
+    config.write_text(
+        'domain = "example.com"\n[spf]\n"bounce.example.com" = "Example Relay"\n'
+        '[ips]\n"198.51.100.0/24" = "Example Office"\n',
+        encoding="utf-8",
+    )
+
+    assert main(["summary", str(folder), "--config", str(config)]) == 0
+
+    out = capsys.readouterr().out
+    assert "(0 selectors, 1 SPF domain, 1 address range)" in out
+    assert "Example Relay" in out
+    assert "Example Office" in out
+    assert "no sender is mapped" not in out

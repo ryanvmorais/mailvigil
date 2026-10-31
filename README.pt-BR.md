@@ -66,8 +66,9 @@ envio de e-mail, cada um com o seu motivo em [Não-objetivos permanentes][non-go
 
 ## Configuração
 
-O MailVigil dá nome a um remetente a partir do seletor DKIM que aparece nos relatórios, usando um
-mapa que você escreve. O arquivo é TOML, e os nomes abaixo são inventados:
+O MailVigil dá nome a um remetente a partir do que os relatórios dizem (um seletor DKIM, um domínio
+SPF ou o endereço de onde veio), usando mapas que você escreve. O arquivo é TOML, e os nomes abaixo
+são inventados:
 
 ```toml
 domain = "example.com"
@@ -76,6 +77,12 @@ domain = "example.com"
 newsletter = "Example Mailer (newsletters)"
 mailbox = "Example Mail (staff mailboxes)"
 "k1.v2" = "Example Campaigns"
+
+[spf]
+"bounce.example.com" = "Example Relay (SPF only)"
+
+[ips]
+"192.0.2.0/24" = "Example Office (own mail server)"
 ```
 
 - **Comece com o `[senders]` vazio** e preencha a partir do que o primeiro resumo mostrar como
@@ -88,6 +95,22 @@ mailbox = "Example Mail (staff mailboxes)"
 - **Um seletor sozinho não é confiável.** Ele dá nome a um serviço só quando há uma assinatura DKIM
   válida sob o seu domínio ou um subdomínio dele; o mesmo seletor sob outro domínio é apontado
   como domínio estrangeiro.
+- **`[spf]` dá nome a um remetente que se autentica só por SPF.** A chave é o domínio que o relatório
+  mostra no SPF (um subdomínio `bounce.` seu, por exemplo); precisa ser o seu domínio ou um
+  subdomínio dele, e a comparação é exata. O domínio de um serviço compartilhado (`amazonses.com`)
+  nunca alinha com o seu, então o MailVigil o recusa em vez de guardar uma linha que nunca casa.
+  Quando uma linha não é reconhecida, o resumo lista os domínios SPF que passaram sob o seu domínio
+  nela.
+- **`[ips]` dá nome a um remetente por faixa de endereços** (um bloco CIDR ou um endereço, IPv4 ou
+  IPv6) e só vale num registro que também passou no DKIM ou no SPF sob o seu domínio: o endereço diz
+  quem conectou, não que o e-mail é seu. Use para servidores só seus; uma faixa de hospedagem
+  compartilhada daria nome a todos os clientes dela. Uma faixa mais larga que `/16` (IPv4) ou `/32`
+  (IPv6) é recusada. Vence a faixa mais estreita.
+- **Ponha entre aspas as chaves de `[spf]` e `[ips]`.** Elas têm pontos, barras ou dois-pontos, que
+  o TOML lê como tabelas aninhadas ou recusa.
+- **A ordem é seletor, depois domínio SPF, depois faixa de endereços.** O primeiro que valer dá
+  nome ao remetente; um seletor que falhou ou é estrangeiro não impede o domínio SPF ou a faixa de
+  dar o nome.
 - **O arquivo é estrito.** Uma chave desconhecida (`domian`), um seletor repetido ou um caractere de
   controle num nome é um erro com motivo, nunca um palpite silencioso, porque um erro de digitação
   mudaria a resposta.
@@ -237,8 +260,9 @@ Regras
   4  falhas reconhecidas      0                <= 0        passa
   5  falhas nao reconhecidas  56 (0.8%)        <= 0.5%     FALHA
 
-Proximo: olhe as origens acima e acrescente os seletores das que forem suas a
-         [senders] na configuracao.
+Proximo: olhe as origens acima e acrescente as que forem suas a [senders]
+         (seletor DKIM), [spf] (dominio SPF) ou [ips] (faixa de IP) na
+         configuracao.
 
 Isto le apenas os relatorios que voce deu: email que nenhum receptor reporta, e
 remetentes que ficaram quietos neste periodo, nao sao cobertos.
