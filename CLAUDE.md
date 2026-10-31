@@ -122,14 +122,15 @@ src/mailvigil/
   render_verdict.py  # render_verdict(verdict, messages) → 80-column ASCII text: reason, rules table,
                      # notes, what was left out, next step
   render_json.py     # summary_document / verdict_document / fetch_document → dict, dumps → ASCII JSON, no language
-                     # (spec 006); the schema is public contract, see docs/json-schema.md
+                     # (spec 006); the schema is public contract, see docs/json-schema.md; `top=N`
+                     # trims the long lists and adds the last key `top` (ADR-8)
   htmlkit.py         # the ONLY module that builds markup (spec 008): `text()` escapes a str into a `Safe`
                      # (a NewType), `el()` takes only `Safe` children and allowlisted tags
   html_style.py      # the palette (light and dark dicts, contrast measured by a test), the stylesheet
                      # and the CSP constant: no `url()`, no `@import`, no `<`
   html_charts.py     # meter, stacked_bar and timeline as inline SVG, integer geometry, figures in words
   render_html.py     # render_html(summary, verdict, messages) → one self-contained ASCII page: no script,
-                     # no network, no path or file name
+                     # no network, no path or file name; the senders table stops at 50 rows or `top` (ADR-12)
   render_fetch.py    # render_fetch(outcome, directory, messages) → the six numbers of a run;
                      # refusal_line(refusal, messages) → the one line of a refused run (spec 009)
   fetch/             # `mailvigil fetch` (spec 009): the only code that reaches the network
@@ -142,19 +143,13 @@ src/mailvigil/
   messages/          # every sentence of the tool, one Messages per language (spec 006): model.py
                      # (Plural and the frozen dataclasses), en.py (ENGLISH), pt_br.py (PORTUGUESE,
                      # ASCII only); language_by_code; imports no renderer
-tests/               # pytest, one test file per module (test_reports_*.py incl.
-                     # test_reports_mail.py, test_text.py, test_config.py,
-                     # test_senders.py, test_summary.py, test_render.py, test_verdict.py,
-                     # test_render_verdict.py, test_render_json.py, test_render_pt.py,
-                     # test_messages.py, test_json_schema_doc.py, test_cli_summary.py,
-                     # test_cli_verdict.py, test_cli_json.py, test_cli_lang.py,
-                     # test_cli_exit_codes.py, test_cli_mail.py, test_htmlkit.py, test_html_style.py,
-                     # test_html_charts.py, test_render_html.py, test_render_html_hostile.py,
-                     # test_cli_html.py, test_cli_html_output.py, test_fetch_*.py,
-                     # test_render_fetch.py, test_cli_fetch.py, test_smoke.py, test_gitignore.py,
-                     # test_readme_pt_br.py, test_readme_links.py, test_properties.py (Hypothesis:
-                     # the readers only refuse and a parsed report reaches every output; the
-                     # `thorough` profile is for a long hunt) and
+tests/               # pytest, one test file per module (test_reports_*.py, test_text.py, test_config.py,
+                     # test_senders.py, test_summary.py, test_verdict.py, test_render*.py incl. the
+                     # *_top.py ones for `--top`, test_messages.py, test_json_schema_doc.py,
+                     # test_cli_*.py incl. test_cli_top.py, test_htmlkit.py, test_html_*.py,
+                     # test_fetch_*.py, test_smoke.py, test_gitignore.py, test_readme_*.py,
+                     # test_properties.py (Hypothesis: the readers only refuse and a parsed report
+                     # reaches every output; the `thorough` profile is for a long hunt) and
                      # test_offline_isolation.py, which runs fresh interpreters to prove that
                      # summary and verdict never load the network code); fixtures are synthetic,
                      # built in conftest.py, cli_helpers.py, mail_helpers.py, schema_examples.py,
