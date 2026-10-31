@@ -58,10 +58,10 @@ The release (1.6.0) is the maintainer's act and is prepared apart, with `/prepar
 
 ## Stage 2 — One reading for many domains (RF-04, RNF-02, ADR-3, ADR-4)
 
-- [ ] Compatibility first: check that the existing suites pin the exact text, JSON and result of a
+- [x] Compatibility first: check that the existing suites pin the exact text, JSON and result of a
   one-domain run over a folder with a foreign report, a duplicate and a refused file; if a case is
   missing, add it **before** the refactor and see it pass on the current code. — RNF-01
-- [ ] `tests/test_reports_ingest_many.py`, written first: three wanted domains and a foreign one —
+- [x] `tests/test_reports_ingest_many.py`, written first: three wanted domains and a foreign one —
   each report goes to its own domain, a report is in exactly one result, `other_domain` counts only
   the foreign one and is the same in every result, `skipped` and `passed_over` are the same in
   every result, results come in the order of the wanted domains; a duplicate within a domain is
@@ -70,9 +70,14 @@ The release (1.6.0) is the maintainer's act and is prepared apart, with `/prepar
   and each report parsed once** whatever the number of domains; `ingest` with one domain equals
   `ingest_many` with that one. A Hypothesis case in `test_properties.py`: no report is ever kept by
   two domains, and a one-domain `ingest_many` equals `ingest`. — RF-04, RNF-02
-- [ ] `src/mailvigil/reports/ingest.py` and `reports/__init__.py`: `ingest_many`, with `ingest` as its
+- [x] `src/mailvigil/reports/ingest.py` and `reports/__init__.py`: `ingest_many`, with `ingest` as its
   call for one domain. — RF-04, ADR-3
-- [ ] Quality gate of the stage (as above). Record the result here. — RNF-01, RNF-06
+- [x] Quality gate of the stage (as above). Record the result here. — RNF-01, RNF-06
+  Result (2026-10-30): ruff, black and mypy clean; 3186 passed, 4 skipped (POSIX modes and symbolic
+  links on Windows); coverage 100%. The compatibility case was missing and was added first
+  (`test_a_one_domain_run_over_a_mixed_folder_has_the_whole_result_pinned`), green on the old code.
+  The only edit to an old test is the new name in the public-API list. `ingest_many` keys its
+  results by the normalized name and collapses a repeated domain into one.
 
 ## Stage 3 — Vocabulary: worst answer, joining, tally, sentences (RF-05, RF-06, ADR-5, ADR-6, ADR-11)
 

@@ -38,7 +38,14 @@ from mailvigil.render import render_summary
 from mailvigil.render_html import render_html
 from mailvigil.render_json import dumps, summary_document, verdict_document
 from mailvigil.render_verdict import render_verdict
-from mailvigil.reports import IngestionResult, Reason, Report, ReportRefused, ingest
+from mailvigil.reports import (
+    IngestionResult,
+    Reason,
+    Report,
+    ReportRefused,
+    ingest,
+    ingest_many,
+)
 from mailvigil.reports.mail import iter_mailbox, read_message
 from mailvigil.reports.parser import parse_report
 from mailvigil.reports.reader import Kind, read_xml_bytes
@@ -382,6 +389,37 @@ def test_ingestion_keeps_going_whatever_the_files_hold(contents: list[bytes]) ->
         result = ingest(paths, "example.com")
     assert isinstance(result, IngestionResult)
     assert all(isinstance(skipped.reason, Reason) for skipped in result.skipped)
+
+
+@settings(max_examples=30, suppress_health_check=[HealthCheck.function_scoped_fixture])
+@given(
+    drawn=st.lists(
+        st.tuples(
+            st.sampled_from(("example.com", "example.net", "example.org", "example.invalid")),
+            st.sampled_from(("r1", "r2", "r3")),
+        ),
+        max_size=8,
+    )
+)
+def test_many_domains_never_share_a_report_and_each_matches_a_run_of_its_own(
+    make_report_xml: Callable[..., bytes], drawn: list[tuple[str, str]]
+) -> None:
+    """A report is kept by one domain at most, and a domain's result is what it gets alone."""
+    wanted = ["example.com", "example.net", "example.org"]
+    with tempfile.TemporaryDirectory() as folder:
+        for index, (domain, report_id) in enumerate(drawn):
+            document = make_report_xml(domain=domain, report_id=report_id)
+            name = f"f{index}!example.com!1790000000!1790086399.xml"
+            (Path(folder) / name).write_bytes(document)
+        together = ingest_many([Path(folder)], wanted)
+        alone = {domain: ingest([Path(folder)], domain) for domain in wanted}
+
+    kept = [report.source_file for result in together.values() for report in result.reports]
+    assert len(kept) == len(set(kept))
+    for domain in wanted:
+        assert together[domain].reports == alone[domain].reports
+        assert together[domain].duplicates == alone[domain].duplicates
+        assert together[domain].skipped == alone[domain].skipped
 
 
 # ---------------------------------------------------------------------------
