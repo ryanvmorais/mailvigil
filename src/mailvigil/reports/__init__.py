@@ -2,7 +2,7 @@
 
 from mailvigil.reports.discovery import Source, discover
 from mailvigil.reports.errors import Reason, ReportRefused
-from mailvigil.reports.ingest import ingest
+from mailvigil.reports.ingest import ingest, ingest_many
 from mailvigil.reports.mail import (
     MAX_DEPTH,
     MAX_LINES,
@@ -48,6 +48,7 @@ __all__ = [
     "SpfResult",
     "discover",
     "ingest",
+    "ingest_many",
     "iter_mailbox",
     "parse_report",
     "read_message",

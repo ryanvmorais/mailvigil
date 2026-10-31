@@ -1,8 +1,9 @@
 """
-Ingestion: the one entry point that turns paths into the reports of a domain.
+Ingestion: the one entry point that turns paths into the reports of one or several domains.
 
-``ingest`` runs discovery, the reader and the parser over every file, keeps the reports of the
-wanted domain, drops the ones already seen, and records every file it had to refuse. A file is a
+``ingest_many`` runs discovery, the reader and the parser over every file once, files the reports of
+each wanted domain under it, drops the ones already seen and records every file it had to refuse;
+``ingest`` is its call for one domain. A file is a
 loose report (``.xml``, ``.gz``, ``.zip``), a mail message (``.eml``) or a mailbox (``.mbox``); the
 last two hold zero or more attachments, each of which goes through the same reader and parser as a
 loose file (007). A refusal is per file, or per attachment, and never global (RF-09): one corrupt
@@ -165,20 +166,26 @@ def _documents(source: Source) -> Iterator[_Document | SkippedFile]:
 # ---------------------------------------------------------------------------
 
 
-def ingest(
+def ingest_many(
     paths: Sequence[Path],
-    domain: str,
+    domains: Sequence[str],
     now: datetime | None = None,
     recursive: bool = False,
-) -> IngestionResult:
+) -> dict[str, IngestionResult]:
     """
-    Read every report under the given paths that belongs to a domain.
+    Read every report under the given paths once and file each under the domain it belongs to.
+
+    Every file is opened, decompressed and parsed a single time whatever the number of domains
+    (RNF-02), so the cost of a run does not grow with them. What belongs to a domain is its
+    ``reports`` and its ``duplicates``; ``skipped`` and ``passed_over`` are the same in every
+    result, because a file that could not be read cannot be assigned to a domain; ``other_domain``
+    is the number of reports of no domain of the run, the same in every result (ADR-4 of 010).
 
     Args:
         paths (Sequence[Path]): Files and folders, as ``discover`` takes them.
-        domain (str): The domain whose reports are wanted. Compared exactly and without regard to
-            case, so ``mail.example.com`` is not ``example.com``; surrounding spaces and a trailing
-            dot are ignored.
+        domains (Sequence[str]): The domains whose reports are wanted. Each is compared exactly and
+            without regard to case, so ``mail.example.com`` is not ``example.com``; surrounding
+            spaces and a trailing dot are ignored, and a name given twice is one domain.
         now (datetime | None, optional): The moment the run happens, timezone-aware. A report that
             ends more than ``FUTURE_TOLERANCE`` after it is refused (``INVALID_FIELD``), so a
             report cannot claim to be the latest policy by dating itself ahead. ``None`` skips the
@@ -187,23 +194,28 @@ def ingest(
             Default: ``False``.
 
     Returns:
-        IngestionResult: The reports kept in discovery order, the files refused with their reasons,
-            how many reports were dropped as duplicates, how many belonged to another domain and
-            how many files the folder search passed over by name. Returned even when nothing was
-            kept.
+        dict[str, IngestionResult]: One result per distinct domain, keyed by the normalized name, in
+            the order the domains were given. Each result holds the reports kept in discovery order,
+            the files refused with their reasons, how many reports were dropped as duplicates, how
+            many belonged to no domain of the run and how many files the folder search passed over
+            by name. Returned even when nothing was kept.
 
     Raises:
-        ValueError: When ``domain`` is empty. That is a mistake in the caller, not a bad input file.
+        ValueError: When ``domains`` is empty or holds an empty name. That is a mistake in the
+            caller, not a bad input file.
     """
-    wanted = normalize_domain(domain)
+    wanted = list(dict.fromkeys(normalize_domain(domain) for domain in domains))
     if not wanted:
+        raise ValueError("domains must not be empty")
+    if "" in wanted:
         raise ValueError("domain must not be empty")
 
     sources, discovery_skipped, passed_over = discover(paths, recursive)
     skipped = list(discovery_skipped)
-    reports: list[Report] = []
-    seen: set[tuple[str, str]] = set()
-    duplicates = 0
+    reports: dict[str, list[Report]] = {domain: [] for domain in wanted}
+    # A report id is only unique per reporting organization (RF-08), and per domain (ADR-4 of 010).
+    seen: dict[str, set[tuple[str, str]]] = {domain: set() for domain in wanted}
+    duplicates = dict.fromkeys(wanted, 0)
     other_domain = 0
 
     for source in sources:
@@ -229,16 +241,58 @@ def ingest(
                 continue
 
             # The domain filter comes first, so a report of another domain is never a duplicate and
-            # never hides a later report of the wanted one.
-            if report.policy.domain != wanted:
+            # never hides a later report of a wanted one.
+            domain = report.policy.domain
+            if domain not in reports:
                 other_domain += 1
                 continue
-            # A report id is only unique per reporting organization (RF-08).
             key = (report.reporter, report.report_id)
-            if key in seen:
-                duplicates += 1
+            if key in seen[domain]:
+                duplicates[domain] += 1
                 continue
-            seen.add(key)
-            reports.append(report)
+            seen[domain].add(key)
+            reports[domain].append(report)
 
-    return IngestionResult(tuple(reports), tuple(skipped), duplicates, other_domain, passed_over)
+    # The shared parts are built once and handed to every result: the tuples are immutable.
+    shared_skipped = tuple(skipped)
+    return {
+        domain: IngestionResult(
+            tuple(reports[domain]), shared_skipped, duplicates[domain], other_domain, passed_over
+        )
+        for domain in wanted
+    }
+
+
+def ingest(
+    paths: Sequence[Path],
+    domain: str,
+    now: datetime | None = None,
+    recursive: bool = False,
+) -> IngestionResult:
+    """
+    Read every report under the given paths that belongs to a domain.
+
+    This is ``ingest_many`` with one domain (ADR-3 of 010), so the answer of a one-domain run is
+    what the loop gives when it goes around once.
+
+    Args:
+        paths (Sequence[Path]): Files and folders, as ``discover`` takes them.
+        domain (str): The domain whose reports are wanted. Compared exactly and without regard to
+            case, so ``mail.example.com`` is not ``example.com``; surrounding spaces and a trailing
+            dot are ignored.
+        now (datetime | None, optional): The moment the run happens, timezone-aware; see
+            ``ingest_many``. Default: ``None``.
+        recursive (bool, optional): ``True`` to search the subfolders of each folder too.
+            Default: ``False``.
+
+    Returns:
+        IngestionResult: The reports kept in discovery order, the files refused with their reasons,
+            how many reports were dropped as duplicates, how many belonged to another domain and
+            how many files the folder search passed over by name. Returned even when nothing was
+            kept.
+
+    Raises:
+        ValueError: When ``domain`` is empty. That is a mistake in the caller, not a bad input file.
+    """
+    (result,) = ingest_many(paths, [domain], now, recursive).values()
+    return result

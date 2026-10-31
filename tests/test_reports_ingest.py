@@ -293,6 +293,28 @@ def test_a_report_of_another_domain_is_never_a_duplicate(
     assert (result.duplicates, result.other_domain) == (0, 2)
 
 
+def test_a_one_domain_run_over_a_mixed_folder_has_the_whole_result_pinned(
+    tmp_path: Path, make_report_xml: _MakeReport
+) -> None:
+    """The foreign report, the duplicate and the refused file together: the shape 010 must keep."""
+    _attachment(tmp_path, "a", make_report_xml(report_id="r1"))
+    _attachment(tmp_path, "b", make_report_xml(report_id="r1"))
+    _attachment(tmp_path, "c", make_report_xml(domain="example.org", report_id="r2"))
+    _attachment(tmp_path, "d", b"not a report")
+    (tmp_path / "renamed.xml").write_bytes(make_report_xml(report_id="r3"))
+
+    result = ingest([tmp_path], "example.com")
+
+    assert [report.report_id for report in result.reports] == ["r1"]
+    assert result.duplicates == 1
+    assert result.other_domain == 1
+    assert result.passed_over == 1
+    assert [(skipped.path.name, skipped.part) for skipped in result.skipped] == [
+        ("d!example.com!1790000000!1790086399.xml", "")
+    ]
+    assert isinstance(result.skipped[0].reason, Reason)
+
+
 def test_the_same_file_given_twice_is_not_a_duplicate_report(
     tmp_path: Path, make_report_xml: _MakeReport
 ) -> None:
@@ -699,6 +721,7 @@ def test_the_public_api_is_exactly_what_the_design_lists() -> None:
         "SpfResult",
         "discover",
         "ingest",
+        "ingest_many",
         "iter_mailbox",
         "parse_report",
         "read_message",
