@@ -237,6 +237,48 @@ def _write_page(path: Path, page: str) -> None:
                 os.unlink(temporary)
 
 
+def _pages_refusal(output: Path | None, count: int, messages: Messages) -> str | None:
+    """
+    Check where the pages of several domains go (spec 010, ADR-8).
+
+    Args:
+        output (Path | None): The ``--output`` value.
+        count (int): How many domains the run has.
+        messages (Messages): The language of the line.
+
+    Returns:
+        str | None: The line of the refusal, or ``None`` when ``output`` is an existing folder.
+    """
+    if output is None:
+        return messages.refusals.html_needs_folder.format(count=count)
+    if not output.is_dir():
+        return messages.refusals.output_not_folder.format(path=echo(output))
+    return None
+
+
+def _write_pages(pages: list[tuple[Path, str]], messages: Messages) -> bool:
+    """
+    Write each page with ``_write_page``, in order, and stop at the first that fails.
+
+    Args:
+        pages (list[tuple[Path, str]]): The file and the page for each.
+        messages (Messages): The language of the refusal line.
+
+    Returns:
+        bool: ``True`` when every page was written; ``False`` after the one line on standard
+            error naming the file that failed. The pages written before it are complete files.
+    """
+    for path, page in pages:
+        try:
+            _write_page(path, page)
+        except OSError as error:
+            reason = error.strerror or type(error).__name__
+            line = messages.refusals.output_failed.format(path=echo(path), reason=echo(reason))
+            write(sys.stderr, f"mailvigil: {line}")
+            return False
+    return True
+
+
 # ---------------------------------------------------------------------------
 # Parser and entry point
 # ---------------------------------------------------------------------------
@@ -378,9 +420,10 @@ def build_parser() -> argparse.ArgumentParser:
     verdict_parser.add_argument(
         "--output",
         type=Path,
-        metavar="FILE",
+        metavar="FILE|FOLDER",
         help="write the --html page to FILE as ASCII, replacing it, instead of printing it "
-        "(use it in Windows PowerShell 5.1, whose > writes UTF-16); requires --html",
+        "(use it in Windows PowerShell 5.1, whose > writes UTF-16); with several domains, an "
+        "existing FOLDER that gets one page each, mailvigil-DOMAIN.html; requires --html",
     )
     add_fetch_parser(commands, language)
     return parser
@@ -413,11 +456,12 @@ def _load(
         write(sys.stderr, f"mailvigil: {refusal.message}")
         return None
 
-    # The page of several domains is built in the stage that follows (spec 010, stage 6); until
-    # then a run that asks for it is refused, not answered with the page of one domain.
+    # Where the pages go is known before a report is read, so a refused run costs nothing (ADR-8).
     if len(configs) > 1 and getattr(args, "html", False):
-        write(sys.stderr, "mailvigil: --html does not cover several domains yet")
-        return None
+        line = _pages_refusal(args.output, len(configs), messages)
+        if line is not None:
+            write(sys.stderr, f"mailvigil: {line}")
+            return None
 
     domains = [config.domain for config in configs]
     results = ingest_many(args.paths, domains, _now(), args.recursive)
@@ -487,15 +531,21 @@ def _run_verdict(args: argparse.Namespace) -> int:
             else verdicts_document(verdicts, args.top)
         )
         write(sys.stdout, dumps(document))
-    elif args.html and args.output is not None:
-        try:
-            _write_page(args.output, render_html(summaries[0], verdicts[0], args.lang, args.top))
-        except OSError as error:
-            reason = error.strerror or type(error).__name__
-            line = args.lang.refusals.output_failed.format(
-                path=echo(args.output), reason=echo(reason)
+    elif args.html and len(verdicts) > 1:
+        # Every page is rendered before the first is written, so a failure in a renderer leaves
+        # the folder as it was (ADR-8).
+        pages = [
+            (
+                args.output / f"mailvigil-{config.domain}.html",
+                render_html(summary, verdict, args.lang, args.top),
             )
-            write(sys.stderr, f"mailvigil: {line}")
+            for config, summary, verdict in zip(configs, summaries, verdicts, strict=True)
+        ]
+        if not _write_pages(pages, args.lang):
+            return EXIT_REFUSED
+    elif args.html and args.output is not None:
+        page = render_html(summaries[0], verdicts[0], args.lang, args.top)
+        if not _write_pages([(args.output, page)], args.lang):
             return EXIT_REFUSED
     elif args.html:
         # ``render_html`` ends in a newline already; ``_write`` adds one, so the last is cut.

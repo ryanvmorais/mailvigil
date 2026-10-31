@@ -626,29 +626,3 @@ def test_json_of_several_domains_is_ascii_and_the_same_in_portuguese(
 
     assert english == portuguese
     assert english[1].isascii()
-
-
-# ---------------------------------------------------------------------------
-# --html: refused until its stage is built (spec 010, stage 6)
-# ---------------------------------------------------------------------------
-
-
-def test_html_of_several_domains_is_refused_before_any_report_is_read(
-    tmp_path: Path,
-    capsys: pytest.CaptureFixture[str],
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Until stage 6, asking for it is a refusal, never the page of one domain."""
-
-    def forbidden(*args: object, **kwargs: object) -> None:
-        """Fail the test if a report is read."""
-        raise AssertionError("a report was read")
-
-    monkeypatch.setattr("mailvigil.cli.ingest_many", forbidden)
-
-    code, out, err = run(
-        capsys, "verdict", str(tmp_path), "--domain", _COM, "--domain", _NET, "--html"
-    )
-
-    assert (code, out) == (1, "")
-    assert err == "mailvigil: --html does not cover several domains yet\n"
