@@ -15,8 +15,10 @@ All notable changes to MailVigil are written here. The format follows
   to cover each value with empty maps. `summary` and `verdict` print one block per domain, set apart
   by a rule line, and `verdict` ends with a line that counts the answers. The exit code of `verdict`
   is the worst answer (`4`, else `3`, else `0`). The reports are read once whatever the number of
-  domains, and a domain with no report yet is `too early` instead of refusing the run. `--json`
-  and `--html` for several domains come in the next changes.
+  domains, and a domain with no report yet is `too early` instead of refusing the run.
+- **`--json` and `--html` with several domains** (#79). `--json` prints one envelope with a
+  `domains` list (`verdict` adds `answer`, the worst answer); `--html` writes one
+  `mailvigil-<domain>.html` per domain into the folder given to `--output`. One domain is unchanged.
 
 ### Changed
 

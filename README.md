@@ -112,6 +112,51 @@ in the current folder, if there is one; with neither a file nor `--domain` it as
 The same file can also hold the mailbox settings of `mailvigil fetch`, in a `[fetch]` table
 (see [Fetch](#fetch)); the password is never one of its keys.
 
+### Several domains
+
+One file can look after several domains: an array of tables, `[[domains]]`, each with its own
+identity maps. The file is one form or the other, never a blend: with `[[domains]]` the top-level
+`domain`, `[senders]`, `[spf]` and `[ips]` are refused. `[fetch]` stays at the top level.
+
+```toml
+[[domains]]
+domain = "example.com"
+
+[domains.senders]
+newsletter = "Example Mailer (newsletters)"
+
+[domains.spf]
+"bounce.example.com" = "Example Relay (SPF only)"
+
+[[domains]]
+domain = "example.org"
+
+[domains.senders]
+shop = "Example Shop (receipts)"
+```
+
+- **Each domain keeps its own maps.** A selector, an SPF domain or an address range names a sender
+  for the domain it is written under and for no other; an `[spf]` key must be within its own domain.
+- **`--domain` picks, it does not add.** Without it, a run covers every domain of the file. With one
+  or more `--domain` values (repeat the option) it covers only those, in the order of the file, and a
+  value that is not in the file is refused. Without a file, each `--domain` is a domain with empty
+  maps, as for one domain.
+- **The reports are read once**, whatever the number of domains, and each report goes to the domain
+  it belongs to. A domain with no report yet is `too early`; the run is refused only when no domain
+  has a report.
+- **At most 50 domains**, and the same domain twice (even as `bücher.example` and its `xn--` form) is
+  a duplicate and is refused.
+- **`summary` and `verdict` print one block per domain**, set apart by a rule line; `verdict` ends
+  with a line that counts the answers. There is no combined answer, because one for a mix of
+  domains would say nothing about any of them.
+
+An internationalized domain can be written as it is read: `bücher.example` in `domain`, in
+`--domain` or as an `[spf]` key becomes `xn--bcher-kva.example`, the form the reports carry, and
+that is what is printed. The conversion is the standard library's `idna` codec (IDNA 2003), so a
+name it would change (`faß.example` becomes `fass.example`), that is not valid or that uses a
+character newer than Unicode 3.2 is refused with the advice to write its `xn--` form, which is
+always accepted.
+
 ## MailVigil vs. other tools
 
 | | MailVigil | [parsedmarc](https://github.com/domainaware/parsedmarc) | Hosted services (dmarcian, EasyDMARC, Postmark) |
@@ -160,6 +205,9 @@ mailvigil summary --domain example.com report.xml.gz
 
 # Ask if the domain is ready for p=reject (same arguments as summary)
 mailvigil verdict --config mailvigil.toml reports/
+
+# Several domains: [[domains]] in the file, or --domain repeated (one block each)
+mailvigil verdict --domain example.com --domain example.org reports/
 
 # The same answers as one JSON document, for a script or a CI job
 mailvigil verdict --config mailvigil.toml reports/ --json
@@ -295,6 +343,12 @@ mailvigil verdict --config mailvigil.toml reports/ --html > report.html
   file already there, never creates the folder, prints nothing when it works and needs `--html`.
   Use it in **Windows PowerShell 5.1**, whose `>` writes UTF-16, which browsers do not read as the
   page intends. The page is ASCII, so any other shell's `>` is fine too.
+- **Several domains write a folder.** With two or more domains, `--output` names an existing
+  folder and the command writes one page per domain, `mailvigil-<domain>.html`
+  (`mailvigil-xn--bcher-kva.example.html` for an internationalized one), each the page of that
+  domain alone; without `--output` the run is refused, because several pages cannot go to one
+  stream. A page that cannot be written ends the run naming that file; the pages before it are
+  complete.
 - **The senders table stops at 50 rows**, so a domain under heavy spoofing does not make a page of
   megabytes. A line after the table says how many senders and messages are not listed, and the total
   row still counts everything. `--top N` moves the stop; `mailvigil summary --json` lists every sender.
@@ -379,7 +433,7 @@ without reading the text. `--json` does not change it.
 
 | Code | Meaning | Commands |
 |---|---|---|
-| `0` | An answer was printed; for `verdict`, the answer is `ready`; for `fetch`, the run finished | all |
+| `0` | An answer was printed; for `verdict`, the answer is `ready` (for every domain, when there are several); for `fetch`, the run finished | all |
 | `1` | The run was refused: invalid configuration or domain, no report kept, or (for `fetch`) the connection, login or folder failed | all |
 | `2` | Usage error (an unknown option, a missing argument) | all |
 | `3` | `verdict` printed `too early`: wait for more reports | `verdict` |
@@ -387,6 +441,9 @@ without reading the text. `--json` does not change it.
 | `70` | Internal error, a bug: one line on standard error says where; please report it | all |
 | `130` | Interrupted with Ctrl+C | all |
 | `141` | The output pipe was closed (`mailvigil verdict ... \| head`) | all |
+
+With several domains, `verdict` exits with the worst answer: `4` if any domain is not ready, else `3`
+if any is too early, else `0`. So `0` means it is safe to move all of them.
 
 Note that `1` is a refusal and `4` is "not ready"; a script that treats every non-zero code alike
 mixes them up:
@@ -413,6 +470,11 @@ failing source, without the limits the text keeps, and a value that may not exis
 no `sp`) is `null`. A refused run prints no document: the one line goes to standard error, as
 without `--json`, and the exit code is `1`. `docs/json-schema.md` lists every field and the
 compatibility promise. The `fetch` document is only the six numbers of the run.
+
+With one domain the document is the one described. With two or more it is an envelope: `schema_version`,
+`command` and a `domains` list holding the document of each domain exactly as a run of that domain
+would print it (for `verdict`, also `answer`, the worst answer, which is what the exit code stands
+for). A script that handles both looks for the `domains` key.
 
 A domain under heavy spoofing can have tens of thousands of failing sources. `--top N` keeps the
 first `N` entries of each long list and adds a last key, `top`, with the limit and how many entries

@@ -1,6 +1,6 @@
 ---
 feature: Several domains in one run, and internationalized domains typed as written
-status: approved
+status: done
 date: 2026-10-30
 related:
   - 010-multiple-domains/requirements.md
@@ -189,17 +189,24 @@ The largest stage: the file and the command that reads it are tested together, i
 
 ## Stage 7 — Documentation and close (RNF-01, RNF-04)
 
-- [ ] `README.md` and `README.pt-BR.md` (the headings stay in step; `tests/test_readme_pt_br.py`):
+- [x] `README.md` and `README.pt-BR.md` (the headings stay in step; `tests/test_readme_pt_br.py`):
   the `[[domains]]` form with an example, `--domain` repeated, internationalized names and the IDNA
   2003 limit, the exit code as the worst answer, `--json` with several, `--html --output FOLDER`.
   The exit-code table keeps its eight rows (a test compares it with `cli_common.py`). — RF-01 to RF-07
-- [ ] `docs/stability.md` (the configuration row gains `[[domains]]`, the JSON row the envelope, the
+- [x] `docs/stability.md` (the configuration row gains `[[domains]]`, the JSON row the envelope, the
   commands row `--domain` repeatable), `CHANGELOG.md` (under `[Unreleased]`: Added), `CLAUDE.md`
   (architecture lines for `ingest_many`, `load_configs`, `worst_answer`, and the ⚠️ that the one-domain
   path is the loop of one), `docs/stack.md` (the `idna` codec and its IDNA 2003 limit),
   `specs/README.md` (010 `done`, the delivery column, the maintenance note). Run `/atualizar-docs`.
-- [ ] A last compatibility pass: the full suite with the one-domain files untouched except the
+- [x] A last compatibility pass: the full suite with the one-domain files untouched except the
   signature edits of stages 4 and the `--help` golden; the wheel declares no `Requires-Dist`
   (`uv build` and the `package` check); `status: done` in the three files. — RNF-01, RNF-04
-- [ ] Quality gate of the stage (as above), the real result recorded; then `/preparar-release` for
+- [x] Quality gate of the stage (as above), the real result recorded; then `/preparar-release` for
   1.6.0 as a separate PR (publishing is the maintainer's). — RNF-01, RNF-06
+  Result (2026-10-31): ruff, black and mypy clean; 3371 collected, 4 skipped (POSIX modes and
+  symbolic links on Windows), the rest passed; coverage 100%. The wheel declares no `Requires-Dist`
+  (`uv build`). The documentation changes are the README pair (a `### Several domains` section
+  under Configuration, the Quick start line, the HTML folder, the worst-answer paragraph under the
+  exit codes, the envelope under JSON), `docs/stability.md`, the CHANGELOG, `CLAUDE.md` (the
+  `ingest_many`, `load_configs` and `worst_answer` lines and the ⚠️ on the loop of one), `docs/stack.md`
+  (the `idna` codec) and `specs/README.md`. `/preparar-release` for 1.6.0 stays a separate PR.

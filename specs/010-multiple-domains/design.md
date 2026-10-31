@@ -1,6 +1,6 @@
 ---
 feature: Several domains in one run, and internationalized domains typed as written
-status: approved
+status: done
 date: 2026-10-30
 related:
   - 010-multiple-domains/requirements.md
