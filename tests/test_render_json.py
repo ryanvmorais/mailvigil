@@ -148,6 +148,7 @@ def source(
     outcome: Outcome = Outcome.UNKNOWN,
     service: str = "",
     messages: int = 3,
+    spf_domains: tuple[str, ...] = (),
 ) -> FailingSource:
     """
     Build a failing source with an address of its own.
@@ -157,6 +158,7 @@ def source(
         outcome (Outcome, optional): What identification said. Default: ``UNKNOWN``.
         service (str, optional): The service name. Default: empty.
         messages (int, optional): The failing messages. Default: 3.
+        spf_domains (tuple[str, ...], optional): The SPF domains that passed. Default: none.
 
     Returns:
         FailingSource: The source.
@@ -166,6 +168,7 @@ def source(
         f"203.0.113.{n}",
         messages,
         service=service,
+        spf_domains=spf_domains,
         dkim=("fail",),
         spf=("none",),
         override_reasons=("forwarded",),
@@ -231,7 +234,12 @@ def test_the_summary_document_has_its_keys_in_the_documented_order() -> None:
     assert document["schema_version"] == 1
     assert document["command"] == "summary"
     assert document["domain"] == "example.com"
-    assert document["config"] == {"source": "mailvigil.toml", "selectors": 1}
+    assert document["config"] == {
+        "source": "mailvigil.toml",
+        "selectors": 1,
+        "spf_domains": 0,
+        "ip_ranges": 0,
+    }
     assert document["reports"] == {"count": 28, "reporters": 2}
 
 
@@ -270,7 +278,12 @@ def test_the_config_source_is_null_without_a_file() -> None:
     """With no file the source is ``null``, not an empty string."""
     document = summary_document(make_summary(), None)
 
-    assert document["config"] == {"source": None, "selectors": 1}
+    assert document["config"] == {
+        "source": None,
+        "selectors": 1,
+        "spf_domains": 0,
+        "ip_ranges": 0,
+    }
 
 
 def test_the_totals_have_the_five_counts() -> None:
@@ -300,12 +313,20 @@ def test_a_sender_row_and_a_failing_source_have_their_documented_shape() -> None
 
     senders = document["senders"]
     assert isinstance(senders, list)
-    assert list(senders[0]) == ["outcome", "service", "source_ip", "selectors", "counts"]
+    assert list(senders[0]) == [
+        "outcome",
+        "service",
+        "source_ip",
+        "selectors",
+        "spf_domains",
+        "counts",
+    ]
     assert senders[0] == {
         "outcome": "known",
         "service": "Example Mailer",
         "source_ip": None,
         "selectors": [],
+        "spf_domains": [],
         "counts": {"ok": 5, "dkim_only": 0, "spf_only": 0, "failing": 0, "total": 5},
     }
     assert senders[1]["service"] is None
@@ -319,6 +340,7 @@ def test_a_sender_row_and_a_failing_source_have_their_documented_shape() -> None
         "source_ip",
         "messages",
         "selectors",
+        "spf_domains",
         "dkim",
         "spf",
         "override_reasons",
@@ -717,3 +739,27 @@ def test_the_fetch_document_is_ascii_json_that_dumps_cleanly() -> None:
 
     assert text.isascii()
     assert json.loads(text)["saved"] == 1
+
+
+def test_the_spf_domains_and_the_counts_of_the_configuration_are_carried() -> None:
+    """The new keys are lists and numbers, in the same version of the schema."""
+    rows = (SenderRow(Outcome.UNKNOWN, source_ip=_OTHER_IP, spf_domains=("a.example.com",)),)
+    failing = (source(1, spf_domains=("a.example.com", "b.example.com")),)
+    summary = dataclasses.replace(
+        make_summary(senders=rows, failing=failing),
+        spf_domains_configured=2,
+        ip_ranges_configured=3,
+    )
+    document = summary_document(summary, "mailvigil.toml")
+
+    assert document["config"] == {
+        "source": "mailvigil.toml",
+        "selectors": 1,
+        "spf_domains": 2,
+        "ip_ranges": 3,
+    }
+    senders = document["senders"]
+    failing_documents = document["failing"]
+    assert isinstance(senders, list) and isinstance(failing_documents, list)
+    assert senders[0]["spf_domains"] == ["a.example.com"]
+    assert failing_documents[0]["spf_domains"] == ["a.example.com", "b.example.com"]

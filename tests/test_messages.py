@@ -36,6 +36,7 @@ from mailvigil.verdict import Answer, NoteKind, RuleId
 # is always allowed there, and a language may leave it out of a form.
 _PLACEHOLDERS: dict[str, frozenset[str]] = {
     "common.selectors_named": frozenset({"names"}),
+    "common.spf_domains_named": frozenset({"names"}),
     "common.more_failing": frozenset({"sources", "messages"}),
     "summary.title": frozenset({"domain"}),
     "summary.period": frozenset({"first", "last", "days"}),

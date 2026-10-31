@@ -132,7 +132,7 @@ def test_the_policy_shows_sp_and_np_and_the_earlier_values() -> None:
 
 def test_an_empty_selector_map_adds_the_note_and_points_at_the_readme() -> None:
     header = section(summary_pt(make_summary(selectors_configured=0)), "Resumo")
-    assert header[2].strip() == "sem seletores configurados: todo remetente fica nao reconhecido"
+    assert header[2].strip() == "nenhum remetente mapeado: todo remetente fica nao reconhecido"
     assert header[3].strip() == "(veja a secao Configuration do README)"
 
 
@@ -521,8 +521,8 @@ def test_the_next_step_for_several_recognized_services_does_not_pick_one() -> No
 
 def test_the_next_step_for_unrecognized_sources_points_at_the_configuration() -> None:
     assert next_step(make_verdict(sources=(other(40),))) == (
-        "Proximo: olhe as origens acima e acrescente os seletores das que forem suas a [senders] "
-        "na configuracao."
+        "Proximo: olhe as origens acima e acrescente as que forem suas a [senders] (seletor DKIM), "
+        "[spf] (dominio SPF) ou [ips] (faixa de IP) na configuracao."
     )
 
 

@@ -127,3 +127,46 @@ first and alone), the loader, then identification, then the close.
   a refused file moved to `cli_common.config_line` so `fetch` can write it. — RF-07
 - [x] Quality gate. — **Result:** 2026-10-30: ruff, black and mypy clean; pytest passed at 100%
   coverage (Python 3.12, Windows).
+
+## Stage 6 — Name a sender by SPF domain or address range (RF-09 to RF-11, ADR-8; issue #78)
+
+Tests first inside each task. Domains are `example.com`, `example.org`, `example.net`; addresses are
+from the documentation blocks `192.0.2.0/24`, `198.51.100.0/24`, `203.0.113.0/24` and `2001:db8::/32`.
+
+- [x] `config.py`: `Config.spf`, `Config.ranges`, `_read_spf`, `_read_ranges`, the four reasons
+  (`INVALID_SPF_DOMAIN`, `FOREIGN_SPF_DOMAIN`, `INVALID_IP_RANGE`, `DUPLICATE_KEY`), `spf` and `ips` as
+  allowed top-level keys, the name check shared with `[senders]`. Tests: both tables read, normalized
+  and read-only; a file without them loads equal to before; `Mail.Example.COM.` and `mail.example.com`
+  are `DUPLICATE_KEY`; `example.org`, `notexample.com`, `localhost`, `exämple.com` and a key with a
+  space are refused with the right reason and `spf.<key>`; `192.0.2.1` is a single host, `192.0.2.0/24`
+  and `2001:DB8::/32` are canonicalized, `192.0.2.1/24`, `10.0.0.0/8`, `::/0`, `0.0.0.0/0`,
+  `2001:db8::/16` and `not-an-ip` are `INVALID_IP_RANGE` with `ips.<key>`; two spellings of one range
+  are `DUPLICATE_KEY`; a name that is an integer, blank, too long or holds a control character is
+  refused as in `[senders]`; `spf` or `ips` that is not a table is `WRONG_TYPE`; the order of the
+  loader (senders, spf, ips, fetch) and the sorted visit of the keys, so the same content in two
+  orders gives equal `Config` values. — RF-09, RF-07, RNF-05
+- [x] `senders.py`: the three questions of ADR-8. Tests: an SPF pass on a key is `KNOWN` with the
+  service and an empty selector; an SPF `fail`, an SPF pass on a domain that is not a key and an
+  empty SPF domain are not; an address in a range with a DKIM pass under the owner (unmapped
+  selector) is `KNOWN`; the same address with only a failing block, with a DKIM pass under another
+  domain, or with no block is `UNKNOWN`; the narrowest of two ranges wins; IPv6 and an IPv4-mapped
+  IPv6 address; an invalid or empty address never matches and never raises; the order DKIM, SPF,
+  address when all three name different services; a `KNOWN` by SPF beats a foreign selector on the
+  same record; foreign and failing selectors still give those outcomes when nothing else names the
+  record; the identification does not read `dkim_evaluated`, `spf_evaluated` or `header_from`; 2,000
+  ranges and many records stay fast (the lookup does not scan the map). — RF-10, ADR-3, ADR-8
+- [x] `summary.py`: `spf_domains` on `SenderRow` and `FailingSource`, only on what is not `KNOWN`, from
+  SPF blocks that passed under the owner; `spf_domains_configured` and `ip_ranges_configured`.
+  Tests: a passing SPF block of an unmapped domain lists it on the unrecognized row; a recognized row
+  lists none; a failing source lists its own. — RF-11
+- [x] Outputs: `render_json.py` (`spf_domains`, the two counts in `config`), `render.py`,
+  `render_verdict.py` and `render_html.py` (the SPF domains next to the selectors; the "no selectors"
+  note only when all three maps are empty), both catalogs (a `Plural` for "SPF domain", the next-step
+  sentences, the completeness test for the four reasons), `docs/json-schema.md` with its examples
+  (additive, same `schema_version`), the recorded `--help` goldens if the text changes. — RF-11
+- [x] Docs: README and `README.pt-BR.md` (Configuration: the two tables, quoting of keys with `.`, `/` or
+  `:`, shared SPF and shared ranges, the precedence), `docs/stability.md` (the public keys), CHANGELOG
+  under `[Unreleased]`, `CLAUDE.md`, `specs/README.md`. — docs
+- [x] Hostile-input pass: the cases above are listed against RF-08, each pointing to its test. — RF-08
+- [x] Quality gate. — **Result:** 2026-10-30: ruff, black and mypy clean; pytest passed at 100%
+  coverage (Python 3.12, Windows).

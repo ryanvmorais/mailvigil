@@ -58,7 +58,9 @@ command (as 002 did): the command, and with it where the file is looked for, arr
 - The text shown for an unknown sender and its language: spec `006`. This layer returns "no
   service", not a string to print.
 - A built-in table of well-known services and selectors (see Resolved decision 4).
-- Identifying a sender by IP address, SPF domain or reverse DNS (see Open question 2).
+- Identifying a sender by reverse DNS, or by an SPF domain outside the owner's (see Resolved
+  decision 7, amended on 2026-10-30; identifying by SPF domain and by address range is RF-09 and
+  RF-10).
 - Writing, generating or editing the configuration file; environment variables as a source.
 
 ## Personas
@@ -209,6 +211,69 @@ command (as 002 did): the command, and with it where the file is looked for, arr
   `notexample.com` look-alike, and the failing signature. Each one expects a refusal with a reason
   or the "no service" result named above.
 
+### RF-09 — Name a sender by SPF domain or address range (*amendment of 2026-10-30, issue #78, design ADR-8*)
+
+- **Given** a `[spf]` table of `domain = "Service name"` pairs, every domain the owner's or one of
+  its subdomains
+  **When** it is loaded
+  **Then** each domain is stored normalized (lower case, no trailing dot) and the map is read-only.
+- **Given** an `[spf]` key that is not a plausible host name, is not ASCII, or is outside the
+  configured domain (`example.org` against `example.com`)
+  **When** it is loaded
+  **Then** it is refused with a reason that names the key as `spf.<domain>`: an SPF domain outside
+  the owner's can never align, so keeping it would be a line that silently never matches.
+- **Given** an `[ips]` table of `range = "Service name"` pairs, each range a CIDR block or a single
+  address, IPv4 or IPv6
+  **When** it is loaded
+  **Then** each range is stored in its canonical form and the map is read-only.
+- **Given** an `[ips]` key that is not an address range, has bits set past its prefix
+  (`192.0.2.1/24`), or is wider than a `/16` (IPv4) or a `/32` (IPv6)
+  **When** it is loaded
+  **Then** it is refused with a reason that names the key as `ips.<range>`: a range that wide is
+  almost certainly a mistake, and it would name a whole network as the owner's.
+- **Given** two keys of one table that mean the same thing (`Mail.Example.com` and
+  `mail.example.com`; `2001:DB8::/32` and `2001:db8::/32`), or a value that breaks the rules of a
+  service name (RF-03)
+  **When** it is loaded
+  **Then** it is refused, as in RF-03.
+- **Given** no `[spf]` and no `[ips]` table, or empty ones
+  **When** it is loaded
+  **Then** the file is accepted and loads exactly as before the amendment.
+
+### RF-10 — Identify by SPF domain or address range
+
+- **Given** a record with an SPF block whose result is `pass` and whose domain is a key of `[spf]`
+  **When** the sender is identified
+  **Then** the result carries the service name, as for a DKIM selector.
+- **Given** a record whose source address is inside a range of `[ips]`, with at least one DKIM or SPF
+  block that passed under the owner's domain (any selector, any SPF domain of the owner)
+  **When** the sender is identified
+  **Then** the result carries the service name of the range. The address alone never names a
+  sender: the record must also have authenticated as the owner.
+- **Given** a record that qualifies by more than one way
+  **When** the sender is identified
+  **Then** the DKIM selector wins, then the SPF domain, then the address range; among ranges the
+  narrowest wins. Every way still has to pass what it asks for, so none replaces the rule that a
+  name counts only on a passing authentication aligned with the owner's domain.
+- **Given** a record that no way names
+  **When** the sender is identified
+  **Then** the result is what it was before the amendment (foreign domain, failing signature or
+  unknown): SPF and the address never produce those three.
+- **Given** a source address that is not a valid address, or an SPF domain that is empty
+  **When** the sender is identified
+  **Then** that way never matches.
+
+### RF-11 — The owner can see what to put in `[spf]` (the outputs of specs 004 and 006)
+
+- **Given** a row or a failing source that is not recognized
+  **When** it is shown (text, HTML and `--json`)
+  **Then** it lists the SPF domains that passed under the owner's domain on its records, sorted,
+  next to the selectors, so the owner can copy one into `[spf]`. An address needs no such field:
+  an unrecognized row already carries it. The field is additive in `--json` (a minor version).
+- **Given** a configuration with only `[spf]` or `[ips]` entries
+  **When** it is shown
+  **Then** it does not say that no sender is configured.
+
 ## Non-functional requirements
 
 ### RNF-01 — Standard library only
@@ -284,7 +349,10 @@ and are Resolved decisions 6 to 10.
 6. **One `domain` in 1.0.0.** `ingest` takes one domain and the verdict is per domain; a list can
    be added later without breaking the file format.
 7. **Identify by DKIM selector only.** A sender that passes only SPF is shown as unknown, which is
-   the safe failure; an SPF-domain table is the next step if real reports need it.
+   the safe failure; an SPF-domain table is the next step if real reports need it. *Amended on
+   2026-10-30 (issue #78): the SPF-domain table and an address-range table were added (RF-09 to
+   RF-11, ADR-8), each keeping the rule that a name counts only on a passing authentication
+   aligned with the owner's domain.*
 8. **Several qualifying signatures: the first in document order wins.** No "ambiguous" state.
 9. **Internationalized domains are refused** with a message to write the `xn--` form.
 10. **Three kinds of "no service"** (failing signature, foreign domain, unknown) are kept distinct.

@@ -75,6 +75,8 @@ class CommonMessages:
             has no entry: it is named by its service.
         selectors_named (Plural): The configured selectors involved in a failing source;
             ``{names}`` is the list.
+        spf_domains_named (Plural): The SPF domains that passed under the owner's domain on a
+            source that is not recognized, the ones ``[spf]`` could name; ``{names}`` is the list.
         more_failing (str): The line that still counts the failing sources a list left out;
             ``{sources}`` and ``{messages}``.
     """
@@ -86,6 +88,7 @@ class CommonMessages:
     no_address: str
     kinds: Mapping[Outcome, str]
     selectors_named: Plural
+    spf_domains_named: Plural
     more_failing: str
 
 
@@ -103,7 +106,10 @@ class SummaryMessages:
         key_messages (str): The label of the messages line.
         config_none (str): The configuration line when no file was used.
         selector (Plural): ``{n}`` selectors configured.
-        no_selectors (str): The note under the configuration line when no selector is mapped.
+        spf_domain (Plural): ``{n}`` SPF domains configured.
+        ip_range (Plural): ``{n}`` address ranges configured.
+        no_selectors (str): The note under the configuration line when no selector, SPF domain or
+            address range is mapped.
         no_selectors_hint (str): Where to read about the configuration.
         no_period (str): The period line when there are no reports.
         period (Plural): The period line, counted by the days with a report (``{n}``); ``{first}``,
@@ -150,6 +156,8 @@ class SummaryMessages:
     key_messages: str
     config_none: str
     selector: Plural
+    spf_domain: Plural
+    ip_range: Plural
     no_selectors: str
     no_selectors_hint: str
     no_period: str

@@ -20,7 +20,7 @@ from collections.abc import Callable, Sequence
 from functools import partial
 
 from mailvigil.messages import ENGLISH, Messages
-from mailvigil.render import address, fit, format_share, share_tenths
+from mailvigil.render import address, fit, format_share, share_tenths, spf_domains_part
 from mailvigil.senders import Outcome
 from mailvigil.summary import FailingSource
 from mailvigil.verdict import Answer, Note, NoteKind, Rule, RuleId, RuleKind, Verdict
@@ -192,7 +192,8 @@ def _other_line(source: FailingSource, messages: Messages) -> str:
     tail = messages.verdict.other_tail.format(
         kind=kind, messages=common.failing_message.of(source.messages)
     )
-    return _entry(where, tail + _overrides(source))
+    tail += _overrides(source) + spf_domains_part(messages, source.spf_domains, _NAME_MAX)
+    return _entry(where, tail)
 
 
 def _sources(

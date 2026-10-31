@@ -449,3 +449,23 @@ def test_the_policy_list_keeps_its_own_role_and_a_group_names_it() -> None:
     assert lists and all("role" not in attrs and "aria-label" not in attrs for attrs in lists)
     groups = [attrs for tag, attrs in page.elements if attrs.get("role") == "group"]
     assert [attrs.get("aria-label") for attrs in groups] == [ENGLISH.html.policy_label]
+
+
+def test_an_unrecognized_source_lists_the_spf_domains_that_passed_under_the_owner() -> None:
+    summary = Summary(
+        **{
+            **vars_of(not_ready_summary()),
+            "failing": (
+                FailingSource(
+                    Outcome.UNKNOWN,
+                    "198.51.100.1",
+                    3,
+                    spf_domains=("a.example.com", "<b>.example.com"),
+                ),
+            ),
+        }
+    )
+    page = Page(render_html(summary, judge(summary)))
+    named = ENGLISH.common.spf_domains_named.of(2, names="a.example.com, <b>.example.com")
+    assert any(named in found for found in page.texts)
+    assert "<b>" not in render_html(summary, judge(summary))

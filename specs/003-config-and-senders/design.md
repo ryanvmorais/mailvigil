@@ -74,6 +74,10 @@ class ConfigReason(StrEnum):
     FORBIDDEN_CHARACTER = "forbidden_character"     # control, format or separator in a name
     INVALID_FETCH_VALUE = "invalid_fetch_value"     # a [fetch] value of the wrong type or range (ADR-7)
     PASSWORD_NOT_ALLOWED = "password_not_allowed"   # a [fetch] key that would hold a password (ADR-7)
+    INVALID_SPF_DOMAIN = "invalid_spf_domain"       # an [spf] key that is not a plausible host name (ADR-8)
+    FOREIGN_SPF_DOMAIN = "foreign_spf_domain"       # an [spf] key outside the configured domain (ADR-8)
+    INVALID_IP_RANGE = "invalid_ip_range"           # an [ips] key that is no range, or too wide (ADR-8)
+    DUPLICATE_KEY = "duplicate_key"                 # two keys of [spf] or [ips] that mean the same (ADR-8)
 
 class ConfigError(Exception):
     reason: ConfigReason
@@ -84,6 +88,8 @@ class Config:
     domain: str                     # normalized: lower case, no trailing dot
     senders: Mapping[str, str]      # selector (lower case) -> service name; a read-only view
     fetch: FetchSettings            # [fetch]: host, user, port, folder; None for a missing key (ADR-7)
+    spf: Mapping[str, str]          # SPF domain (lower case) -> service name; empty by default (ADR-8)
+    ranges: Mapping[IPv4Network | IPv6Network, str]   # canonical range -> service name; empty by default (ADR-8)
 
 class Outcome(StrEnum):
     KNOWN = "known"                         # a configured selector, passing, under the owner's domain
@@ -325,6 +331,81 @@ mean different things; the cost is one line in the file. A file shared with `sum
 `fetch` too when `[fetch]` is wrong, which is what strict means. `ConfigReason` goes from thirteen
 members to fifteen: adding one is a minor change (`docs/stability.md`). (RF-04)
 
+### ADR-8 — Name a sender by SPF domain or address range, only on an authentication aligned with the owner (amendment of 2026-10-30, issue #78)
+
+**Decision.** `spf` and `ips` become the fourth and fifth top-level keys, two tables of
+`key = "Service name"`. `load_config` returns them as `Config.spf` (normalized domain to name) and
+`Config.ranges` (canonical network to name), both read-only, both empty for a file written before
+this amendment. The loader reads them after `[senders]` and before `[fetch]`, with the same name
+rules, and visits the keys in sorted order (RNF-05).
+
+- **`[spf]` keys** go through `normalize_domain` and the label rule of the domain (`INVALID_SPF_DOMAIN`,
+  `NON_ASCII_DOMAIN`), and must satisfy `is_within_domain(key, config.domain)` (`FOREIGN_SPF_DOMAIN`).
+  Two keys that normalize alike are `DUPLICATE_KEY`.
+- **`[ips]` keys** go through `ipaddress.ip_network(key, strict=True)`: a bare address is a single-host
+  network, host bits past the prefix, a malformed key, a prefix shorter than `MIN_PREFIX_V4 = 16` or
+  `MIN_PREFIX_V6 = 32` are `INVALID_IP_RANGE`. A key whose canonical form repeats one is `DUPLICATE_KEY`.
+- **Refusal keys** are `spf.<key>` and `ips.<key>`, cleaned by `clean_text` like every key from the file.
+- **Four new reasons**: `INVALID_SPF_DOMAIN`, `FOREIGN_SPF_DOMAIN`, `INVALID_IP_RANGE`, `DUPLICATE_KEY`.
+  `DUPLICATE_SELECTOR` keeps meaning a `[senders]` duplicate. `ConfigReason` goes from fifteen to
+  nineteen: adding one is a minor change (`docs/stability.md`).
+
+`identify_sender` becomes three questions asked in order, the first yes ending the search:
+
+1. **A DKIM block** passes, signed under the owner's domain, with a configured selector: as today.
+2. **An SPF block** passes and its domain is a key of `Config.spf`. The key is within the owner's
+   domain by construction, so the pass is aligned in the relaxed sense and the owner's DNS is what
+   authorized the sender.
+3. **The source address** is inside a range of `Config.ranges` **and** the record has a
+   *qualifying block*: a DKIM block that passed under the owner's domain (any selector) or an SPF
+   block that passed under it. The range names the sender; the block proves it authenticated as the
+   owner. Among several ranges the narrowest wins, found by masking the address at each prefix length
+   present in the map (at most 33 plus 129 lookups, whatever the number of ranges), so a long map does
+   not slow a run of many records. An address that is not valid, or an IPv4-mapped IPv6 address
+   (read as its IPv4 form), is handled before the lookup and never raises.
+
+A record named by none of the three keeps the answer it had: `FOREIGN_DOMAIN` if a configured selector
+was signed under another domain, else `FAILING_SIGNATURE`, else `UNKNOWN` (ADR-2). A `KNOWN` from
+question 2 or 3 beats a foreign or failing selector on the same record, as a `KNOWN` DKIM block
+already does (foreign plus known is known): the SPF pass or the qualifying block is proof the owner's
+domain authorized it, which a stranger reusing a selector cannot have. `Identification` gains no
+field; `selector` stays empty when the name came from SPF or from a range.
+
+**Alternatives.**
+(a) *The range alone names the sender*, with no qualifying block. Rejected: the address says who
+connected, not that the mail is the owner's. A shared server, a forwarder or a neighbor on the same
+network would be named "legitimate" with no check, and rule 4 would be bent by an address instead of
+a signature.
+(b) *The range requires `dkim_evaluated` or `spf_evaluated` to be `pass`* (the receiver's DMARC
+verdict). Rejected: it makes `identify_sender` read the evaluated fields, which ADR-3 keeps out so
+that identification and the summary's combination stay separate. The raw blocks answer the same
+question ("did it authenticate as the owner") without crossing that line.
+(c) *An SPF domain outside the owner's* (`amazonses.com`). Rejected: SPF there cannot align, so the
+mail fails DMARC whatever the name says, and a shared sender domain is a service many customers use,
+which would name a stranger on the same service as the owner's.
+(d) *An SPF domain by suffix* (`example.com` naming every subdomain). Rejected for the same reason as a
+shared DKIM selector (Risk 2): exact keys, so each line names one thing.
+(e) *No minimum prefix.* Rejected: `0.0.0.0/0` would name the whole internet in one line; the floor
+costs a user who really owns a `/12` an explicit second thought, and the reason is in the error.
+(f) *`[spf]` and `[ips]` merged into `[senders]`* with a prefix in the key. Rejected: a selector, a
+domain and an address are three namespaces, and the keys of `[senders]` already refuse a `/` or a `:`.
+
+**Why.** The issue asks for a second and third way to name a sender while the rule of ADR-3 and
+Resolved decision 1 stays: a label counts only on a passing authentication aligned with the owner. A
+service that authenticates by SPF alone is common (a mailbox provider's relay, a server with no DKIM
+key written down), and today its failures weigh on rule 5 and never on rule 4 although it is the
+owner's. SPF is the clean case: the owner's own DNS names the domain, so the check is as strong as
+the selector one. The address is the weaker evidence, so it carries the extra condition.
+**Trade-off.** (1) A record from the owner's address range whose authentication did *not* pass is
+`UNKNOWN`, not a recognized failure: it counts in rule 5 (up to 0.5%), not rule 4, as any unmapped
+sender's failure does today. It is listed with its address, which is what the owner needs to see.
+(2) A range on shared hosting names every tenant of that range, so the README says the range must be
+the owner's alone. (3) A record can be `KNOWN` while its evaluated result is `fail`, as ADR-3 already
+accepts; the summary flags it. (4) The precedence DKIM, SPF, address means that when a selector and
+an SPF domain name different services for one record, the selector wins and the other is ignored; no
+"ambiguous" state, as in Resolved decision 8. (5) The SPF domains seen on unrecognized rows become
+output (RF-11), which touches specs 004 and 006 and adds a field to `--json`. (RF-09, RF-10, RF-11)
+
 ## Impact on existing code
 
 - **New files:** `src/mailvigil/text.py`, `config.py`, `senders.py` and three test files.
@@ -340,6 +421,27 @@ members to fifteen: adding one is a minor change (`docs/stability.md`). (RF-04)
   `CLAUDE.md` gains the three modules in its architecture block. `/atualizar-docs` at the end. The
   `specs/README.md` row moves to `in progress`, then `done`.
 - **The site repository's script** is not changed.
+
+## Impact of ADR-8 (issue #78)
+
+- **`config.py`:** `Config.spf`, `Config.ranges`, `_read_spf`, `_read_ranges`, the four reasons, `spf`
+  and `ips` as allowed top-level keys; the name check moves out of `_read_senders` into a helper the
+  three readers share.
+- **`senders.py`:** the three questions above; the docstrings stop saying "DKIM selector only".
+- **`summary.py`:** `SenderRow.spf_domains` and `FailingSource.spf_domains` (default empty, filled
+  only on a row or source that is not `KNOWN`), and `Summary.spf_domains_configured` and
+  `Summary.ip_ranges_configured` beside `selectors_configured`.
+- **Outputs (spec 006):** `--json` gains `spf_domains` on a sender row and on a failing source and
+  `spf_domains` and `ip_ranges` counts in `config` (additive, same `schema_version`;
+  `docs/json-schema.md` and its examples updated); the text, HTML and verdict renderers show the SPF
+  domains next to the selectors; the "no selectors configured" note appears only when all three
+  maps are empty; the next-step sentences name `[senders]`, `[spf]` and `[ips]`. Both catalogs.
+- **Docs:** README (Configuration: the two tables, the quoting of dotted and colon keys, the three
+  warnings about shared selectors, shared SPF and shared ranges, and the order of precedence),
+  `docs/stability.md` (the public keys), `docs/stack.md` (`ipaddress`, already listed for reports),
+  CHANGELOG, `README.pt-BR.md`, `CLAUDE.md`.
+- **Tests:** the hostile rows of RF-08 grow with the cases below; the `ConfigReason` completeness test
+  in `tests/test_messages.py` covers the four new reasons.
 
 ## Risks
 

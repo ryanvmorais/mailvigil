@@ -7,6 +7,24 @@ All notable changes to MailVigil are written here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **A sender can be named by SPF domain or by address range, not only by DKIM selector** (#78).
+  `[spf]` maps an SPF domain that passed (your domain or a subdomain, matched exactly) to a service
+  name; `[ips]` maps a CIDR block or a single address (IPv4 or IPv6, no wider than `/16` or `/32`) to
+  one, and only counts on a record that also passed DKIM or SPF under your domain. The order is
+  selector, SPF domain, address range. A file without the new tables loads exactly as before; an
+  older MailVigil refuses a file that uses them. The rows and failing sources that are not
+  recognized now list the SPF domains that passed under your domain, so you know what to write
+  in `[spf]`: `--json` gains `spf_domains` on `senders`, `failing` and the verdict's
+  `unrecognized_failing` entries and `spf_domains` and `ip_ranges` counts in `config` (additive,
+  same `schema_version`).
+
+### Changed
+
+- The "no selectors are configured" note now appears only when no selector, SPF domain or address
+  range is mapped, and the next-step sentence names `[senders]`, `[spf]` and `[ips]`.
+
 ## [1.4.0] - 2026-10-30
 
 ### Added

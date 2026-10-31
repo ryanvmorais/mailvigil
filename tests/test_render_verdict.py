@@ -592,10 +592,10 @@ def test_the_next_step_for_several_recognized_services_does_not_pick_one() -> No
 
 
 def test_the_next_step_for_unrecognized_sources_points_at_the_configuration() -> None:
-    """Rule 5: look at the sources, add the selectors that are yours."""
+    """Rule 5: look at the sources, add the ones that are yours."""
     assert next_step(make_verdict(sources=(other(40),))) == (
-        "Next: look at the sources above and add the selectors of the ones that are yours to "
-        "[senders] in the configuration."
+        "Next: look at the sources above and add the ones that are yours to [senders] (DKIM "
+        "selector), [spf] (SPF domain) or [ips] (address range) in the configuration."
     )
 
 
@@ -1084,3 +1084,14 @@ def test_the_sentence_of_every_kind_of_note_is_filled(messages: Messages) -> Non
         assert sentence
         assert "{" not in sentence
         assert str(kind) not in sentence
+
+
+def test_rule_five_lists_the_spf_domains_that_passed_under_the_owner() -> None:
+    """The owner sees the domain to copy into `[spf]`, next to the address."""
+    sources = (
+        other(40, 1, spf_domains=("a.example.com",)),
+        other(30, 2, spf_domains=("a.io", "b.io")),
+    )
+    lines = lines_of(make_verdict(sources=sources))
+    assert "  198.51.100.1  unrecognized: 40 failing messages; SPF domain a.example.com" in lines
+    assert "  198.51.100.2  unrecognized: 30 failing messages; SPF domains a.io, b.io" in lines
