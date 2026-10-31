@@ -5,7 +5,9 @@ RF-07).
 Isolation: nothing touches the disk and no command runs. The summaries and the verdicts are built
 with the builders of ``test_render.py`` and ``test_render_verdict.py``, the same inputs the English
 tests use, so the two languages are compared on equal ground: the same numbers, the same order of
-sections, every line within 80 columns and ASCII. Domains, services and addresses are invented
+sections, every line within 80 columns and ASCII. The text here is the folded catalog
+(``PORTUGUESE_ASCII``), the one a pipe on Windows gets; ``test_render_accents.py`` proves the
+accented catalog renders the same lines. Domains, services and addresses are invented
 (``example.com``, ``example.net``; ``192.0.2.0/24``, ``198.51.100.0/24``, ``2001:db8::/32``;
 RNF-06).
 """
@@ -28,7 +30,7 @@ from tests.test_render import known as summary_known
 from tests.test_render import other as summary_other
 from tests.test_render_verdict import known, make_verdict, other, verdicts_of
 
-from mailvigil.messages import ENGLISH, PORTUGUESE
+from mailvigil.messages import ENGLISH, PORTUGUESE_ASCII
 from mailvigil.render import no_reports_message, render_summary
 from mailvigil.render_verdict import render_tally, render_verdict
 from mailvigil.reports import IngestionResult, PolicyPublished, Reason
@@ -46,12 +48,12 @@ _V6 = "2001:db8:85a3:8d3:1319:8a2e:370:7344"
 
 def summary_pt(summary: Summary, source: str | None = "mailvigil.toml") -> str:
     """Render a summary in Portuguese."""
-    return render_summary(summary, source, PORTUGUESE)
+    return render_summary(summary, source, PORTUGUESE_ASCII)
 
 
 def verdict_pt(verdict: Verdict) -> str:
     """Render a verdict in Portuguese."""
-    return render_verdict(verdict, PORTUGUESE)
+    return render_verdict(verdict, PORTUGUESE_ASCII)
 
 
 def cells(line: str) -> list[str]:
@@ -278,7 +280,7 @@ def test_twelve_skipped_files_print_ten_and_a_remainder() -> None:
 def test_every_reason_prints_as_a_portuguese_phrase_never_as_its_key(reason: Reason) -> None:
     summary = make_summary(skipped=(skipped("x.xml", reason),), skipped_by_reason=((reason, 1),))
     text = summary_pt(summary)
-    phrase = PORTUGUESE.summary.reasons[reason]
+    phrase = PORTUGUESE_ASCII.summary.reasons[reason]
     assert f"    x.xml: {phrase}" in text.split("\n")
     assert f": {reason.value}" not in text
     assert phrase != ENGLISH.summary.reasons[reason]
@@ -295,7 +297,7 @@ def test_no_reports_message_names_the_domain_and_what_was_left_out() -> None:
         duplicates=2,
         other_domain=3,
     )
-    lines = no_reports_message(result, ["example.com"], PORTUGUESE).split("\n")
+    lines = no_reports_message(result, ["example.com"], PORTUGUESE_ASCII).split("\n")
     assert lines[0] == "Nenhum relatorio DMARC de example.com foi mantido."
     assert lines[2:4] == ["    a.xml: grande demais", "    b.txt: nao e um relatorio DMARC"]
     assert [cells(line) for line in (lines[1], lines[4], lines[5])] == [
@@ -306,7 +308,7 @@ def test_no_reports_message_names_the_domain_and_what_was_left_out() -> None:
 
 
 def test_no_reports_message_for_nothing_found_says_where_to_look() -> None:
-    lines = no_reports_message(IngestionResult(), ["example.com"], PORTUGUESE).split("\n")
+    lines = no_reports_message(IngestionResult(), ["example.com"], PORTUGUESE_ASCII).split("\n")
     assert lines[0] == "Nenhum relatorio DMARC de example.com foi mantido."
     assert lines[1].startswith("Nenhum arquivo de relatorio foi")
     assert "provider!domain!begin!end.zip" in lines[2]
@@ -320,7 +322,7 @@ def test_no_reports_message_for_nothing_found_says_where_to_look() -> None:
 
 def test_no_reports_message_is_short_enough_and_ends_without_a_newline() -> None:
     result = IngestionResult(skipped=(skipped("n" * 100 + ".xml"),))
-    message = no_reports_message(result, ["d" * 80 + ".example.com"], PORTUGUESE)
+    message = no_reports_message(result, ["d" * 80 + ".example.com"], PORTUGUESE_ASCII)
     assert not message.endswith("\n")
     assert max(len(line) for line in message.split("\n")) <= 80
     assert message.isascii()
@@ -350,9 +352,9 @@ def test_the_title_names_the_answer(kwargs: dict[str, Any], phrase: str) -> None
 
 
 def test_every_answer_has_its_own_word_in_both_forms() -> None:
-    for words in (PORTUGUESE.verdict.words, PORTUGUESE.verdict.words_enforcing):
+    for words in (PORTUGUESE_ASCII.verdict.words, PORTUGUESE_ASCII.verdict.words_enforcing):
         assert set(words) == set(Answer)
-    assert len(set(PORTUGUESE.verdict.words.values())) == 3
+    assert len(set(PORTUGUESE_ASCII.verdict.words.values())) == 3
 
 
 def test_a_title_too_wide_for_one_line_goes_on_two() -> None:
@@ -463,7 +465,7 @@ def test_a_failed_data_rule_reads_fail_too_early() -> None:
 def test_every_rule_has_a_name_in_the_table() -> None:
     text = verdict_pt(make_verdict())
     for rule in RuleId:
-        assert PORTUGUESE.verdict.rule_names[rule] in text
+        assert PORTUGUESE_ASCII.verdict.rule_names[rule] in text
 
 
 def test_no_notes_prints_no_section() -> None:
@@ -704,13 +706,13 @@ def test_the_same_input_rendered_twice_is_the_same_text() -> None:
     ],
 )
 def test_the_tally_is_in_portuguese(counts: tuple[int, int, int], line: str) -> None:
-    assert render_tally(verdicts_of(*counts), PORTUGUESE) == line
+    assert render_tally(verdicts_of(*counts), PORTUGUESE_ASCII) == line
 
 
 def test_the_no_reports_message_counts_several_domains_in_portuguese() -> None:
     result = IngestionResult(duplicates=2, other_domain=3)
     domains = ["example.com", "example.net", "example.org"]
-    first, *rest = no_reports_message(result, domains, PORTUGUESE).split("\n")
+    first, *rest = no_reports_message(result, domains, PORTUGUESE_ASCII).split("\n")
     assert first == "Nenhum relatorio DMARC dos 3 dominios foi mantido."
     assert [cells(line)[0] for line in rest] == [
         "arquivos ignorados",

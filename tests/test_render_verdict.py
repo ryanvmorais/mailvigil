@@ -21,7 +21,7 @@ import pytest
 from tests.render_verdict_golden import GOLDEN
 
 from mailvigil import verdict as verdict_module
-from mailvigil.messages import ENGLISH, PORTUGUESE, Messages
+from mailvigil.messages import ENGLISH, PORTUGUESE_ASCII, Messages
 from mailvigil.render_verdict import (
     measured_text,
     missing_text,
@@ -976,7 +976,7 @@ PINNED_CASES: dict[str, Callable[[], Verdict]] = {
 
 
 @pytest.mark.parametrize("case", sorted(PINNED_CASES))
-@pytest.mark.parametrize(("code", "messages"), [("en", ENGLISH), ("pt-BR", PORTUGUESE)])
+@pytest.mark.parametrize(("code", "messages"), [("en", ENGLISH), ("pt-BR", PORTUGUESE_ASCII)])
 def test_the_text_of_a_fixed_verdict_is_recorded_whole(
     case: str, code: str, messages: Messages
 ) -> None:
@@ -1013,7 +1013,7 @@ def test_the_reason_sentence_is_what_the_text_prints_after_the_label() -> None:
     """Both renderers read the same sentence, so they cannot drift."""
     for build in PINNED_CASES.values():
         verdict = build()
-        for messages in (ENGLISH, PORTUGUESE):
+        for messages in (ENGLISH, PORTUGUESE_ASCII):
             label = messages.verdict.why_label
             first = flat(render_verdict(verdict, messages).split("\n\n")[1])
             assert first.startswith(f"{label} {flat(reason_sentence(verdict, messages))}")
@@ -1035,7 +1035,7 @@ def test_the_next_sentence_is_empty_when_ready_and_one_sentence_otherwise() -> N
 
 @pytest.mark.parametrize(
     ("messages", "above", "below"),
-    [(ENGLISH, "above", "below"), (PORTUGUESE, "acima", "abaixo")],
+    [(ENGLISH, "above", "below"), (PORTUGUESE_ASCII, "acima", "abaixo")],
     ids=["en", "pt-BR"],
 )
 def test_the_next_sentence_points_below_on_the_page_and_above_in_the_text(
@@ -1075,7 +1075,7 @@ def test_measured_needed_and_missing_text_for_each_rule() -> None:
     assert missing_text(by_id[RuleId.VOLUME], ENGLISH) == "need 49 more messages"
 
 
-@pytest.mark.parametrize("messages", [ENGLISH, PORTUGUESE])
+@pytest.mark.parametrize("messages", [ENGLISH, PORTUGUESE_ASCII])
 def test_the_sentence_of_every_kind_of_note_is_filled(messages: Messages) -> None:
     """The test iterates ``NoteKind``: a kind added later cannot reach the page as a bare key."""
     for kind in NoteKind:

@@ -34,6 +34,7 @@ from mailvigil.html_charts import (
     timeline,
 )
 from mailvigil.messages import ENGLISH, PORTUGUESE, Messages
+from mailvigil.messages.fold import fold_text
 from mailvigil.render import format_share
 from mailvigil.summary import Counts, DayCounts, Period, Summary
 from mailvigil.verdict import Rule, RuleId, RuleKind
@@ -316,16 +317,17 @@ def test_the_share_of_rule_five_is_the_one_of_the_text_format() -> None:
 
 @_BOTH
 def test_a_meter_is_a_list_item_with_ascii_markup(messages: Messages) -> None:
+    """The markup is ASCII; the only other characters are the accents, which ``page`` escapes."""
     for rule_id in RuleId:
         markup = meter(make_rule(rule_id, 1, 10), messages)
         assert markup.startswith("<li ")
         assert markup.endswith("</li>")
-        assert markup.isascii()
+        assert fold_text(markup).isascii()
 
 
 def test_the_portuguese_meter_speaks_portuguese() -> None:
     markup = meter(make_rule(RuleId.UNRECOGNIZED_FAILURES, 48, 7323, passed=False), PORTUGUESE)
-    assert "maximo permitido" in markup
+    assert "máximo permitido" in markup
     assert PORTUGUESE.verdict.result_fail in markup
 
 
@@ -411,7 +413,7 @@ def test_a_bar_with_no_messages_does_not_divide_by_zero() -> None:
 
 @_BOTH
 def test_the_bar_is_ascii_in_both_languages(messages: Messages) -> None:
-    assert stacked_bar(_MIX, messages).isascii()
+    assert fold_text(stacked_bar(_MIX, messages)).isascii()
 
 
 # ---------------------------------------------------------------------------
@@ -766,10 +768,10 @@ def test_two_calls_give_the_same_markup() -> None:
 
 @_BOTH
 def test_the_timeline_is_ascii_in_both_languages(messages: Messages) -> None:
-    assert timeline(month(), messages).isascii()
+    assert fold_text(timeline(month(), messages)).isascii()
 
 
 def test_the_portuguese_timeline_speaks_portuguese() -> None:
     markup = timeline(month(), PORTUGUESE)
-    assert "Cada coluna e um dia" in markup
+    assert "Cada coluna é um dia" in markup
     assert PORTUGUESE.html.show_numbers in markup

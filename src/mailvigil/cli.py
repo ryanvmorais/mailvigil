@@ -53,7 +53,7 @@ from mailvigil.config import (
     check_domain,
     load_configs,
 )
-from mailvigil.messages import ENGLISH, Messages, language_by_code
+from mailvigil.messages import ENGLISH, Messages, catalog_for_streams, language_by_code
 from mailvigil.render import join_blocks, no_reports_message, render_summary
 from mailvigil.render_html import render_html
 from mailvigil.render_json import (
@@ -509,7 +509,7 @@ def _run_verdict(args: argparse.Namespace) -> int:
 
     Args:
         args (argparse.Namespace): The parsed arguments: ``paths``, ``config``, ``domain``,
-            ``json``, ``html``, ``top`` and ``lang``.
+            ``json``, ``html``, ``top``, ``lang`` and ``page_lang``.
 
     Returns:
         int: ``EXIT_OK`` for ready, ``EXIT_TOO_EARLY`` for too early, ``EXIT_NOT_READY`` for not
@@ -537,19 +537,19 @@ def _run_verdict(args: argparse.Namespace) -> int:
         pages = [
             (
                 args.output / f"mailvigil-{config.domain}.html",
-                render_html(summary, verdict, args.lang, args.top),
+                render_html(summary, verdict, args.page_lang, args.top),
             )
             for config, summary, verdict in zip(configs, summaries, verdicts, strict=True)
         ]
         if not _write_pages(pages, args.lang):
             return EXIT_REFUSED
     elif args.html and args.output is not None:
-        page = render_html(summaries[0], verdicts[0], args.lang, args.top)
+        page = render_html(summaries[0], verdicts[0], args.page_lang, args.top)
         if not _write_pages([(args.output, page)], args.lang):
             return EXIT_REFUSED
     elif args.html:
         # ``render_html`` ends in a newline already; ``_write`` adds one, so the last is cut.
-        page = render_html(summaries[0], verdicts[0], args.lang, args.top)
+        page = render_html(summaries[0], verdicts[0], args.page_lang, args.top)
         write(sys.stdout, page.rstrip("\n"))
     else:
         blocks = [render_verdict(verdict, args.lang) for verdict in verdicts]
@@ -648,6 +648,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     """
     parser = build_parser()
     args = parser.parse_args(argv)
+    # The page is ASCII with character references whatever the stream, so it keeps the catalog with
+    # accents; the text on the streams gets the one they can carry (spec 006 ADR-9).
+    if hasattr(args, "lang"):
+        args.page_lang = args.lang
+        args.lang = catalog_for_streams(args.lang, (sys.stdout, sys.stderr))
     try:
         return _dispatch(args, parser)
     except KeyboardInterrupt:

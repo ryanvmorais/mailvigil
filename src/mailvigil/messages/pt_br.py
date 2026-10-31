@@ -2,11 +2,14 @@
 The Brazilian Portuguese text of MailVigil.
 
 The same structure as ``en.py``, sentence by sentence, so the two outputs have the same sections in
-the same order and the same numbers. ASCII only (``nao``, not ``não``): no console encoding can
-break the layout (spec 006 Resolved decision 4). Plain, short sentences. The words "seguro" and
-"ataque" are not used: the verdict reads reports, it does not certify a domain. A phrase whose other
-words agree with the count is a ``Plural`` of the whole phrase, not of the noun. Every number inside
-a sentence is a placeholder filled from the constants the rules use (RNF-05).
+the same order and the same numbers. Written with accents, in NFC, with the letters of Portuguese
+only (``á à â ã é ê í ó ô õ ú ü ç`` and their capitals; no typographic quote, dash or ellipsis).
+``fold.py`` derives the ASCII catalog from this one, one character for one, for a stream that cannot
+be trusted with accents (spec 006 ADR-9, which supersedes Resolved decision 4). Plain, short
+sentences. The words "seguro" and "ataque" are not used: the verdict reads reports, it does not
+certify a domain. A phrase whose other words agree with the count is a ``Plural`` of the whole
+phrase, not of the noun. Every number inside a sentence is a placeholder filled from the constants
+the rules use (RNF-05).
 """
 
 from __future__ import annotations
@@ -40,16 +43,16 @@ _COMMON = CommonMessages(
     message=Plural("{n} mensagem", "{n} mensagens"),
     failing_message=Plural("{n} mensagem com falha", "{n} mensagens com falha"),
     other_source=Plural("{n} outra origem", "{n} outras origens"),
-    no_address="sem endereco",
+    no_address="sem endereço",
     kinds=MappingProxyType(
         {
-            Outcome.UNKNOWN: "nao reconhecido",
-            Outcome.FOREIGN_DOMAIN: "dominio externo",
+            Outcome.UNKNOWN: "não reconhecido",
+            Outcome.FOREIGN_DOMAIN: "domínio externo",
             Outcome.FAILING_SIGNATURE: "assinatura com falha",
         }
     ),
     selectors_named=Plural("seletor {names}", "seletores {names}"),
-    spf_domains_named=Plural("dominio SPF {names}", "dominios SPF {names}"),
+    spf_domains_named=Plural("domínio SPF {names}", "domínios SPF {names}"),
     more_failing="... e {sources}: {messages}",
 )
 
@@ -58,70 +61,70 @@ _COMMON = CommonMessages(
 # ---------------------------------------------------------------------------
 
 # O que o ``summary`` diz, no mesmo molde de ``en.py``; o bloco "fora" e comum a mensagem de
-# nenhum relatorio.
+# nenhum relatório.
 _SUMMARY = SummaryMessages(
     title="Resumo do MailVigil para {domain}",
     key_config="config",
-    key_period="periodo",
-    key_reports="relatorios",
-    key_policy="politica",
+    key_period="período",
+    key_reports="relatórios",
+    key_policy="política",
     key_messages="mensagens",
     config_none="nenhum",
     selector=Plural("{n} seletor", "{n} seletores"),
-    spf_domain=Plural("{n} dominio SPF", "{n} dominios SPF"),
+    spf_domain=Plural("{n} domínio SPF", "{n} domínios SPF"),
     ip_range=Plural("{n} faixa de IP", "{n} faixas de IP"),
-    no_selectors="nenhum remetente mapeado: todo remetente fica nao reconhecido",
-    no_selectors_hint="(veja a secao Configuration do README)",
-    no_period="sem relatorios",
-    # The two forms are alike: "com relatorio" does not agree with the count.
+    no_selectors="nenhum remetente mapeado: todo remetente fica não reconhecido",
+    no_selectors_hint="(veja a seção Configuration do README)",
+    no_period="sem relatórios",
+    # The two forms are alike: "com relatório" does not agree with the count.
     period=Plural(
-        "{first} a {last} ({n} de {days} com relatorio)",
-        "{first} a {last} ({n} de {days} com relatorio)",
+        "{first} a {last} ({n} de {days} com relatório)",
+        "{first} a {last} ({n} de {days} com relatório)",
     ),
     reporter=Plural("{n} provedor", "{n} provedores"),
     reports_line="{reports} de {reporters}",
     policy_none="nenhuma",
-    policy_changed="mudou durante o periodo, p anterior: {earlier}",
+    policy_changed="mudou durante o período, p anterior: {earlier}",
     messages_line="{total} ({recognized} de remetentes reconhecidos, {share})",
-    situations_title="Situacoes",
+    situations_title="Situações",
     col_ok="ok",
-    col_fragile="fragil",
+    col_fragile="frágil",
     col_failing="falha",
     col_total="total",
     senders_title="Remetentes",
     col_sender="remetente",
     no_messages="nenhuma mensagem contada",
     senders_more="... e {sources}: {messages}, {failing} com falha",
-    unrecognized_who="nao reconhecido, {kind}",
+    unrecognized_who="não reconhecido, {kind}",
     mechanism_none="nenhum",
     source_detail="{messages}  dkim: {dkim}, spf: {spf}",
     source=Plural("{n} origem", "{n} origens"),
     no_failures="Nenhuma mensagem com falha.",
     failing_title="! FALHA: {messages} em {sources}",
     failing_recognized="Remetentes reconhecidos que falham",
-    failing_unrecognized="Origens nao reconhecidas que falham",
-    left_out_title="Fora destes numeros",
+    failing_unrecognized="Origens não reconhecidas que falham",
+    left_out_title="Fora destes números",
     key_skipped="arquivos ignorados",
     key_duplicates="duplicados",
-    key_other_domains="outros dominios",
+    key_other_domains="outros domínios",
     key_passed_over="ignorados pelo nome",
     reasons=MappingProxyType(
         {
-            Reason.UNSUPPORTED_EXTENSION: "tipo de arquivo nao suportado",
-            Reason.UNREADABLE: "nao foi possivel ler",
+            Reason.UNSUPPORTED_EXTENSION: "tipo de arquivo não suportado",
+            Reason.UNREADABLE: "não foi possível ler",
             Reason.FILE_TOO_LARGE: "grande demais",
             Reason.DECOMPRESSED_TOO_LARGE: "grande demais depois de descompactado",
-            Reason.NOT_AN_ARCHIVE: "arquivo compactado invalido",
+            Reason.NOT_AN_ARCHIVE: "arquivo compactado inválido",
             Reason.NO_XML_MEMBER: "nenhum XML dentro",
             Reason.MULTIPLE_XML_MEMBERS: "mais de um XML dentro",
-            Reason.FORBIDDEN_DECLARATION: "XML com declaracao proibida (DOCTYPE ou ENTITY)",
+            Reason.FORBIDDEN_DECLARATION: "XML com declaração proibida (DOCTYPE ou ENTITY)",
             Reason.MALFORMED_XML: "XML mal formado",
-            Reason.NOT_A_REPORT: "nao e um relatorio DMARC",
-            Reason.UNSUPPORTED_VERSION: "versao de relatorio nao suportada",
-            Reason.INVALID_FIELD: "valor invalido no relatorio",
+            Reason.NOT_A_REPORT: "não é um relatório DMARC",
+            Reason.UNSUPPORTED_VERSION: "versão de relatório não suportada",
+            Reason.INVALID_FIELD: "valor inválido no relatório",
             Reason.MESSAGE_TOO_LARGE: "mensagem grande demais",
             Reason.MESSAGE_TOO_COMPLEX: "mensagem complexa demais",
-            Reason.NO_REPORT_ATTACHMENT: "nenhum relatorio anexado",
+            Reason.NO_REPORT_ATTACHMENT: "nenhum relatório anexado",
             Reason.MALFORMED_MESSAGE: "mensagem malformada",
             Reason.XML_TOO_COMPLEX: "XML complexo demais",
         }
@@ -136,12 +139,12 @@ _SUMMARY = SummaryMessages(
 # O que o ``verdict`` diz, no mesmo molde de ``en.py``.
 _VERDICT = VerdictMessages(
     title="Veredito do MailVigil para {domain}",
-    enforcing="ja em p=reject: {words}",
+    enforcing="já em p=reject: {words}",
     words=MappingProxyType(
         {
             Answer.READY: "PRONTO para p=reject",
             Answer.TOO_EARLY: "CEDO DEMAIS para dizer",
-            Answer.NOT_READY: "NAO PRONTO para p=reject",
+            Answer.NOT_READY: "NÃO PRONTO para p=reject",
         }
     ),
     words_enforcing=MappingProxyType(
@@ -153,31 +156,31 @@ _VERDICT = VerdictMessages(
     ),
     rule_names=MappingProxyType(
         {
-            RuleId.PERIOD: "periodo coberto",
-            RuleId.COVERAGE: "dias com relatorio",
+            RuleId.PERIOD: "período coberto",
+            RuleId.COVERAGE: "dias com relatório",
             RuleId.VOLUME: "mensagens vistas",
             RuleId.RECOGNIZED_FAILURES: "falhas reconhecidas",
-            RuleId.UNRECOGNIZED_FAILURES: "falhas nao reconhecidas",
+            RuleId.UNRECOGNIZED_FAILURES: "falhas não reconhecidas",
         }
     ),
     why_label="Motivo:",
     why_ready="todas as regras passam.",
-    still_failing="Ainda falham, de origens nao reconhecidas e abaixo do limite:",
-    why_too_early="ainda nao ha relatorios suficientes para dizer.",
-    no_report_kept="nenhum relatorio foi mantido para este dominio",
+    still_failing="Ainda falham, de origens não reconhecidas e abaixo do limite:",
+    why_too_early="ainda não há relatórios suficientes para dizer.",
+    no_report_kept="nenhum relatório foi mantido para este domínio",
     need_days=Plural("falta {n} dia", "faltam {n} dias"),
     need_messages=Plural("falta {n} mensagem", "faltam {n} mensagens"),
     why_recognized="um remetente reconhecido falha no DMARC.",
     why_unrecognized=(
-        "as falhas de origens nao reconhecidas sao {share} das mensagens ({measured} de "
-        "{whole}); o limite e {limit}."
+        "as falhas de origens não reconhecidas são {share} das mensagens ({measured} de "
+        "{whole}); o limite é {limit}."
     ),
     recognized_tail=": {messages} de {where}",
     other_tail="  {kind}: {messages}",
     rules_title="Regras",
     col_rule="regra",
     col_measured="medido",
-    col_needed="necessario",
+    col_needed="necessário",
     col_result="resultado",
     measured_coverage="{measured} de {whole} ({share})",
     result_pass="passa",
@@ -187,54 +190,54 @@ _VERDICT = VerdictMessages(
     notes=MappingProxyType(
         {
             NoteKind.FRAGILE: (
-                "Trafego fragil: {fragile} de {total} mensagens ({share}) passam por apenas um "
-                "entre DKIM e SPF; {spf_only} delas so por SPF, que o encaminhamento quebra."
+                "Tráfego frágil: {fragile} de {total} mensagens ({share}) passam por apenas um "
+                "entre DKIM e SPF; {spf_only} delas só por SPF, que o encaminhamento quebra."
             ),
-            NoteKind.PARTIAL_POLICY: "A politica vale para apenas {pct}% do email (pct={pct}).",
+            NoteKind.PARTIAL_POLICY: "A política vale para apenas {pct}% do email (pct={pct}).",
             NoteKind.POLICY_CHANGED: (
-                "A politica mudou durante o periodo (p anterior: {earlier}), entao os numeros "
-                "misturam politicas."
+                "A política mudou durante o período (p anterior: {earlier}), então os números "
+                "misturam políticas."
             ),
             NoteKind.SUBDOMAIN_POLICY: (
-                "Os subdominios tem politica propria ({shown}): mudar o p nao a altera."
+                "Os subdomínios têm política própria ({shown}): mudar o p não a altera."
             ),
             NoteKind.CURRENTLY_QUARANTINE: (
-                "A politica atual e p=quarantine; este veredito trata da mudanca para p=reject."
+                "A política atual é p=quarantine; este veredito trata da mudança para p=reject."
             ),
             NoteKind.SILENT_REPORTER: (
-                "{name} enviou {share} das mensagens mas nada nos ultimos {days} dias; os dias "
-                "que faltaram podem parecer cobertos por outros relatorios."
+                "{name} enviou {share} das mensagens mas nada nos últimos {days} dias; os dias "
+                "que faltaram podem parecer cobertos por outros relatórios."
             ),
             NoteKind.STALE: (
-                "O ultimo relatorio terminou ha {days} dias; os numeros podem nao descrever o "
-                "e-mail que voce envia hoje."
+                "O último relatório terminou há {days} dias; os números podem não descrever o "
+                "e-mail que você envia hoje."
             ),
         }
     ),
-    next_label="Proximo:",
-    next_each_service="cada servico listado acima",
+    next_label="Próximo:",
+    next_each_service="cada serviço listado acima",
     next_recognized=(
-        "faca {who} assinar com o seu dominio (DKIM) ou acrescente os servidores ao SPF, e "
-        "depois colete outro periodo."
+        "faça {who} assinar com o seu domínio (DKIM) ou acrescente os servidores ao SPF, e "
+        "depois colete outro período."
     ),
     next_unrecognized=(
         "olhe as origens acima e acrescente as que forem suas a [senders] (seletor DKIM), "
-        "[spf] (dominio SPF) ou [ips] (faixa de IP) na configuracao."
+        "[spf] (domínio SPF) ou [ips] (faixa de IP) na configuração."
     ),
-    next_data="continue coletando relatorios ate que as regras marcadas '{marker}' passem.",
+    next_data="continue coletando relatórios até que as regras marcadas '{marker}' passem.",
     skipped_file=Plural("{n} arquivo ignorado", "{n} arquivos ignorados"),
     duplicate=Plural("{n} duplicado", "{n} duplicados"),
-    other_domain=Plural("{n} relatorio de outro dominio", "{n} relatorios de outros dominios"),
+    other_domain=Plural("{n} relatório de outro domínio", "{n} relatórios de outros domínios"),
     passed_over=Plural("{n} arquivo ignorado pelo nome", "{n} arquivos ignorados pelo nome"),
     left_out="Fora deste veredito: {parts}. O comando mailvigil summary mostra o motivo.",
     caveat=(
-        "Isto le apenas os relatorios que voce deu: email que nenhum receptor reporta, e "
-        "remetentes que ficaram quietos neste periodo, nao sao cobertos."
+        "Isto lê apenas os relatórios que você deu: email que nenhum receptor reporta, e "
+        "remetentes que ficaram quietos neste período, não são cobertos."
     ),
-    tally=Plural("{n} dominio: {parts}", "{n} dominios: {parts}"),
+    tally=Plural("{n} domínio: {parts}", "{n} domínios: {parts}"),
     tally_ready=Plural("{n} pronto", "{n} prontos"),
     tally_early=Plural("{n} cedo demais", "{n} cedo demais"),
-    tally_not_ready=Plural("{n} nao pronto", "{n} nao prontos"),
+    tally_not_ready=Plural("{n} não pronto", "{n} não prontos"),
 )
 
 # ---------------------------------------------------------------------------
@@ -243,73 +246,73 @@ _VERDICT = VerdictMessages(
 
 _REFUSALS = RefusalMessages(
     no_domain="informe --domain ou --config (ou coloque um {default} nesta pasta)",
-    domain_mismatch="--domain {wanted} nao corresponde ao dominio {domain} de {path}",
+    domain_mismatch="--domain {wanted} não corresponde ao domínio {domain} de {path}",
     # A phrase per reason; the English detail of ``config.py`` is kept only where a reader cannot
     # act without it (ADR-5): the parser's own message and the suggested key.
     config_reasons=MappingProxyType(
         {
-            ConfigReason.UNREADABLE: "nao foi possivel ler o arquivo",
+            ConfigReason.UNREADABLE: "não foi possível ler o arquivo",
             ConfigReason.FILE_TOO_LARGE: "arquivo grande demais",
-            ConfigReason.NOT_UTF8: "o arquivo nao esta em UTF-8",
+            ConfigReason.NOT_UTF8: "o arquivo não está em UTF-8",
             ConfigReason.MALFORMED_TOML: "TOML mal formado",
             ConfigReason.UNKNOWN_KEY: "chave desconhecida",
-            ConfigReason.MISSING_DOMAIN: "falta o dominio",
-            ConfigReason.INVALID_DOMAIN: "dominio invalido",
+            ConfigReason.MISSING_DOMAIN: "falta o domínio",
+            ConfigReason.INVALID_DOMAIN: "domínio inválido",
             ConfigReason.NON_ASCII_DOMAIN: (
-                "nao foi possivel converter o dominio como escrito (use a forma xn--)"
+                "não foi possível converter o domínio como escrito (use a forma xn--)"
             ),
             ConfigReason.WRONG_TYPE: "tipo de valor errado",
-            ConfigReason.INVALID_SELECTOR: "seletor invalido",
+            ConfigReason.INVALID_SELECTOR: "seletor inválido",
             ConfigReason.DUPLICATE_SELECTOR: "seletor repetido",
-            ConfigReason.INVALID_SERVICE_NAME: "nome de servico invalido",
+            ConfigReason.INVALID_SERVICE_NAME: "nome de serviço inválido",
             ConfigReason.FORBIDDEN_CHARACTER: "caractere proibido",
-            ConfigReason.INVALID_FETCH_VALUE: "valor invalido em [fetch]",
+            ConfigReason.INVALID_FETCH_VALUE: "valor inválido em [fetch]",
             ConfigReason.PASSWORD_NOT_ALLOWED: (
                 "a senha nunca fica no arquivo: use o prompt ou --password-file"
             ),
-            ConfigReason.INVALID_SPF_DOMAIN: "dominio SPF invalido em [spf]",
-            ConfigReason.FOREIGN_SPF_DOMAIN: "dominio SPF fora do seu dominio",
+            ConfigReason.INVALID_SPF_DOMAIN: "domínio SPF inválido em [spf]",
+            ConfigReason.FOREIGN_SPF_DOMAIN: "domínio SPF fora do seu domínio",
             ConfigReason.INVALID_IP_RANGE: (
-                "faixa de IP invalida em [ips]: use um bloco CIDR sem bits alem do prefixo, "
-                "nao mais largo que /16 (IPv4) ou /32 (IPv6)"
+                "faixa de IP inválida em [ips]: use um bloco CIDR sem bits além do prefixo, "
+                "não mais largo que /16 (IPv4) ou /32 (IPv6)"
             ),
             ConfigReason.DUPLICATE_KEY: "chave repetida",
             ConfigReason.DOMAIN_CONFLICT: (
-                "domains junto de domain, senders, spf ou ips: use uma forma so"
+                "domains junto de domain, senders, spf ou ips: use uma forma só"
             ),
-            ConfigReason.NO_DOMAINS: "domains esta vazio",
-            ConfigReason.TOO_MANY_DOMAINS: "dominios demais",
-            ConfigReason.DUPLICATE_DOMAIN: "dominio repetido",
+            ConfigReason.NO_DOMAINS: "domains está vazio",
+            ConfigReason.TOO_MANY_DOMAINS: "domínios demais",
+            ConfigReason.DUPLICATE_DOMAIN: "domínio repetido",
         }
     ),
     config_detail=frozenset({ConfigReason.MALFORMED_TOML, ConfigReason.UNKNOWN_KEY}),
-    no_reports="Nenhum relatorio DMARC de {domain} foi mantido.",
-    no_file_found="Nenhum arquivo de relatorio foi achado. Uma pasta so le nomes como",
+    no_reports="Nenhum relatório DMARC de {domain} foi mantido.",
+    no_file_found="Nenhum arquivo de relatório foi achado. Uma pasta só lê nomes como",
     # The pattern is the one the providers use (RFC 7489), so its words stay as they are.
-    no_file_hint="provider!domain!begin!end.zip; use --recursive ou informe o proprio arquivo.",
-    output_failed="nao foi possivel gravar {path}: {reason}",
-    domain_not_listed="--domain {wanted} nao esta entre os dominios de {path}",
-    no_reports_many="Nenhum relatorio DMARC dos {count} dominios foi mantido.",
+    no_file_hint="provider!domain!begin!end.zip; use --recursive ou informe o próprio arquivo.",
+    output_failed="não foi possível gravar {path}: {reason}",
+    domain_not_listed="--domain {wanted} não está entre os domínios de {path}",
+    no_reports_many="Nenhum relatório DMARC dos {count} domínios foi mantido.",
     html_needs_folder=(
-        "--html de {count} dominios grava uma pagina por dominio: informe --output PASTA"
+        "--html de {count} domínios grava uma página por domínio: informe --output PASTA"
     ),
-    output_not_folder="--output {path} nao e uma pasta existente",
+    output_not_folder="--output {path} não é uma pasta existente",
 )
 
 # ---------------------------------------------------------------------------
 # Fetch
 # ---------------------------------------------------------------------------
 
-# Muitos planos gratuitos de e-mail nao tem IMAP, e um provedor que o desligou responde como uma
+# Muitos planos gratuitos de e-mail não têm IMAP, e um provedor que o desligou responde como uma
 # senha errada ou como um servidor fora do ar; as duas frases que parecem isso dizem o que fazer.
-_IMAP_HINT = "; seu provedor precisa liberar o IMAP, senao baixe os relatorios a mao e use summary"
+_IMAP_HINT = "; seu provedor precisa liberar o IMAP, senão baixe os relatórios à mão e use summary"
 
 # O que o fetch diz, no mesmo molde de en.py.
 _FETCH = FetchMessages(
-    title="Mensagens de relatorio baixadas da caixa de e-mail.",
+    title="Mensagens de relatório baixadas da caixa de e-mail.",
     key_matched="Encontradas:",
     key_saved="Salvas:",
-    key_already="Ja salvas:",
+    key_already="Já salvas:",
     key_too_large="Grandes demais:",
     key_skipped="Ignoradas:",
     key_left="Ficaram para depois:",
@@ -318,27 +321,27 @@ _FETCH = FetchMessages(
         "{n} mensagem foi salva antes de parar.",
         "{n} mensagens foram salvas antes de parar.",
     ),
-    password_file_exposed="aviso: {path} pode ser lido por outros usuarios; rode chmod 600 nele",
+    password_file_exposed="aviso: {path} pode ser lido por outros usuários; rode chmod 600 nele",
     reasons=MappingProxyType(
         {
-            FetchReason.HOST_UNREACHABLE: f"nao foi possivel alcancar o servidor{_IMAP_HINT}",
+            FetchReason.HOST_UNREACHABLE: f"não foi possível alcançar o servidor{_IMAP_HINT}",
             FetchReason.TIMEOUT: "o servidor demorou demais para responder",
-            FetchReason.DEADLINE_EXCEEDED: "a execucao demorou demais e foi interrompida",
-            FetchReason.CERTIFICATE_INVALID: "o certificado do servidor nao foi aceito",
-            FetchReason.TLS_FAILED: "nao foi possivel abrir uma conexao segura",
-            FetchReason.LOGIN_FAILED: f"o servidor recusou o usuario ou a senha{_IMAP_HINT}",
+            FetchReason.DEADLINE_EXCEEDED: "a execução demorou demais e foi interrompida",
+            FetchReason.CERTIFICATE_INVALID: "o certificado do servidor não foi aceito",
+            FetchReason.TLS_FAILED: "não foi possível abrir uma conexão segura",
+            FetchReason.LOGIN_FAILED: f"o servidor recusou o usuário ou a senha{_IMAP_HINT}",
             FetchReason.PASSWORD_UNUSABLE: (
-                "a senha esta vazia, tem quebra de linha ou caractere de controle, ou o login tem "
-                "caracteres fora do ASCII que o servidor nao aceita"
+                "a senha está vazia, tem quebra de linha ou caractere de controle, ou o login tem "
+                "caracteres fora do ASCII que o servidor não aceita"
             ),
-            FetchReason.PASSWORD_FILE: "nao foi possivel ler a senha do arquivo",
+            FetchReason.PASSWORD_FILE: "não foi possível ler a senha do arquivo",
             FetchReason.CAFILE_UNUSABLE: (
-                "nao foi possivel ler uma autoridade certificadora do arquivo de --cafile"
+                "não foi possível ler uma autoridade certificadora do arquivo de --cafile"
             ),
-            FetchReason.FOLDER_NOT_FOUND: "a pasta nao foi encontrada",
-            FetchReason.PROTOCOL_ERROR: "o servidor enviou uma resposta que nao deu para usar",
+            FetchReason.FOLDER_NOT_FOUND: "a pasta não foi encontrada",
+            FetchReason.PROTOCOL_ERROR: "o servidor enviou uma resposta que não deu para usar",
             FetchReason.TOO_MANY_MATCHES: "mensagens demais; restrinja com --since",
-            FetchReason.WRITE_FAILED: "nao foi possivel gravar na pasta",
+            FetchReason.WRITE_FAILED: "não foi possível gravar na pasta",
         }
     ),
 )
@@ -347,35 +350,35 @@ _FETCH = FetchMessages(
 # HTML
 # ---------------------------------------------------------------------------
 
-# O que so o relatorio HTML diz; o resto da pagina le as areas acima.
+# O que so o relatório HTML diz; o resto da página le as areas acima.
 _HTML = HtmlMessages(
     lang="pt-BR",
-    page_title="Relatorio DMARC de {domain}",
+    page_title="Relatório DMARC de {domain}",
     eyebrow="Pronto para p=reject?",
-    policy_label="Politica publicada",
-    rules_title="As cinco regras por tras da resposta",
-    group_data="Ha evidencia suficiente?",
-    group_problem="Algo esta errado?",
-    meter_legend="A marca escura e o limite de cada regra.",
-    at_least="minimo necessario: {value}",
-    at_most="maximo permitido: {value}",
+    policy_label="Política publicada",
+    rules_title="As cinco regras por trás da resposta",
+    group_data="Há evidência suficiente?",
+    group_problem="Algo está errado?",
+    meter_legend="A marca escura é o limite de cada regra.",
+    at_least="mínimo necessário: {value}",
+    at_most="máximo permitido: {value}",
     none_allowed="nenhuma permitida",
     meter_label="{name}: {measured}, {needed}",
     of_messages=Plural("de {n} mensagem", "de {n} mensagens"),
     mix_title=Plural("O que aconteceu com {n} mensagem", "O que aconteceu com as {n} mensagens"),
     situation_ok="Passam nos dois",
-    situation_dkim="So DKIM",
-    situation_spf="So SPF",
+    situation_dkim="Só DKIM",
+    situation_spf="Só SPF",
     situation_failing="Falham",
     situation_label="{name}: {count} ({share})",
     days_title="Dia a dia",
     column_note=Plural(
-        "Cada coluna e um dia, em UTC. Um relatorio conta no dia em que comeca.",
-        "Cada coluna e de {n} dias, em UTC. Um relatorio conta no dia em que comeca.",
+        "Cada coluna é um dia, em UTC. Um relatório conta no dia em que começa.",
+        "Cada coluna é de {n} dias, em UTC. Um relatório conta no dia em que começa.",
     ),
     legend_failing_day="Dia com mensagens que falharam",
-    legend_no_report="Sem relatorio",
-    legend_covered="Coberto por um relatorio que conta em outro dia",
+    legend_no_report="Sem relatório",
+    legend_covered="Coberto por um relatório que conta em outro dia",
     scale_note=(
         "Coluna mais alta, mais mensagens. A mais alta teve {tallest}. "
         "As mensagens que falharam ficam na base de cada coluna."
@@ -384,7 +387,7 @@ _HTML = HtmlMessages(
         "Mensagens por dia de {first} a {last}: {n} coluna, {failing} com mensagens que falharam.",
         "Mensagens por dia de {first} a {last}: {n} colunas, {failing} com mensagens que falharam.",
     ),
-    show_numbers="Mostrar os numeros",
+    show_numbers="Mostrar os números",
     numbers_region="Mensagens por dia",
     senders_region="Tabela de remetentes",
     other_sender=Plural("{n} outro remetente", "{n} outros remetentes"),
@@ -393,16 +396,16 @@ _HTML = HtmlMessages(
         "mailvigil summary --json lista todos os remetentes."
     ),
     failing_heading="Fontes que falham",
-    next_each_service="cada servico listado abaixo",
+    next_each_service="cada serviço listado abaixo",
     next_unrecognized=(
         "olhe as origens abaixo e acrescente as que forem suas a [senders] (seletor DKIM), "
-        "[spf] (dominio SPF) ou [ips] (faixa de IP) na configuracao."
+        "[spf] (domínio SPF) ou [ips] (faixa de IP) na configuração."
     ),
     col_day="Dia",
     range_label="{first} a {last}",
     footer=(
         "Gerado offline pelo MailVigil {version}. "
-        "Este arquivo nao tem scripts e nao faz requisicoes de rede."
+        "Este arquivo não tem scripts e não faz requisições de rede."
     ),
 )
 

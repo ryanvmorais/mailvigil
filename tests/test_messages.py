@@ -22,7 +22,14 @@ import pytest
 from mailvigil.cli_common import config_line
 from mailvigil.config import ConfigError, ConfigReason
 from mailvigil.fetch.errors import FetchReason
-from mailvigil.messages import ENGLISH, PORTUGUESE, Messages, Plural, language_by_code
+from mailvigil.messages import (
+    ENGLISH,
+    PORTUGUESE,
+    PORTUGUESE_ASCII,
+    Messages,
+    Plural,
+    language_by_code,
+)
 from mailvigil.reports import Reason
 from mailvigil.senders import Outcome
 from mailvigil.verdict import Answer, NoteKind, RuleId
@@ -159,8 +166,9 @@ def test_no_template_is_empty(messages: Messages) -> None:
         assert template.strip(), path
 
 
-@_BOTH
-def test_every_template_is_ascii(messages: Messages) -> None:
+@pytest.mark.parametrize("messages", [ENGLISH, PORTUGUESE_ASCII], ids=["en", "pt-BR-ascii"])
+def test_every_template_of_an_ascii_catalog_is_ascii(messages: Messages) -> None:
+    """English and the folded Portuguese are what a stream that cannot carry accents gets."""
     for path, template, _is_plural in _walk(messages):
         assert template.isascii(), path
 

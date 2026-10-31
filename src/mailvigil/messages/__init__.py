@@ -11,6 +11,7 @@ from collections.abc import Mapping
 from types import MappingProxyType
 
 from mailvigil.messages.en import ENGLISH
+from mailvigil.messages.fold import PORTUGUESE_ASCII, catalog_for_streams, fold_ascii
 from mailvigil.messages.model import (
     CommonMessages,
     FetchMessages,
@@ -27,6 +28,7 @@ __all__ = [
     "ENGLISH",
     "LANGUAGES",
     "PORTUGUESE",
+    "PORTUGUESE_ASCII",
     "CommonMessages",
     "FetchMessages",
     "HtmlMessages",
@@ -35,6 +37,8 @@ __all__ = [
     "RefusalMessages",
     "SummaryMessages",
     "VerdictMessages",
+    "catalog_for_streams",
+    "fold_ascii",
     "language_by_code",
 ]
 
