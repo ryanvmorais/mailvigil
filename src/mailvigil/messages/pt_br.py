@@ -251,7 +251,9 @@ _REFUSALS = RefusalMessages(
             ConfigReason.UNKNOWN_KEY: "chave desconhecida",
             ConfigReason.MISSING_DOMAIN: "falta o dominio",
             ConfigReason.INVALID_DOMAIN: "dominio invalido",
-            ConfigReason.NON_ASCII_DOMAIN: "dominio com letras fora do ASCII (use a forma xn--)",
+            ConfigReason.NON_ASCII_DOMAIN: (
+                "nao foi possivel converter o dominio como escrito (use a forma xn--)"
+            ),
             ConfigReason.WRONG_TYPE: "tipo de valor errado",
             ConfigReason.INVALID_SELECTOR: "seletor invalido",
             ConfigReason.DUPLICATE_SELECTOR: "seletor repetido",
