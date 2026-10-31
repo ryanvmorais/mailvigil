@@ -32,7 +32,7 @@ from hypothesis import strategies as st
 from tests.html_helpers import Page
 from tests.mail_helpers import build_eml
 
-from mailvigil.config import Config, ConfigError, load_config
+from mailvigil.config import Config, ConfigError, load_configs
 from mailvigil.messages import ENGLISH, PORTUGUESE
 from mailvigil.render import render_summary
 from mailvigil.render_html import render_html
@@ -493,10 +493,10 @@ def test_the_configuration_loader_only_ever_refuses(data: bytes) -> None:
         path = Path(folder) / "mailvigil.toml"
         path.write_bytes(data)
         try:
-            config = load_config(path)
+            configs = load_configs(path)
         except ConfigError:
             return
-    assert config.domain == config.domain.lower()
+    assert all(config.domain == config.domain.lower() for config in configs)
 
 
 @given(st.text(alphabet=_TOML_ALPHABET, max_size=120))
@@ -506,7 +506,7 @@ def test_the_configuration_loader_handles_text_that_looks_like_toml(body: str) -
         path = Path(folder) / "mailvigil.toml"
         path.write_text(f'domain = "example.com"\n[senders]\n{body}\n', encoding="utf-8")
         try:
-            config = load_config(path)
+            configs = load_configs(path)
         except ConfigError:
             return
-    assert all(not has_dropped_characters(name) for name in config.senders.values())
+    assert all(not has_dropped_characters(name) for name in configs[0].senders.values())

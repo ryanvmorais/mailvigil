@@ -20,13 +20,14 @@ import pytest
 
 from mailvigil.config import (
     MAX_CONFIG_BYTES,
+    MAX_DOMAINS,
     MAX_SERVICE_NAME,
     Config,
     ConfigError,
     ConfigReason,
     FetchSettings,
     check_domain,
-    load_config,
+    load_configs,
 )
 from mailvigil.text import normalize_domain
 
@@ -66,8 +67,23 @@ def refusal(path: Path) -> ConfigError:
         ConfigError: The refusal, for the test to inspect.
     """
     with pytest.raises(ConfigError) as caught:
-        load_config(path)
+        load_configs(path)
     return caught.value
+
+
+def load_one(path: Path) -> Config:
+    """
+    Load a file that holds exactly one domain.
+
+    Args:
+        path (Path): The configuration file.
+
+    Returns:
+        Config: The only configuration of the file.
+    """
+    configs = load_configs(path)
+    assert len(configs) == 1
+    return configs[0]
 
 
 # ---------------------------------------------------------------------------
@@ -75,10 +91,10 @@ def refusal(path: Path) -> ConfigError:
 # ---------------------------------------------------------------------------
 
 
-def test_config_reason_is_a_string_enum_with_the_nineteen_members() -> None:
-    """``ConfigReason`` has exactly the nineteen refusals of the design, each a string."""
+def test_config_reason_is_a_string_enum_with_the_twenty_three_members() -> None:
+    """``ConfigReason`` has exactly the twenty-three refusals of the design, each a string."""
     assert issubclass(ConfigReason, StrEnum)
-    assert len(ConfigReason) == 19
+    assert len(ConfigReason) == 23
 
 
 def test_config_reason_values_are_unique_lower_snake_strings() -> None:
@@ -143,7 +159,7 @@ def test_config_is_frozen_and_its_senders_are_read_only() -> None:
 
 def test_a_minimal_valid_file_loads(tmp_path: Path) -> None:
     """A domain alone is a complete configuration: every sender will be unknown."""
-    config = load_config(write(tmp_path, _VALID))
+    config = load_one(write(tmp_path, _VALID))
 
     assert config.domain == "example.com"
     assert dict(config.senders) == {}
@@ -168,7 +184,7 @@ def test_exactly_the_size_cap_is_accepted(tmp_path: Path) -> None:
     content = base + b"#" * (MAX_CONFIG_BYTES - len(base))
     assert len(content) == MAX_CONFIG_BYTES
 
-    assert load_config(write(tmp_path, content)).domain == "example.com"
+    assert load_one(write(tmp_path, content)).domain == "example.com"
 
 
 def test_one_byte_over_the_cap_is_refused_without_parsing(tmp_path: Path) -> None:
@@ -187,7 +203,7 @@ def test_bytes_that_are_not_utf8_are_refused(tmp_path: Path) -> None:
 
 def test_a_byte_order_mark_is_accepted(tmp_path: Path) -> None:
     """Windows editors add one; ``tomllib`` alone would reject it as an invalid statement."""
-    config = load_config(write(tmp_path, b"\xef\xbb\xbf" + _VALID.encode()))
+    config = load_one(write(tmp_path, b"\xef\xbb\xbf" + _VALID.encode()))
 
     assert config.domain == "example.com"
 
@@ -216,7 +232,7 @@ def test_loading_creates_and_writes_nothing(tmp_path: Path) -> None:
     path = write(tmp_path, _VALID + '[senders]\nresend = "Example Mailer"\n')
     before = (sorted(tmp_path.iterdir()), path.read_bytes(), path.stat().st_mtime_ns)
 
-    load_config(path)
+    load_one(path)
 
     assert (sorted(tmp_path.iterdir()), path.read_bytes(), path.stat().st_mtime_ns) == before
 
@@ -229,7 +245,7 @@ def test_loading_creates_and_writes_nothing(tmp_path: Path) -> None:
 @pytest.mark.parametrize("raw", ["Example.COM.", "  example.com  ", "EXAMPLE.com", "example.com."])
 def test_the_domain_is_normalized_like_ingest_does(tmp_path: Path, raw: str) -> None:
     """The loaded domain is the one ``ingest`` would use for the same text."""
-    config = load_config(write(tmp_path, f'domain = "{raw}"\n'))
+    config = load_one(write(tmp_path, f'domain = "{raw}"\n'))
 
     assert config.domain == "example.com"
     assert config.domain == normalize_domain(raw)
@@ -299,7 +315,7 @@ def test_the_longest_valid_name_is_accepted(tmp_path: Path) -> None:
     name = ".".join(["a" * 63] * 3 + ["b" * 61])
     assert len(name) == 253
 
-    assert load_config(write(tmp_path, f'domain = "{name}"\n')).domain == name
+    assert load_one(write(tmp_path, f'domain = "{name}"\n')).domain == name
 
 
 @pytest.mark.parametrize(
@@ -318,7 +334,7 @@ def test_a_domain_that_changes_in_conversion_is_refused_with_the_punycode_advice
 
 def test_an_internationalized_domain_in_the_file_is_stored_in_its_xn_form(tmp_path: Path) -> None:
     """The name is written as the person reads it and compared as reports spell it (RF-03)."""
-    config = load_config(write(tmp_path, 'domain = "bücher.example"\n'))
+    config = load_one(write(tmp_path, 'domain = "bücher.example"\n'))
 
     assert config.domain == "xn--bcher-kva.example"
 
@@ -463,7 +479,7 @@ def test_an_internationalized_spf_key_is_converted_and_checked_against_the_domai
     """The ``[spf]`` keys go through the same rule, and must be within the converted domain."""
     text = 'domain = "bücher.example"\n[spf]\n"mail.bücher.example" = "Example Relay"\n'
 
-    config = load_config(write(tmp_path, text))
+    config = load_one(write(tmp_path, text))
 
     assert dict(config.spf) == {"mail.xn--bcher-kva.example": "Example Relay"}
 
@@ -546,7 +562,7 @@ def test_a_hostile_unknown_key_is_cleaned_in_the_error(tmp_path: Path) -> None:
 
 def test_selectors_are_stored_lower_case_and_the_map_is_read_only(tmp_path: Path) -> None:
     """Lookups are case-insensitive because the stored keys are all lower case."""
-    config = load_config(write(tmp_path, f'{_VALID}[senders]\nResend = "Example Mailer"\n'))
+    config = load_one(write(tmp_path, f'{_VALID}[senders]\nResend = "Example Mailer"\n'))
 
     assert dict(config.senders) == {"resend": "Example Mailer"}
     with pytest.raises(TypeError):
@@ -606,7 +622,7 @@ def test_a_dotted_key_is_read_as_a_nested_table_and_refused(tmp_path: Path) -> N
 
 def test_a_quoted_dotted_selector_is_accepted(tmp_path: Path) -> None:
     """The way to write a selector that contains a dot, as the README will say."""
-    config = load_config(write(tmp_path, f'{_VALID}[senders]\n"a.b" = "Example Campaigns"\n'))
+    config = load_one(write(tmp_path, f'{_VALID}[senders]\n"a.b" = "Example Campaigns"\n'))
 
     assert dict(config.senders) == {"a.b": "Example Campaigns"}
 
@@ -626,7 +642,7 @@ def test_a_forbidden_character_in_a_service_name_is_refused(tmp_path: Path, esca
 
 def test_a_service_name_is_stripped_when_stored(tmp_path: Path) -> None:
     """Spaces around a name are padding, not part of it."""
-    config = load_config(write(tmp_path, f'{_VALID}[senders]\nresend = "  Example Mailer  "\n'))
+    config = load_one(write(tmp_path, f'{_VALID}[senders]\nresend = "  Example Mailer  "\n'))
 
     assert dict(config.senders) == {"resend": "Example Mailer"}
 
@@ -635,7 +651,7 @@ def test_a_name_of_exactly_the_limit_is_accepted(tmp_path: Path) -> None:
     """The limit is inclusive."""
     name = "n" * MAX_SERVICE_NAME
 
-    config = load_config(write(tmp_path, f'{_VALID}[senders]\nresend = "{name}"\n'))
+    config = load_one(write(tmp_path, f'{_VALID}[senders]\nresend = "{name}"\n'))
 
     assert config.senders["resend"] == name
 
@@ -643,7 +659,7 @@ def test_a_name_of_exactly_the_limit_is_accepted(tmp_path: Path) -> None:
 @pytest.mark.parametrize("senders", ["", "[senders]\n"], ids=["absent", "empty"])
 def test_an_absent_or_empty_senders_table_is_accepted(tmp_path: Path, senders: str) -> None:
     """A first run on a new domain is a legitimate case: every sender will be unknown."""
-    config = load_config(write(tmp_path, _VALID + senders))
+    config = load_one(write(tmp_path, _VALID + senders))
 
     assert dict(config.senders) == {}
 
@@ -655,7 +671,7 @@ def test_an_absent_or_empty_senders_table_is_accepted(tmp_path: Path, senders: s
 
 def test_a_file_without_a_fetch_table_gives_empty_settings(tmp_path: Path) -> None:
     """Absent is not an error: every field stays ``None`` for the flags and defaults to fill."""
-    config = load_config(write(tmp_path, _VALID))
+    config = load_one(write(tmp_path, _VALID))
 
     assert config.fetch == FetchSettings()
 
@@ -664,21 +680,21 @@ def test_the_four_keys_of_the_fetch_table_are_read(tmp_path: Path) -> None:
     """Host, user, port and folder come back as the file wrote them, stripped."""
     table = '[fetch]\nhost = " imap.example.com "\nuser = "reports"\nport = 143\nfolder = "DMARC"\n'
 
-    config = load_config(write(tmp_path, _VALID + table))
+    config = load_one(write(tmp_path, _VALID + table))
 
     assert config.fetch == FetchSettings("imap.example.com", "reports", 143, "DMARC")
 
 
 def test_a_fetch_table_may_hold_only_some_keys(tmp_path: Path) -> None:
     """The flags fill the rest, so a partial table is valid."""
-    config = load_config(write(tmp_path, f'{_VALID}[fetch]\nhost = "imap.example.com"\n'))
+    config = load_one(write(tmp_path, f'{_VALID}[fetch]\nhost = "imap.example.com"\n'))
 
     assert config.fetch == FetchSettings(host="imap.example.com")
 
 
 def test_a_folder_name_may_hold_a_space(tmp_path: Path) -> None:
     """Only a host and a login are one word; a mailbox folder is not."""
-    config = load_config(write(tmp_path, f'{_VALID}[fetch]\nfolder = "DMARC reports"\n'))
+    config = load_one(write(tmp_path, f'{_VALID}[fetch]\nfolder = "DMARC reports"\n'))
 
     assert config.fetch.folder == "DMARC reports"
 
@@ -749,7 +765,7 @@ def test_a_fetch_value_of_the_wrong_kind_is_refused(tmp_path: Path, line: str) -
 def test_the_edges_of_the_port_are_accepted(tmp_path: Path) -> None:
     """1 and 65535 are ports."""
     for port in (1, 65535):
-        config = load_config(write(tmp_path, f"{_VALID}[fetch]\nport = {port}\n"))
+        config = load_one(write(tmp_path, f"{_VALID}[fetch]\nport = {port}\n"))
         assert config.fetch.port == port
 
 
@@ -829,8 +845,8 @@ def test_the_same_content_in_two_orders_gives_equal_configs(tmp_path: Path) -> N
         "other.toml",
     )
 
-    assert load_config(one) == load_config(other)
-    assert list(load_config(one).senders) == ["resend", "zoho"]
+    assert load_one(one) == load_one(other)
+    assert list(load_one(one).senders) == ["resend", "zoho"]
 
 
 # ---------------------------------------------------------------------------
@@ -840,7 +856,7 @@ def test_the_same_content_in_two_orders_gives_equal_configs(tmp_path: Path) -> N
 
 def test_a_file_without_the_new_tables_loads_with_both_maps_empty(tmp_path: Path) -> None:
     """Every file written before the amendment loads as before."""
-    config = load_config(write(tmp_path, _VALID))
+    config = load_one(write(tmp_path, _VALID))
 
     assert config.spf == {}
     assert config.ranges == {}
@@ -854,7 +870,7 @@ def test_both_tables_are_read_normalized_and_read_only(tmp_path: Path) -> None:
         '[ips]\n"192.0.2.0/24" = "Example Office"\n"2001:DB8::/32" = "Example v6"\n'
         '"198.51.100.7" = "Example Host"\n'
     )
-    config = load_config(write(tmp_path, text))
+    config = load_one(write(tmp_path, text))
 
     assert dict(config.spf) == {"bounce.example.com": "Example Relay"}
     assert dict(config.ranges) == {
@@ -871,7 +887,7 @@ def test_both_tables_are_read_normalized_and_read_only(tmp_path: Path) -> None:
 
 def test_the_apex_domain_is_a_valid_spf_key(tmp_path: Path) -> None:
     """The configured domain itself is an SPF domain of the owner."""
-    config = load_config(write(tmp_path, f'{_VALID}[spf]\n"example.com" = "Example Mail"\n'))
+    config = load_one(write(tmp_path, f'{_VALID}[spf]\n"example.com" = "Example Mail"\n'))
 
     assert dict(config.spf) == {"example.com": "Example Mail"}
 
@@ -931,7 +947,7 @@ def test_the_floor_prefixes_are_accepted_and_one_wider_is_not(tmp_path: Path) ->
     accepted = write(tmp_path, f'{_VALID}[ips]\n"10.1.0.0/16" = "A"\n"2001:db8::/32" = "B"\n')
     wider = write(tmp_path, f'{_VALID}[ips]\n"10.0.0.0/15" = "A"\n', "wider.toml")
 
-    assert len(load_config(accepted).ranges) == 2
+    assert len(load_one(accepted).ranges) == 2
     assert refusal(wider).key == "ips.10.0.0.0/15"
 
 
@@ -1024,5 +1040,264 @@ def test_the_same_content_in_two_orders_gives_equal_configs_with_the_new_tables(
         "other.toml",
     )
 
-    assert load_config(one) == load_config(other)
-    assert list(load_config(one).spf) == ["a.example.com", "b.example.com"]
+    assert load_one(one) == load_one(other)
+    assert list(load_one(one).spf) == ["a.example.com", "b.example.com"]
+
+
+# ---------------------------------------------------------------------------
+# Several domains in one file (spec 010, RF-01, ADR-1, ADR-10)
+# ---------------------------------------------------------------------------
+
+# Two entries with maps of their own; the same selector is a different service in each.
+_TWO_DOMAINS = (
+    '[[domains]]\ndomain = "example.com"\n'
+    '[domains.senders]\ns1 = "Example Mail"\n'
+    '[domains.spf]\n"bounce.example.com" = "Example Bounces"\n'
+    '[domains.ips]\n"192.0.2.0/24" = "Office"\n'
+    '[[domains]]\ndomain = "example.net"\n'
+    '[domains.senders]\ns1 = "Other Mail"\n'
+    '[domains.spf]\n"bounce.example.net" = "Other Bounces"\n'
+    '[domains.ips]\n"198.51.100.0/24" = "Branch"\n'
+)
+
+
+def test_a_file_of_two_domains_gives_two_configs_with_maps_of_their_own(
+    tmp_path: Path,
+) -> None:
+    """Each entry keeps its senders, its SPF domains and its ranges (RF-01)."""
+    first, second = load_configs(write(tmp_path, _TWO_DOMAINS))
+
+    assert (first.domain, second.domain) == ("example.com", "example.net")
+    assert dict(first.senders) == {"s1": "Example Mail"}
+    assert dict(second.senders) == {"s1": "Other Mail"}
+    assert dict(first.spf) == {"bounce.example.com": "Example Bounces"}
+    assert dict(second.spf) == {"bounce.example.net": "Other Bounces"}
+    assert list(first.ranges) == [ip_network("192.0.2.0/24")]
+    assert list(second.ranges) == [ip_network("198.51.100.0/24")]
+
+
+def test_the_entries_come_in_the_order_of_the_file_not_sorted(tmp_path: Path) -> None:
+    """``example.net`` written first stays first (RNF-03)."""
+    text = '[[domains]]\ndomain = "example.net"\n[[domains]]\ndomain = "example.com"\n'
+
+    configs = load_configs(write(tmp_path, text))
+
+    assert [config.domain for config in configs] == ["example.net", "example.com"]
+
+
+def test_a_file_of_one_domain_is_a_tuple_of_one(tmp_path: Path) -> None:
+    """The top-level form is read as before and means one domain (RF-01)."""
+    configs = load_configs(write(tmp_path, f'{_VALID}[senders]\ns1 = "Example Mail"\n'))
+
+    assert len(configs) == 1
+    assert configs[0].domain == "example.com"
+    assert dict(configs[0].senders) == {"s1": "Example Mail"}
+
+
+def test_a_file_with_one_entry_is_a_tuple_of_one(tmp_path: Path) -> None:
+    """One ``[[domains]]`` entry is a valid file of one domain."""
+    configs = load_configs(write(tmp_path, '[[domains]]\ndomain = "example.com"\n'))
+
+    assert [config.domain for config in configs] == ["example.com"]
+
+
+def test_the_fetch_table_at_the_top_level_reaches_every_config(tmp_path: Path) -> None:
+    """``[fetch]`` stays at the top level and is the same value in each config (ADR-1)."""
+    text = _TWO_DOMAINS + '[fetch]\nhost = "imap.example.invalid"\nuser = "reports"\n'
+
+    first, second = load_configs(write(tmp_path, text))
+
+    assert first.fetch == second.fetch
+    assert first.fetch == FetchSettings(host="imap.example.invalid", user="reports")
+
+
+def test_an_invalid_fetch_table_refuses_a_file_of_several_domains(
+    tmp_path: Path,
+) -> None:
+    """The ``[fetch]`` rules are the same whatever the form of the file."""
+    error = refusal(write(tmp_path, _TWO_DOMAINS + "[fetch]\nport = 0\n"))
+
+    assert error.reason is ConfigReason.INVALID_FETCH_VALUE
+
+
+def test_an_internationalized_entry_is_converted_and_its_spf_keys_follow(
+    tmp_path: Path,
+) -> None:
+    """The conversion of RF-03 reaches an entry and its own ``[spf]`` keys."""
+    text = (
+        '[[domains]]\ndomain = "bücher.example"\n'
+        '[domains.spf]\n"mail.bücher.example" = "Example Mail"\n'
+    )
+
+    (config,) = load_configs(write(tmp_path, text))
+
+    assert config.domain == "xn--bcher-kva.example"
+    assert list(config.spf) == ["mail.xn--bcher-kva.example"]
+
+
+@pytest.mark.parametrize(
+    ("top_level", "key"),
+    [
+        ('domain = "example.com"\n', "domain"),
+        ('[senders]\ns1 = "Example Mail"\n', "senders"),
+        ('[spf]\n"bounce.example.net" = "Example Bounces"\n', "spf"),
+        ('[ips]\n"192.0.2.0/24" = "Office"\n', "ips"),
+    ],
+)
+def test_a_top_level_key_beside_domains_is_a_conflict_that_names_it(
+    tmp_path: Path, top_level: str, key: str
+) -> None:
+    """One file is one form or the other, never a blend (RF-01)."""
+    text = top_level + '[[domains]]\ndomain = "example.net"\n'
+
+    error = refusal(write(tmp_path, text))
+
+    assert error.reason is ConfigReason.DOMAIN_CONFLICT
+    assert error.key == key
+
+
+def test_an_empty_array_of_domains_is_refused(tmp_path: Path) -> None:
+    """No domain at all is a typed reason, not a run of nothing (RF-01)."""
+    error = refusal(write(tmp_path, "domains = []\n"))
+
+    assert error.reason is ConfigReason.NO_DOMAINS
+    assert error.key == "domains"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        'domains = "example.com"\n',
+        "domains = [1, 2]\n",
+        '[domains]\ndomain = "example.com"\n',
+        'domains = ["example.com"]\n',
+    ],
+)
+def test_domains_that_is_not_an_array_of_tables_is_the_wrong_type(
+    tmp_path: Path, text: str
+) -> None:
+    """Only ``[[domains]]`` (an array of tables) is the form (RF-01)."""
+    error = refusal(write(tmp_path, text))
+
+    assert error.reason is ConfigReason.WRONG_TYPE
+    assert error.key == "domains"
+
+
+def test_an_entry_without_a_domain_is_refused_with_its_place(tmp_path: Path) -> None:
+    """The key names the entry, counted from 1 as the person counts the blocks."""
+    text = '[[domains]]\ndomain = "example.com"\n[[domains]]\n[domains.senders]\ns1 = "A"\n'
+
+    error = refusal(write(tmp_path, text))
+
+    assert error.reason is ConfigReason.MISSING_DOMAIN
+    assert error.key == "domains[2].domain"
+
+
+@pytest.mark.parametrize(
+    ("first", "second", "named"),
+    [
+        ("example.com", "example.com", "example.com"),
+        ("example.com", "EXAMPLE.com.", "example.com"),
+        ("bücher.example", "xn--bcher-kva.example", "xn--bcher-kva.example"),
+        ("xn--bcher-kva.example", "BÜCHER.example", "xn--bcher-kva.example"),
+    ],
+)
+def test_two_entries_with_the_same_domain_are_a_duplicate(
+    tmp_path: Path, first: str, second: str, named: str
+) -> None:
+    """After case, the trailing dot and the internationalized form, one name is one entry."""
+    text = f'[[domains]]\ndomain = "{first}"\n[[domains]]\ndomain = "{second}"\n'
+
+    error = refusal(write(tmp_path, text))
+
+    assert error.reason is ConfigReason.DUPLICATE_DOMAIN
+    assert error.key == "domains[2].domain"
+    assert named in error.detail
+
+
+def _entries(count: int) -> str:
+    """
+    Build a file of ``count`` entries named ``d1.example``, ``d2.example`` and so on.
+
+    Args:
+        count (int): How many ``[[domains]]`` entries to write.
+
+    Returns:
+        str: The TOML text.
+    """
+    return "".join(f'[[domains]]\ndomain = "d{n}.example"\n' for n in range(1, count + 1))
+
+
+def test_fifty_entries_are_accepted_and_fifty_one_are_not(tmp_path: Path) -> None:
+    """The cap of ADR-10 is on the entries of the file."""
+    assert len(load_configs(write(tmp_path, _entries(MAX_DOMAINS)))) == MAX_DOMAINS
+
+    error = refusal(write(tmp_path, _entries(MAX_DOMAINS + 1), "many.toml"))
+
+    assert error.reason is ConfigReason.TOO_MANY_DOMAINS
+    assert error.key == "domains"
+
+
+def test_an_unknown_key_in_an_entry_gets_the_suggestion_of_the_entry_keys(
+    tmp_path: Path,
+) -> None:
+    """The strictness of the top level holds inside an entry, with the entry's place."""
+    text = '[[domains]]\ndomain = "example.com"\n[[domains]]\ndomain = "example.net"\nsender = 1\n'
+
+    error = refusal(write(tmp_path, text))
+
+    assert error.reason is ConfigReason.UNKNOWN_KEY
+    assert error.key == "domains[2].sender"
+    assert error.detail == 'did you mean "senders"?'
+
+
+def test_fetch_inside_an_entry_is_an_unknown_key(tmp_path: Path) -> None:
+    """``[fetch]`` has no domain: it lives at the top level only."""
+    text = '[[domains]]\ndomain = "example.com"\n[domains.fetch]\nhost = "imap.example.invalid"\n'
+
+    error = refusal(write(tmp_path, text))
+
+    assert error.reason is ConfigReason.UNKNOWN_KEY
+    assert error.key == "domains[1].fetch"
+
+
+def test_an_spf_key_of_another_entry_is_foreign_to_this_one(tmp_path: Path) -> None:
+    """Within-the-domain is checked against the entry's own domain (RF-01)."""
+    text = (
+        '[[domains]]\ndomain = "example.com"\n'
+        '[[domains]]\ndomain = "example.net"\n'
+        '[domains.spf]\n"bounce.example.com" = "Example Bounces"\n'
+    )
+
+    error = refusal(write(tmp_path, text))
+
+    assert error.reason is ConfigReason.FOREIGN_SPF_DOMAIN
+    assert error.key == "domains[2].spf.bounce.example.com"
+
+
+@pytest.mark.parametrize(
+    ("table", "reason", "key"),
+    [
+        ('senders = "x"\n', ConfigReason.WRONG_TYPE, "domains[2].senders"),
+        (
+            '[domains.senders]\n"bad key" = "A"\n',
+            ConfigReason.INVALID_SELECTOR,
+            "domains[2].bad key",
+        ),
+        (
+            '[domains.ips]\n"192.0.2.1/24" = "A"\n',
+            ConfigReason.INVALID_IP_RANGE,
+            "domains[2].ips.192.0.2.1/24",
+        ),
+    ],
+)
+def test_a_refusal_inside_an_entry_names_the_entry_and_yields_no_partial_tuple(
+    tmp_path: Path, table: str, reason: ConfigReason, key: str
+) -> None:
+    """The first entry is fine, the second is not: nothing is returned (RF-01)."""
+    text = '[[domains]]\ndomain = "example.com"\n[[domains]]\ndomain = "example.net"\n' + table
+
+    error = refusal(write(tmp_path, text))
+
+    assert error.reason is reason
+    assert error.key == key

@@ -274,6 +274,12 @@ _REFUSALS = RefusalMessages(
                 "nao mais largo que /16 (IPv4) ou /32 (IPv6)"
             ),
             ConfigReason.DUPLICATE_KEY: "chave repetida",
+            ConfigReason.DOMAIN_CONFLICT: (
+                "domains junto de domain, senders, spf ou ips: use uma forma so"
+            ),
+            ConfigReason.NO_DOMAINS: "domains esta vazio",
+            ConfigReason.TOO_MANY_DOMAINS: "dominios demais",
+            ConfigReason.DUPLICATE_DOMAIN: "dominio repetido",
         }
     ),
     config_detail=frozenset({ConfigReason.MALFORMED_TOML, ConfigReason.UNKNOWN_KEY}),

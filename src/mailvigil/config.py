@@ -1,6 +1,7 @@
 """
-The configuration file: the domain the reports are about, the maps from DKIM selector, SPF domain
-and address range to service name and, for ``fetch``, the connection settings of the mailbox.
+The configuration file: the domain, or the domains, the reports are about, the maps from DKIM
+selector, SPF domain and address range to service name and, for ``fetch``, the connection settings
+of the mailbox.
 
 Only the owner knows which selector, SPF domain or address is which service, so the answer comes
 from a short TOML file.
@@ -19,7 +20,7 @@ import stat
 import stringprep
 import tomllib
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from pathlib import Path
 from types import MappingProxyType
@@ -47,7 +48,16 @@ MAX_SERVICE_NAME = 100
 _MAX_KEY = 100
 
 # The top-level keys of the format. Anything else is a typo or a feature from the future.
-_ALLOWED_KEYS = ("domain", "senders", "spf", "ips", "fetch")
+_ALLOWED_KEYS = ("domain", "senders", "spf", "ips", "fetch", "domains")
+
+# The keys of one ``[[domains]]`` entry (ADR-1 of spec 010): the four a one-domain file has at the
+# top level. ``fetch`` is not one, because a mailbox has no domain.
+_ENTRY_KEYS = ("domain", "senders", "spf", "ips")
+
+# The most domains a run covers, for the entries of a file and for the distinct ``--domain`` values
+# (ADR-10 of spec 010): enough for an agency, little enough to bound the output. Raising it is a
+# minor change.
+MAX_DOMAINS = 50
 
 # The keys of the ``[fetch]`` table (ADR-7 of spec 003, ADR-12 of spec 009). The password is not one
 # of them and never will be; ``to``, ``since``, ``limit`` and ``cafile`` stay flags.
@@ -88,12 +98,13 @@ class ConfigReason(StrEnum):
         FILE_TOO_LARGE (str): The file is over the cap.
         NOT_UTF8 (str): The bytes are not valid UTF-8.
         MALFORMED_TOML (str): Not valid TOML, or nested too deeply to parse.
-        UNKNOWN_KEY (str): A top-level key or table, or a ``[fetch]`` key, the format does not
-            define.
+        UNKNOWN_KEY (str): A top-level key or table, a key of an entry of ``domains`` or a
+            ``[fetch]`` key, the format does not define.
         MISSING_DOMAIN (str): There is no ``domain``.
         INVALID_DOMAIN (str): Not a string, empty, or not a plausible host name.
         NON_ASCII_DOMAIN (str): The name could not be converted as written; write its ``xn--`` form.
-        WRONG_TYPE (str): ``senders``, ``spf``, ``ips`` or ``fetch`` is not a table.
+        WRONG_TYPE (str): ``senders``, ``spf``, ``ips`` or ``fetch`` is not a table, or
+            ``domains`` is not an array of tables.
         INVALID_SELECTOR (str): A selector key a DKIM selector cannot be.
         DUPLICATE_SELECTOR (str): Two selector keys that differ only by case.
         INVALID_SERVICE_NAME (str): Not a string, blank, too long, or a nested value.
@@ -105,6 +116,11 @@ class ConfigReason(StrEnum):
         INVALID_IP_RANGE (str): An ``[ips]`` key that is no address range, has bits set past its
             prefix, or is wider than the floor.
         DUPLICATE_KEY (str): Two keys of ``[spf]`` or ``[ips]`` that mean the same thing.
+        DOMAIN_CONFLICT (str): ``domains`` beside a top-level ``domain``, ``senders``, ``spf`` or
+            ``ips``: one file is one form or the other.
+        NO_DOMAINS (str): ``domains`` is an empty array.
+        TOO_MANY_DOMAINS (str): More than ``MAX_DOMAINS`` entries or ``--domain`` values.
+        DUPLICATE_DOMAIN (str): Two entries that name the same domain.
     """
 
     UNREADABLE = "unreadable"
@@ -126,6 +142,10 @@ class ConfigReason(StrEnum):
     FOREIGN_SPF_DOMAIN = "foreign_spf_domain"
     INVALID_IP_RANGE = "invalid_ip_range"
     DUPLICATE_KEY = "duplicate_key"
+    DOMAIN_CONFLICT = "domain_conflict"
+    NO_DOMAINS = "no_domains"
+    TOO_MANY_DOMAINS = "too_many_domains"
+    DUPLICATE_DOMAIN = "duplicate_domain"
 
 
 class ConfigError(Exception):
@@ -283,24 +303,28 @@ def _read_table(path: Path) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-def _check_keys(table: dict[str, Any]) -> None:
+def _check_keys(
+    table: dict[str, Any], allowed: tuple[str, ...] = _ALLOWED_KEYS, prefix: str = ""
+) -> None:
     """
-    Refuse the first top-level key the format does not define (step 5).
+    Refuse the first key of a table the format does not define (step 5).
 
     Args:
-        table (dict[str, Any]): The parsed file.
+        table (dict[str, Any]): The parsed file, or one entry of ``domains``.
+        allowed (tuple[str, ...], optional): The keys the table may have. Default: the top-level
+            keys.
+        prefix (str, optional): What to put before the key in the refusal, such as ``domains[2].``.
+            Default: empty.
 
     Raises:
         ConfigError: ``UNKNOWN_KEY``, with the closest allowed key in the detail when there is one.
     """
     for key in sorted(table):
-        if key in _ALLOWED_KEYS:
+        if key in allowed:
             continue
-        close = difflib.get_close_matches(key, _ALLOWED_KEYS, n=1)
-        detail = (
-            f'did you mean "{close[0]}"?' if close else "allowed keys: " + ", ".join(_ALLOWED_KEYS)
-        )
-        raise ConfigError(ConfigReason.UNKNOWN_KEY, key, detail)
+        close = difflib.get_close_matches(key, allowed, n=1)
+        detail = f'did you mean "{close[0]}"?' if close else "allowed keys: " + ", ".join(allowed)
+        raise ConfigError(ConfigReason.UNKNOWN_KEY, prefix + key, detail)
 
 
 def _fold(char: str) -> str:
@@ -666,30 +690,106 @@ def _read_fetch(table: dict[str, Any]) -> FetchSettings:
 # ---------------------------------------------------------------------------
 
 
-def load_config(path: Path) -> Config:
+def _read_entries(table: dict[str, Any]) -> tuple[Config, ...]:
     """
-    Load a configuration file.
+    Read the ``[[domains]]`` form: one ``Config`` per entry, in the order of the file (ADR-1).
+
+    Each entry is read by the code that reads the top level of a one-domain file, so the strictness
+    is one set of rules. A refusal inside an entry names its key after ``domains[N].``, ``N``
+    counted from 1 as the person counts the blocks of the file.
+
+    Args:
+        table (dict[str, Any]): The parsed file, which has ``domains``.
+
+    Returns:
+        tuple[Config, ...]: The configurations, without ``fetch`` (the caller adds it).
+
+    Raises:
+        ConfigError: ``DOMAIN_CONFLICT``, ``WRONG_TYPE``, ``NO_DOMAINS``, ``TOO_MANY_DOMAINS``,
+            ``DUPLICATE_DOMAIN`` or any refusal of the keys of an entry.
+    """
+    for key in _ENTRY_KEYS:
+        if key in table:
+            raise ConfigError(
+                ConfigReason.DOMAIN_CONFLICT,
+                key,
+                "use either domains or the top-level domain, senders, spf and ips, not both",
+            )
+    raw = table["domains"]
+    if not isinstance(raw, list) or not all(isinstance(entry, dict) for entry in raw):
+        raise ConfigError(ConfigReason.WRONG_TYPE, "domains", "domains must be an array of tables")
+    if not raw:
+        raise ConfigError(ConfigReason.NO_DOMAINS, "domains", "the array has no entry")
+    # Before reading any entry, so a file past the cap costs nothing.
+    if len(raw) > MAX_DOMAINS:
+        raise ConfigError(
+            ConfigReason.TOO_MANY_DOMAINS, "domains", f"more than {MAX_DOMAINS} entries"
+        )
+
+    configs: list[Config] = []
+    seen: set[str] = set()
+    for number, entry in enumerate(raw, start=1):
+        prefix = f"domains[{number}]."
+        _check_keys(entry, _ENTRY_KEYS, prefix)
+        try:
+            domain = _read_domain(entry)
+            if domain in seen:
+                raise ConfigError(
+                    ConfigReason.DUPLICATE_DOMAIN, "domain", f"{domain} is listed twice"
+                )
+            seen.add(domain)
+            senders = _read_senders(entry)
+            spf = _read_spf(entry, domain)
+            ranges = _read_ranges(entry)
+        except ConfigError as error:
+            raise ConfigError(error.reason, prefix + error.key, error.detail) from None
+        configs.append(
+            Config(
+                domain,
+                MappingProxyType(senders),
+                spf=MappingProxyType(spf),
+                ranges=MappingProxyType(ranges),
+            )
+        )
+    return tuple(configs)
+
+
+def load_configs(path: Path) -> tuple[Config, ...]:
+    """
+    Load a configuration file of one domain or of several.
 
     The checks run in a fixed order and the first failure is the one reported (RF-07): the file,
-    its bytes, its TOML, the top-level keys, the domain, the selector map, ``[spf]``, ``[ips]``,
-    then ``[fetch]``.
+    its bytes, its TOML, the top-level keys, then either the domain, the selector map, ``[spf]``
+    and ``[ips]`` of the one-domain form, or the entries of ``[[domains]]`` (spec 010), and last
+    ``[fetch]``. The ``[fetch]`` table is read once and is the same in every ``Config``.
 
     Args:
         path (Path): The TOML file. The loader never searches for one.
 
     Returns:
-        Config: The immutable configuration.
+        tuple[Config, ...]: One immutable configuration per domain, in the order of the file; a
+            one-domain file gives a tuple of one.
 
     Raises:
-        ConfigError: For any problem in the file; ``reason`` and ``key`` say which.
+        ConfigError: For any problem in the file; ``reason`` and ``key`` say which. No partial
+            result is ever returned.
     """
     table = _read_table(path)
     _check_keys(table)
-    domain = _read_domain(table)
-    senders = _read_senders(table)
-    spf = _read_spf(table, domain)
-    ranges = _read_ranges(table)
+    if "domains" in table:
+        configs = _read_entries(table)
+    else:
+        domain = _read_domain(table)
+        senders = _read_senders(table)
+        spf = _read_spf(table, domain)
+        ranges = _read_ranges(table)
+        configs = (
+            Config(
+                domain,
+                MappingProxyType(senders),
+                spf=MappingProxyType(spf),
+                ranges=MappingProxyType(ranges),
+            ),
+        )
     fetch = _read_fetch(table)
-    return Config(
-        domain, MappingProxyType(senders), fetch, MappingProxyType(spf), MappingProxyType(ranges)
-    )
+    return tuple(replace(config, fetch=fetch) for config in configs)
