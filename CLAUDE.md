@@ -15,8 +15,7 @@ static HTML page of `verdict --html` (spec 008 is done). `mailvigil fetch` (spec
 folder, opt-in) is built too; it is the only command that touches the network. Several domains in
 one run (spec 010) are built. Everything
 is specified in [specs/](specs/) first. The repository has been public since
-2026-10-27 (the maintainer made it public, not Claude); releasing and announcing are the
-maintainer's acts (`docs/releasing.md`).
+2026-10-27; releasing and announcing are the maintainer's acts.
 
 Conversation with the maintainer (Ryan) and plan files are in Portuguese; everything in the
 repository is English.
@@ -170,7 +169,6 @@ specs/               # spec-driven development: requirements → design → task
 docs/stack.md        # each technology of the stack, why it was chosen, what to study first
 docs/json-schema.md  # every field of the three --json documents and the compatibility promise
 docs/stability.md    # what is public (commands, exit codes, JSON, config) and what is not; deprecation
-docs/releasing.md    # the maintainer's release steps (PyPI trusted publishing, TestPyPI dry run)
 CHANGELOG.md         # Keep a Changelog; a change a user would notice goes in [Unreleased] in the same PR
 scripts/             # benchmark_ingest.py: times the reading of synthetic reports (not a test; issue #70)
 docs/demo/           # build_demo.py makes the invented reports and runs the CLI to write verdict.cast,

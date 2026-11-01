@@ -97,8 +97,7 @@ contains only `src/mailvigil`; the sdist adds the README and the license.
 
 How the package reaches PyPI without a stored token: the release workflow (`release.yml`) proves
 its identity to PyPI with a short-lived OIDC token. Publishing itself is always the maintainer's
-act: a GitHub Release runs the workflow, and a manual run does the dry run on TestPyPI
-(`docs/releasing.md`).
+act: a GitHub Release runs the workflow, and a manual run does the dry run on TestPyPI.
 
 **Why this:** against an API token in a repository secret, there is nothing to leak or rotate.
 
