@@ -442,7 +442,7 @@ dev = [
 [package.metadata.requires-dev]
 dev = [
     { name = "black", specifier = ">=26.10.1" },
-    { name = "hypothesis", specifier = ">=6.170.8" },
+    { name = "hypothesis", specifier = ">=6.170.9" },
     { name = "mypy", specifier = ">=2.4.0" },
     { name = "pytest", specifier = ">=9.2.0" },
     { name = "pytest-cov", specifier = ">=7.1.0" },
