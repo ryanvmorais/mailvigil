@@ -10,7 +10,7 @@ origin: conception
 
 # 008 — HTML report — Tasks
 
-Each stage is one pull request (issue → branch → PR); Claude opens it and never merges. Inside a
+Each stage is one pull request (issue → branch → PR). Inside a
 stage, tests come first: write the test, watch it fail for the right reason, then write the code.
 `Summary` and `Verdict` values are built in the test (the `Summary` through `summarize` over
 synthetic reports where the day matters). Domains, selectors and addresses are invented
@@ -252,9 +252,8 @@ maintainer, not decided here.
   terms (subject, technology, context) and the README gives it a descriptive `alt`. The link is
   absolute (`raw.githubusercontent.com`, `main`) so it also renders on PyPI; it resolves once this
   branch is merged.
-- [x] `status:` of the three files of the spec to `done`, and the maintainer's memory of the
-  project updated (the 008 closed, the next is 009), in the same session. — RNF-05
-- [x] `/atualizar-docs`, then `/fechar-sessao` (commit, push, PR; no merge). — #48
+- [x] `status:` of the three files of the spec to `done`. — RNF-05
+- [x] Update the docs, then commit, push and open the PR (no merge). — #48
 - [x] Final quality gate: the same four commands, plus `uv build` and the check that the wheel has
   no `Requires-Dist` (RNF-01). **Result:** ruff, black, mypy strict clean; 2231 tests pass,
   coverage 100%; `uv build` makes the sdist and the wheel and the wheel has 0 `Requires-Dist`.

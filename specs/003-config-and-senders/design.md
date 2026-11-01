@@ -418,9 +418,8 @@ output (RF-11), which touches specs 004 and 006 and adds a field to `--json`. (R
   `tmp_path`.
 - **Docs:** README gains the file format and a quick-start line (status stays "planned" until the
   command exists); `docs/stack.md` gains `tomllib`, `difflib` and `types.MappingProxyType`;
-  `CLAUDE.md` gains the three modules in its architecture block. `/atualizar-docs` at the end. The
+  `CLAUDE.md` gains the three modules in its architecture block. The docs are updated at the end. The
   `specs/README.md` row moves to `in progress`, then `done`.
-- **The site repository's script** is not changed.
 
 ## Impact of ADR-8 (issue #78)
 

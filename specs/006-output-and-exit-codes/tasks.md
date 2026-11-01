@@ -10,7 +10,7 @@ origin: conception
 
 # 006 — Output and exit codes — Tasks
 
-Each stage is one pull request (issue → branch → PR); Claude opens it and never merges. Inside a
+Each stage is one pull request (issue → branch → PR). Inside a
 stage, tests come first: write the test that feeds the input, watch it fail for the right reason,
 then write the code. Values are built in the test with a small builder that has defaults (the
 `make_summary` of `tests/test_verdict.py` is the model), so each test states only what it changes;
@@ -164,11 +164,11 @@ Behavior-neutral: the output is byte-equal to today's. No Portuguese is written 
   ASCII; the Portuguese read naturally. Nothing needed a change. Two things seen and left alone,
   both outside this spec: the decimal point stays a point in Portuguese (localized numbers are a
   non-goal) and the list of sources in the verdict does not align its columns (as in 005).
-- [x] Run `/atualizar-docs`: `README.md` (flags, the Portuguese quick start with an invented
+- [x] Update the docs: `README.md` (flags, the Portuguese quick start with an invented
   example, the roadmap and status rows, "provisional" gone), `CLAUDE.md` (architecture block gains
   `render_json.py` and `messages/`; the language line is rewritten for `--lang`; the status
   paragraph loses "`--json` and the stable exit codes are not built yet"), `docs/stack.md` (the
-  `json` module and the catalog pattern); then `/fechar-sessao`. — Resolved decision 2
+  `json` module and the catalog pattern); then commit, push and open the PR. — Resolved decision 2
 - [x] Mark the three files `done` and move the roadmap row of `006` in `specs/README.md` to `done`,
   with the note that "Exit codes and `--json` are public contract" now applies.
 - [x] Quality gate. — ruff, black and mypy clean; `pytest --cov` 1074 passed, 100% coverage (2026-10-28); only docs and spec files changed in this stage.

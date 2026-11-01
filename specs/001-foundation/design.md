@@ -159,8 +159,7 @@ shows one. Review the floor when 3.12 reaches end of life (2028-10-31). (RF-04)
 
 **Decision.** `[build-system] requires = ["hatchling"]`, wheel from `src/mailvigil`.
 **Alternatives.** (a) `uv_build`. (b) `setuptools`. (c) Flit.
-**Why.** Same backend as WebVigil, so one packaging model across the maintainer's projects, and
-the explicit `include` list for the sdist is a one-block config. The build backend is not a
+**Why.** The explicit `include` list for the sdist is a one-block config. The build backend is not a
 runtime dependency.
 **Trade-off.** One more build-time package to keep current; it is covered by the lock and the
 weekly audit. (RF-01, RF-05)

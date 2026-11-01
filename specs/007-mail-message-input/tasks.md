@@ -10,7 +10,7 @@ origin: conception
 
 # 007 — Mail message input — Tasks
 
-Each stage is one pull request (issue → branch → PR); Claude opens it and never merges. Inside a
+Each stage is one pull request (issue → branch → PR). Inside a
 stage, tests come first: write the test that feeds the input, watch it fail for the right reason,
 then write the code. Messages are built in the test with `email.message.EmailMessage` or as raw
 bytes, mailboxes as bytes joined with separator lines, files in `tmp_path`. Domains and addresses
@@ -166,7 +166,7 @@ fails, the code is wrong.
   first item), `CLAUDE.md` (the architecture tree gets `mail.py` and the new tests),
   `docs/stack.md` (`email`, `email.policy`, the message factory seam, `io.BytesIO`, `bytearray`),
   `specs/README.md` (the roadmap row to `done`), this file and the other two (`status: done`).
-  Run `/atualizar-docs`. — RF-08, RNF-01
+  Update the docs. — RF-08, RNF-01
 - [x] Quality gate of the spec, the whole sequence on the final branch: `uv run ruff check .` →
   `uv run black --check .` → `uv run mypy` → `uv run pytest --cov`, and `uv lock --check`; confirm
   `dependencies = []` and that the CI `package` job would still pass (`uv build`, then no

@@ -396,8 +396,7 @@ cover. (RF-08)
   `mailvigil summary` with an invented example; the exit codes stay "not defined yet"),
   `docs/stack.md` (`argparse` subcommands, `datetime`, `dataclass` properties, integer rounding),
   `CLAUDE.md` (the two modules and the command in the architecture block and the status paragraph).
-  `/atualizar-docs` at the end. The `specs/README.md` row moves to `in progress`, then `done`.
-- **The site repository's script** is not changed.
+  The docs are updated at the end. The `specs/README.md` row moves to `in progress`, then `done`.
 
 ## Risks
 

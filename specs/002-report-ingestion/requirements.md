@@ -28,11 +28,11 @@ Two things make that layer worth its own spec instead of a helper function:
   twice (`report (1).zip`), reports for other domains land in the same folder, and one corrupt file
   must not hide the other two hundred good ones.
 
-The starting point is a working script in the maintainer's site repository
-(`site-ryan-morais/scripts/relatorios_dmarc.py`) that already reads `.zip`, `.gz` and `.xml`, caps
+The starting point is a working script of the maintainer's, outside this repository,
+that already reads `.zip`, `.gz` and `.xml`, caps
 the decompressed size at 5 MiB, refuses `DOCTYPE` and `ENTITY`, and deduplicates by provider and
 report id. This spec carries that behavior over, states it as a contract, and closes the gaps found
-while reading it (listed in the requirements below). The script stays in the site repository until
+while reading it (listed in the requirements below). The script stays where it is until
 MailVigil is released.
 
 Today `src/mailvigil` holds only the `--version` skeleton from [001](../001-foundation/). This spec

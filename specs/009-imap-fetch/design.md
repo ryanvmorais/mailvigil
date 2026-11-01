@@ -59,7 +59,7 @@ src/mailvigil/cli.py                     # CHANGED  `fetch` subcommand, parent p
 .gitignore                               # CHANGED  *.eml and *.mbox outside tests/ (RNF-07)
 tests/test_fetch_imap.py, test_fetch_store.py, test_fetch_run.py, test_render_fetch.py,
 tests/test_cli_fetch.py, test_offline_isolation.py, fetch_helpers.py          # NEW
-README.md, CLAUDE.md, docs/stack.md      # CHANGED  at the end (the `/atualizar-docs` step)
+README.md, CLAUDE.md, docs/stack.md      # CHANGED  at the end (the docs-update step)
 ```
 
 `reports/`, `summary.py`, `verdict.py`, `senders.py`, `config.py`, `render*.py` (but the new one),

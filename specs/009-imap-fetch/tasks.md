@@ -10,7 +10,7 @@ origin: conception
 
 # 009 — IMAP fetch — Tasks
 
-Each stage is one pull request (issue → branch → PR); Claude opens it and never merges. Inside a
+Each stage is one pull request (issue → branch → PR). Inside a
 stage, tests come first: write the test that feeds the input, watch it fail for the right reason,
 then write the code. No test opens a connection: the logic runs against a `FakeMailbox`, the
 adapter's bounds against a local `socket.socketpair()` (ADR-1). Hosts are `.invalid`, users and
@@ -169,14 +169,14 @@ signature changed (the parent parser split); if any other one fails, the code is
   not accepted in this version. `CLAUDE.md`: the architecture tree (`fetch/`, `render_fetch.py`),
   the commands block, the ⚠️ "`imaplib` and `ssl` only in `fetch/imap.py`; never an unverified
   context; `summary` and `verdict` never load them", and the line on the project overview.
-  `docs/stack.md`: `imaplib`, `ssl`, `getpass`, `os.replace`. Run `/atualizar-docs`. — RF-08, RF-09
+  `docs/stack.md`: `imaplib`, `ssl`, `getpass`, `os.replace`. Update the docs. — RF-08, RF-09
 - [x] `specs/README.md`: the roadmap row of 009 to **done**; the three statuses of the spec to
-  `done`; the memory of the project updated in the same session.
+  `done`.
 - [x] Zero dependencies still true: `[project].dependencies` is empty, `uv build` succeeds and the
   CI `package` job passes. — RNF-01
 - [x] **Manual check by the maintainer, with a real mailbox (not in CI, nothing from it enters the
-  repository):** run `mailvigil fetch` against his own mailbox; compare the number matched with the
-  DMARC report messages he can count by hand (this closes the risk of the subject criterion, open
+  repository):** run `mailvigil fetch` against their own mailbox; compare the number matched with the
+  DMARC report messages they can count by hand (this closes the risk of the subject criterion, open
   question 3); run it again and confirm that nothing is saved; run `mailvigil verdict` over the
   folder; confirm in the mail client that no message was marked as read. If a provider's subject
   does not match, the criterion changes in `imap.py` with a test, in a new PR. — RF-03, RF-04,

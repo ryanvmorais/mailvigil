@@ -10,7 +10,7 @@ origin: conception
 
 # 004 — Summary — Tasks
 
-Each stage is one pull request (issue → branch → PR); Claude opens it and never merges. Inside a
+Each stage is one pull request (issue → branch → PR). Inside a
 stage, tests come first: write the test that feeds the input, watch it fail for the right reason,
 then write the code. Records, reports and configurations are built in the test with the dataclasses
 (`Record`, `Report`, `Config`) and the files in `tmp_path`, from invented domains (`example.com`,
@@ -208,7 +208,7 @@ command, then the close. The computation (`summary.py`) never imports `render` (
   `uv run mailvigil summary` runs from it. — RNF-01. Result on 2026-10-28: the wheel has no
   `Requires-Dist`, holds both modules, and `mailvigil summary` ran from it in an isolated
   environment (`uv run --isolated --no-project --with <wheel>`) on a synthetic report, exit 0
-- [x] Run `/atualizar-docs` (done on 2026-10-28; the README also gained the folder naming rule): the README gains the `mailvigil summary` quick start with an invented
+- [x] Update the docs (done on 2026-10-28; the README also gained the folder naming rule): the README gains the `mailvigil summary` quick start with an invented
   example output, its "Summary" row, and keeps the exit codes as "not defined yet"; `CLAUDE.md`'s
   architecture block and status paragraph gain the two modules and the command; `docs/stack.md`
   gains the subcommands of `argparse`, `datetime` and interval merging, and integer rounding. —

@@ -30,9 +30,9 @@ IPs, domains inside reports). In a terminal that text is cleaned; in HTML it wou
 nothing stopped it. This is the same rule as in 002, in a more dangerous medium: every character that
 comes from a report is escaped at the one place that writes HTML, and a test feeds it the attack.
 
-The page has an interface, so it follows the global rule: the maintainer approved a mockup before any
+The page has an interface, so the maintainer approved a mockup before any
 code (decided on 2026-10-28, recorded in the roadmap: the verdict first, each rule as a meter
-against its limit, the stacked bar of the message mix, WebVigil's visual language, a per-day
+against its limit, the stacked bar of the message mix, a slate visual language, a per-day
 timeline in inline SVG). The mockup goes into the design; no HTML is written before the design is
 approved.
 
@@ -370,7 +370,7 @@ approved.
 
 1. **One static file, no script, no network** (the roadmap line and the permanent non-goals).
 2. **The interface was decided from a mockup on 2026-10-28:** the verdict first, each rule as a
-   meter against its limit (alternative B), the stacked bar of the message mix (from C), WebVigil's
+   meter against its limit (alternative B), the stacked bar of the message mix (from C), a slate
    visual language, a timeline drawn from the reports' own dates in inline SVG. The mockup is
    reconfirmed and attached to the design before any HTML is written.
 3. **The page judges nothing.** It renders the `Verdict` of 005 and the `Summary` of 004.

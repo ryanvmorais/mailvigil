@@ -10,7 +10,7 @@ origin: conception
 
 # 005 — Reject verdict — Tasks
 
-Each stage is one pull request (issue → branch → PR); Claude opens it and never merges. Inside a
+Each stage is one pull request (issue → branch → PR). Inside a
 stage, tests come first: write the test that feeds the input, watch it fail for the right reason,
 then write the code. `Summary` values are built in the test with a small builder that has defaults,
 so each test states only what it changes; files are in `tmp_path`. Domains, services and addresses
@@ -179,7 +179,7 @@ other stages; the rules, the thresholds and the exit codes do not change.
 - [x] Zero-dependency guard: `uv build`, then check the wheel metadata has no `Requires-Dist`, holds
   `verdict.py` and `render_verdict.py`, importable from the built wheel, and that
   `mailvigil verdict` runs from it on a synthetic report. — RNF-01
-- [x] Run `/atualizar-docs`: the README gains the `mailvigil verdict` quick start with an invented
+- [x] Update the docs: the README gains the `mailvigil verdict` quick start with an invented
   example output and its status row, and keeps the exit codes as provisional; `CLAUDE.md`'s
   architecture block and status paragraph gain the two modules and the command; `docs/stack.md`
   gains `IntEnum`, integer comparison of thresholds and `argparse` parent parsers. — docs

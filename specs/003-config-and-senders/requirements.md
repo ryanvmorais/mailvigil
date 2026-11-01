@@ -28,7 +28,7 @@ So this spec adds the two things the later specs need to talk about senders:
   or say that it is unknown. "Unknown" is the interesting answer: it is exactly what the owner must
   see before hardening the policy.
 
-The starting point is the pair of constants in the maintainer's site script
+The starting point is the pair of constants in a script of the maintainer's, outside this repository
 (`DOMINIO_PADRAO` and `REMETENTES_CONHECIDOS`, a selector to name dictionary), which become
 configuration. Reading it closely shows a gap this spec closes: the script trusts the selector
 alone. A selector is a label chosen by whoever signs, so a stranger can sign with the selector

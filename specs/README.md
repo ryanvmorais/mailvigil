@@ -1,8 +1,7 @@
 # Specs
 
 MailVigil is built with spec-driven development. Each feature is designed as a spec under
-`specs/NNN-name/` before implementation, driven by the `/spec` skill. Specs are plain Markdown and
-stay readable without any tool.
+`specs/NNN-name/` before implementation. Specs are plain Markdown and stay readable without any tool.
 
 ## Conventions
 
@@ -19,7 +18,7 @@ stay readable without any tool.
 - **Acceptance criteria:** Given / When / Then, one bullet per scenario.
 - **Traceability:** requirements are `RF-NN` (functional) and `RNF-NN` (non-functional). Each task
   and each design decision cites the requirement it satisfies.
-- **Language:** specs are in English. The conversation with the maintainer is in Portuguese.
+- **Language:** specs are in English.
 
 ## How a spec is tested
 
@@ -38,15 +37,14 @@ stay readable without any tool.
 requirements → design → tasks → implementation
 ```
 
-No phase starts without the maintainer's explicit approval of the previous one.
+No phase starts without the approval of the previous one. The `status:` in the frontmatter of each
+file says where the spec is.
 
-| Command | What it does |
-|---|---|
-| `/spec nova <name>` | Opens `specs/NNN-name/` with `requirements.md` as a draft |
-| `/spec design` | Writes `design.md` once the requirements are approved |
-| `/spec tasks` | Writes `tasks.md` once the design is approved |
-| `/spec implementar` | Runs the tasks one by one and records each quality gate |
-| `/spec status` | Summarizes every spec's status and current phase |
+- `requirements.md`: opened as a `draft`; says what and why.
+- `design.md`: written once the requirements are `approved`; says how.
+- `tasks.md`: written once the design is `approved`; the tasks run one by one, and each stage
+  records the real result of its quality gate.
+- The status of every spec is in the [Roadmap](#roadmap) table below.
 
 ## Roadmap
 
@@ -64,7 +62,7 @@ spec still to be built has no milestone yet (`—`).
 | [`005-reject-verdict`](005-reject-verdict/) | "ready for `reject`?" with a declared criterion (minimum window, minimum volume, no legitimate failures); the thresholds are decided there | `v0.4` | **done** |
 | [`006-output-and-exit-codes`](006-output-and-exit-codes/) | `--json`, stable exit codes, English and Portuguese text (`--lang`) | `v0.5` | **done** |
 | [`007-mail-message-input`](007-mail-message-input/) | read `.eml` and `.mbox` files: the report attachment is taken out of the message in memory and goes through the same reader, parser, filter and dedup | `v0.6` | **done** |
-| [`008-html-report`](008-html-report/) | a single static HTML file with the summary and the verdict (`--html` on `verdict`): no server, no script, no network. Interface decided on 2026-10-28 from a mockup: the verdict first, then each rule as a meter against its limit (alternative B), with the stacked bar of the message mix (from C); WebVigil's visual language (slate palette, 0.5 rem radius, icon plus text on every badge, 4.5:1 contrast, dark mode from the system); a per-day timeline drawn from the reports' own dates, in inline SVG | `v0.7` | **done** |
+| [`008-html-report`](008-html-report/) | a single static HTML file with the summary and the verdict (`--html` on `verdict`): no server, no script, no network. Interface decided on 2026-10-28 from a mockup: the verdict first, then each rule as a meter against its limit (alternative B), with the stacked bar of the message mix (from C); a slate visual language (palette, 0.5 rem radius, icon plus text on every badge, 4.5:1 contrast, dark mode from the system); a per-day timeline drawn from the reports' own dates, in inline SVG | `v0.7` | **done** |
 | [`009-imap-fetch`](009-imap-fetch/) | `mailvigil fetch`: download the report messages from a mailbox into a folder, opt-in; `summary` and `verdict` stay offline | `v0.8` | **done** |
 | [`010-multiple-domains`](010-multiple-domains/) | more than one domain per run, one summary and one verdict per domain, what the `verdict` exit code means for several answers, and internationalized domains typed as written (issue #79) | `v0.10` | **done** |
 
