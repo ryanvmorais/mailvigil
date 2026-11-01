@@ -170,6 +170,9 @@ always accepted.
 MailVigil is not a replacement for a monitoring pipeline: if you already run parsedmarc, keep it.
 It answers one question, and answers it without a stack to install.
 
+Before there are reports to read, [DMARC Fácil](https://dmarcfacil.ryanmorais.com.br) checks the
+DMARC, SPF and DKIM records of a domain in your browser (the interface is in Portuguese).
+
 ## Scope and limitations
 
 MailVigil is deliberately small. For each limit below, what to reach for instead.
