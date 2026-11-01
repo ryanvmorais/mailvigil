@@ -197,7 +197,7 @@ novo que o Unicode 3.2 é recusado, com o conselho de escrever a forma `xn--`, q
 O MailVigil não substitui um pipeline de monitoramento: se você já roda o parsedmarc, continue com
 ele. O MailVigil responde a uma pergunta só, e responde sem uma stack para instalar.
 
-Antes de haver relatórios para ler, o [DMARC Fácil](https://dmarcfacil.ryanmorais.com.br) confere no
+Antes de haver relatórios para ler, o [DMARC Fácil](https://dmarc-facil.ryanmorais.com.br) confere no
 navegador os registros DMARC, SPF e DKIM de um domínio.
 
 ## Escopo e limitações
