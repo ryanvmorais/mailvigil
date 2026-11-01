@@ -175,8 +175,7 @@ other stages; the rules, the thresholds and the exit codes do not change.
   the repository (deleted afterwards): clean, short, recognized and unrecognized failures, the 0.5%
   edge, 28 days and 100 messages on both sides, already at `p=reject`, `quarantine` with `pct` and
   `sp`, IPv6, a 100-character service name, mixed `.xml`/`.gz`/`.zip`, and skipped, duplicate and
-  other-domain files. Answers, codes and the 80-column limit held and nothing needed a change. The
-  thresholds were **not** checked against real traffic: revisit them on the first real set
+  other-domain files. Answers, codes and the 80-column limit held and nothing needed a change.
 - [x] Zero-dependency guard: `uv build`, then check the wheel metadata has no `Requires-Dist`, holds
   `verdict.py` and `render_verdict.py`, importable from the built wheel, and that
   `mailvigil verdict` runs from it on a synthetic report. — RNF-01

@@ -5,8 +5,7 @@ and the handful of concepts worth learning first if it is new to you.
 
 This is not exhaustive: the full version graph is pinned in `uv.lock`, and per-feature decisions
 live in the `### ADR-N` blocks of `specs/*/design.md`. This page is the map: the *shape* of the
-project and the reasoning behind each piece. Entries marked **(planned)** are decided but not
-built yet. The project is released (1.7.0, on PyPI): the report-ingestion layer (`mailvigil.reports`), the
+project and the reasoning behind each piece. The project is released (1.7.0, on PyPI): the report-ingestion layer (`mailvigil.reports`), the
 configuration loader, the sender identification, the summary, the verdict and their texts are built
 and tested (it reads `.eml` and `.mbox` too, spec 007), and `mailvigil summary` and `mailvigil
 verdict` run them end to end, in English or Portuguese (`--lang`), as text or as one JSON document
@@ -85,7 +84,7 @@ The build backend: the program that turns the source tree into the sdist and the
 run `uv build`. Configured in `[build-system]` and `[tool.hatch.*]` of `pyproject.toml`.
 
 **Why this:** against setuptools and Flit, Hatchling needs almost no configuration for a `src/`
-layout, has no legacy `setup.py` baggage and is the same backend WebVigil uses. The wheel
+layout, has no legacy `setup.py` baggage. The wheel
 contains only `src/mailvigil`; the sdist adds the README and the license.
 
 **Learn:** the `src/` layout and why it stops you from importing the source tree by accident,
@@ -292,8 +291,7 @@ the language's message catalog, so a code that does not exist is argparse's own 
 `2`) and the command never sees a string.
 
 **Why this:** against click, typer and rich, argparse needs nothing installed. The CLI is small
-enough that its verbosity does not hurt, and terminal colors are a few ANSI codes that honor
-`NO_COLOR` (**planned**).
+enough that its verbosity does not hurt, and the output is plain text with no color codes.
 
 **Learn:** `ArgumentParser` with `add_argument` (`action="version"`, `nargs="+"` for "one or more
 paths"), `add_subparsers(dest="command")` for a command with its own flags, a parent parser
@@ -355,8 +353,8 @@ instead of a user's.
 The code formatter. No options beyond line length and target version, so formatting is never a
 review topic.
 
-**Why this:** against Ruff's own formatter, black is the house standard across the maintainer's
-projects, and the hooks run `ruff check --fix` then `black`.
+**Why this:** against Ruff's own formatter, black is the long-established default, and the
+hooks run `ruff check --fix` then `black`.
 
 **Learn:** `black --check .` (what the gate runs) and `black .` (what the hook runs), and the
 "magic trailing comma".
@@ -490,7 +488,6 @@ hands anything back.
 | `getpass` | asks for the IMAP password on the terminal without echoing it; the alternative is the first line of `--password-file`. There is no argument and no environment variable, so the password is in neither the process list nor the shell history |
 | `os.replace` | `fetch/store.py` writes a message to a temporary file and renames it onto its final name, which is atomic on the same volume, so a run that dies never leaves a half-written `.eml` for the next run to count as saved |
 | `hashlib` | the tag at the start of a saved file name is a hash of host, user and folder, so two mailboxes saved in one folder do not clash and the name carries no address |
-| `NO_COLOR` | convention for turning terminal colors off, honored by the output (**planned**) |
 
 ---
 
