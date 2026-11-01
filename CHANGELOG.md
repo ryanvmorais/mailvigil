@@ -186,7 +186,7 @@ first release and contains `v0.1` to `v0.9`, and `v0.10` (several domains) arriv
 
 ### Added
 
-The first release. It gathers the milestones `v0.1` to `v0.9` described in the README.
+The first release. It gathers the milestones `v0.1` to `v0.9` built as specs under `specs/`.
 
 - **Reading reports.** `summary`, `verdict` and the other commands read DMARC aggregate reports
   from files and folders: `.xml`, `.gz` and `.zip`, and also `.eml` and `.mbox` mail, where the
