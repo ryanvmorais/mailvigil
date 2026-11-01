@@ -427,7 +427,7 @@ is the norm for both ends, a pipe included.
 - `cli.py`: two arguments, one output branch, the messages threaded into the refusal lines.
 - `README.md`, `CLAUDE.md`, `docs/stack.md`, `specs/README.md`: the codes lose "provisional", the
   flags are documented, the `CLAUDE.md` language line is rewritten (Resolved decision 2), and the
-  architecture block gains `render_json.py` and `messages/`. `/atualizar-docs` does this at the end.
+  architecture block gains `render_json.py` and `messages/`. The docs are updated at the end.
 - Nothing in `pyproject.toml` changes: `json` is the standard library and the wheel gains Python
   modules only. The `package` job's check for `Requires-Dist` is unaffected.
 

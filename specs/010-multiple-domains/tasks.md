@@ -10,7 +10,7 @@ origin: conception
 
 # 010 — Multiple domains — Tasks
 
-Each stage is one pull request (issue → branch → PR); Claude opens it and never merges. Inside a
+Each stage is one pull request (issue → branch → PR). Inside a
 stage, tests come first: write the test that feeds the input, watch it fail for the right reason,
 then write the code. Every domain in a test is invented (`example.com`, `example.net`, `.invalid`,
 an invented internationalized name) and every address is in a documentation range (RNF-06).
@@ -20,7 +20,7 @@ vocabulary nothing calls yet, then the configuration and the command that wire t
 exit codes, then the two outputs that need more (`--json`, `--html`), then the close. **The rule of
 the whole spec is RNF-01:** the existing test files for one domain are edited only where a
 signature changed (`load_config`, `resolve_config`); if any other one fails, the code is wrong.
-The release (1.6.0) is the maintainer's act and is prepared apart, with `/preparar-release`.
+The release (1.6.0) is the maintainer's act and is prepared apart.
 
 ## Stage 0 — The spec (RF-01 to RF-08, RNF-01 to RNF-06)
 
@@ -197,11 +197,11 @@ The largest stage: the file and the command that reads it are tested together, i
   commands row `--domain` repeatable), `CHANGELOG.md` (under `[Unreleased]`: Added), `CLAUDE.md`
   (architecture lines for `ingest_many`, `load_configs`, `worst_answer`, and the ⚠️ that the one-domain
   path is the loop of one), `docs/stack.md` (the `idna` codec and its IDNA 2003 limit),
-  `specs/README.md` (010 `done`, the delivery column, the maintenance note). Run `/atualizar-docs`.
+  `specs/README.md` (010 `done`, the delivery column, the maintenance note). Update the docs.
 - [x] A last compatibility pass: the full suite with the one-domain files untouched except the
   signature edits of stages 4 and the `--help` golden; the wheel declares no `Requires-Dist`
   (`uv build` and the `package` check); `status: done` in the three files. — RNF-01, RNF-04
-- [x] Quality gate of the stage (as above), the real result recorded; then `/preparar-release` for
+- [x] Quality gate of the stage (as above), the real result recorded; then the preparation of
   1.6.0 as a separate PR (publishing is the maintainer's). — RNF-01, RNF-06
   Result (2026-10-31): ruff, black and mypy clean; 3371 collected, 4 skipped (POSIX modes and
   symbolic links on Windows), the rest passed; coverage 100%. The wheel declares no `Requires-Dist`
@@ -209,4 +209,4 @@ The largest stage: the file and the command that reads it are tested together, i
   under Configuration, the Quick start line, the HTML folder, the worst-answer paragraph under the
   exit codes, the envelope under JSON), `docs/stability.md`, the CHANGELOG, `CLAUDE.md` (the
   `ingest_many`, `load_configs` and `worst_answer` lines and the ⚠️ on the loop of one), `docs/stack.md`
-  (the `idna` codec) and `specs/README.md`. `/preparar-release` for 1.6.0 stays a separate PR.
+  (the `idna` codec) and `specs/README.md`. The release preparation for 1.6.0 stays a separate PR.

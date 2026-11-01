@@ -10,7 +10,7 @@ origin: conception
 
 # 002 — Report ingestion — Tasks
 
-Each stage is one pull request (issue → branch → PR); Claude opens it and never merges. Inside a
+Each stage is one pull request (issue → branch → PR). Inside a
 stage, tests come first: write the test that feeds the input, watch it fail for the right reason,
 then write the code. Every hostile-input test expects `ReportRefused` and asserts `.reason`.
 
@@ -148,11 +148,11 @@ public entry point.
 
 ## Stage 6 — Close the spec
 
-- [x] Run `/atualizar-docs`: `CLAUDE.md` architecture tree gets `reports/`, `docs/stack.md` gets the
+- [x] Update the docs: `CLAUDE.md` architecture tree gets `reports/`, `docs/stack.md` gets the
   standard-library modules this spec relies on (`expat`, `zipfile`, `gzip`, `ipaddress`). — docs
   (merged in #12; the README status rows and the stale "private repository" wording went with it)
-- [x] The maintainer runs the layer over the real reports of his domain, locally and outside the
-  repository (a throwaway script), and tells Claude only the counts per `Reason` and whether
+- [x] The maintainer runs the layer over the real reports of a domain they own, locally and outside the
+  repository (a throwaway script), and reports only the counts per `Reason` and whether
   anything refused looked legitimate. No report content is pasted into a conversation, an issue or
   a PR. Findings become follow-up tasks or an ADR, not silent edits. — Risk 2 of the design
   (result on 2026-10-27: the maintainer ran it and reported that everything was fine, with no

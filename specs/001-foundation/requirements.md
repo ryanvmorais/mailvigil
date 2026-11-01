@@ -218,7 +218,7 @@ and a US$ 0 budget (CI stops when the minutes run out). That shapes several requ
 1. **Python floor `3.12`**, so anyone still on it can install the tool; reviewed when 3.12 reaches
    end of life (2028-10-31). The CI matrix is the floor plus the newest stable (3.15 today), not
    every version in between.
-2. **Build backend: Hatchling**, the same as WebVigil.
+2. **Build backend: Hatchling**.
 3. **Dependabot ecosystem `uv`**, not `pip`, because only `uv` reads `uv.lock`.
 4. **`astral-sh/setup-uv` pinned to v10.3.0** at the start: v10.3.2 was inside the 7-day cooldown.
 5. **CI on pull requests and by hand only**, because of the Free plan's minute budget.

@@ -15,11 +15,9 @@ static HTML page of `verdict --html` (spec 008 is done). `mailvigil fetch` (spec
 folder, opt-in) is built too; it is the only command that touches the network. Several domains in
 one run (spec 010) are built. Everything
 is specified in [specs/](specs/) first. The repository has been public since
-2026-10-27 (the maintainer made it public, not Claude); releasing and announcing are the
-maintainer's acts (`docs/releasing.md`).
+2026-10-27; releasing and announcing are the maintainer's acts.
 
-Conversation with the maintainer (Ryan) and plan files are in Portuguese; everything in the
-repository is English.
+Everything in the repository is English, except `README.pt-BR.md` (see Conventions).
 
 ## Common commands
 
@@ -67,169 +65,62 @@ never commit a local one (`mailvigil.local.toml` is ignored).
 
 ## Architecture
 
+The package is layered, and the data flows in this order: `reports/` (ingestion of hostile input),
+`text.py` and `config.py` (shared text rules, the TOML file), `senders.py` (who sent the mail),
+`summary.py` (the figures), `verdict.py` (the judgment on `p=reject`), the renderers (`render.py`,
+`render_verdict.py`, `render_json.py`, `render_html.py` over `htmlkit.py`, `render_fetch.py`) with
+every sentence in `messages/`, and `cli.py` / `cli_fetch.py` wiring the commands. `fetch/` is the
+only code that reaches the network. The module tree, with a comment per file, is in
+[docs/referencia/architecture.md](docs/referencia/architecture.md).
+
 ```text
-src/mailvigil/
-  __init__.py        # __version__ read from package metadata
-  cli.py             # argparse entry point (`mailvigil = mailvigil.cli:main`): `--version`, `summary`
-                     # (resolve_config, ingest → summarize → render, exit 0/1/2) and `verdict` (same
-                     # load, then judge → render_verdict; exit 0 ready, 3 too early, 4 not ready);
-                     # the exit code is decided before the format; a parent parser shares
-                     # paths/--config/--domain/--recursive/--json/--top/--lang (`--lang` is parsed to a Messages;
-                     # `--top N` needs `--json`, or `--html` on `verdict`, and is refused before any work);
-                     # `--html` exists on `verdict` only and is refused together with `--json`;
-                     # `--output FILE` (ADR-11) needs `--html` and `_write_page` writes it atomically,
-                     # and for several domains it is a folder of `mailvigil-<domain>.html` (`_write_pages`);
-                     # `fetch` (spec 009) is added by `cli_fetch.add_fetch_parser` and run by
-                     # `cli_fetch.run_fetch`
-  cli_common.py      # the eight EXIT_* codes (the one table), `echo` (a command-line value made safe to
-                     # print), `write` (a line to a stream, whatever it can encode) and `config_line`
-                     # (the line of a refused configuration); shared by cli and cli_fetch, which may
-                     # not import each other
-  cli_fetch.py       # the `fetch` command (spec 009): option types (`--port`, `--limit`, `--since`,
-                     # `--folder`), the subparser (takes only `--lang` from the parents and has its own
-                     # `--json`, the six numbers of a run), the password
-                     # helpers, `_connection` (flag, else the [fetch] table of `--config`, else the
-                     # default; the file is never searched for, ADR-12) and `run_fetch`, which loads `fetch.imap` (imaplib, ssl) inside the
-                     # function, never at import (#82)
-  py.typed           # marks the package as typed (PEP 561)
-  reports/           # report ingestion (spec 002); public API re-exported by __init__.py
-    errors.py        #   Reason (StrEnum) and ReportRefused: every refusal is typed
-    model.py         #   frozen dataclasses: Report, Record, PolicyPublished, IngestionResult…
-    xmlsafe.py       #   the only XML parser: expat handlers refuse DOCTYPE and ENTITY, and a
-                     #                document past MAX_DEPTH levels or MAX_ELEMENTS elements
-    reader.py        #   .xml/.gz/.zip to bytes, capped at MAX_BYTES (5 MiB) as it decompresses
-    mail.py          #   .eml/.mbox (spec 007): report attachments out of messages, bounded in size,
-                     #   lines, parts and depth before and while the `email` parser works
-    parser.py        #   XML tree to Report: sanitized text, strict numbers, IPs normalized
-    discovery.py     #   paths (files and folders) to an ordered list of `Source`s, deduplicated;
-                     #   `--recursive` goes down 8 levels (no link entered) and the report-suffix
-                     #   files whose name did not qualify are counted (`passed_over`, ADR-9 of 002)
-    ingest.py        #   ingest_many(paths, domains): one reading, a result per domain (spec 010);
-                     #   ingest(paths, domain) is the loop of one; refusals go to `skipped`
-  text.py            # text and domain rules shared by reports and config (clean_text, normalize_domain…)
-  config.py          # load_configs(path) → tuple of frozen Config, one per `domain` or `[[domains]]`
-                     # entry (50 at most; an IDN goes through the `idna` codec and is refused if it
-                     # changes; spec 010): domain + selector map + the [spf] and [ips] maps + the
-                     # [fetch] settings (host, user, port, folder, never a password);
-                     # check_domain is shared with the CLI's --domain; ConfigError is typed (spec 003)
-  senders.py         # identify_sender(record, config) → Identification: a DKIM selector, an SPF domain
-                     # or an address range names a sender only on an authentication aligned with the
-                     # domain (ADR-8 of spec 003); the address needs a passing block as well
-  summary.py         # summarize(result, config) → frozen Summary: rows per sender, failing sources, period,
-                     # policy, what was left out (spec 004), the messages per day (`DayCounts`, spec 008,
-                     # internal: not in `--json`), what each reporter sent (`ReporterActivity`, internal),
-                     # the SPF domains that passed on a row not recognized (`spf_domains`, ADR-8);
-                     # a day is covered when the merged report periods cover 12 h of it; never imports render
-  render.py          # render_summary(summary, config_source, messages) → 80-column text;
-                     # no_reports_message; also the public helpers fit, address, format_share,
-                     # share_tenths
-  verdict.py         # worst_answer(verdicts): the exit code of several domains;
-                     # judge(summary) → frozen Verdict: Answer (READY/TOO_EARLY/NOT_READY), five Rules
-                     # with the four threshold constants, Notes, LeftOut (what the summary did not
-                     # count; it never changes the answer); integer arithmetic; never imports a
-                     # text module (spec 005)
-  render_verdict.py  # render_verdict(verdict, messages) → 80-column text: reason, rules table,
-                     # notes, what was left out, next step
-  render_json.py     # summary_document / verdict_document / fetch_document (+ the `domains`
-                     # envelopes) → dict, dumps → ASCII JSON, no language
-                     # (spec 006); the schema is public contract, see docs/json-schema.md; `top=N`
-                     # trims the long lists and adds the last key `top` (ADR-8)
-  htmlkit.py         # the ONLY module that builds markup (spec 008): `text()` escapes a str into a `Safe`
-                     # (a NewType), `el()` takes only `Safe` children and allowlisted tags
-  html_style.py      # the palette (light and dark dicts, contrast measured by a test), the stylesheet
-                     # and the CSP constant: no `url()`, no `@import`, no `<`
-  html_charts.py     # meter, stacked_bar and timeline as inline SVG, integer geometry, figures in words
-  render_html.py     # render_html(summary, verdict, messages) → one self-contained ASCII page: no script,
-                     # no network, no path or file name; the senders table stops at 50 rows or `top` (ADR-12)
-  render_fetch.py    # render_fetch(outcome, directory, messages) → the six numbers of a run;
-                     # refusal_line(refusal, messages) → the one line of a refused run (spec 009)
-  fetch/             # `mailvigil fetch` (spec 009): the only code that reaches the network
-    errors.py        #   FetchReason (StrEnum) and FetchRefused: every refusal is typed
-    model.py         #   FetchOutcome and the limits (DEFAULT_LIMIT, MAX_LIMIT, DEADLINE_SECONDS…)
-    store.py         #   Store: `<tag>-<validity>-<uid>.eml` names, atomic writes (`os.replace`)
-    run.py           #   fetch_reports(): the loop over a mailbox protocol; tested with FakeMailbox
-    imap.py          #   the ONLY module that imports `imaplib` and `ssl`: verified TLS context,
-                     #   BODY.PEEK reads, bounded reads, every library failure becomes a FetchReason
-  messages/          # every sentence of the tool, one Messages per language (spec 006): model.py
-                     # (Plural and the frozen dataclasses), en.py (ENGLISH), pt_br.py (PORTUGUESE,
-                     # with accents, NFC), fold.py (PORTUGUESE_ASCII = the same without accents,
-                     # one character for one; `catalog_for_streams` picks the catalog from the
-                     # streams: UTF-8 on both and, on Windows, a console); language_by_code;
-                     # imports no renderer
-tests/               # pytest, one test file per module (test_reports_*.py, test_text.py, test_config.py,
-                     # test_senders.py, test_summary.py, test_verdict.py, test_render*.py, test_messages*.py,
-                     # test_json_schema_doc.py, test_cli_*.py, test_htmlkit.py, test_html_*.py,
-                     # test_fetch_*.py, test_smoke.py, test_gitignore.py, test_readme_*.py,
-                     # test_properties.py (Hypothesis: the readers only refuse and a parsed report
-                     # reaches every output; the `thorough` profile is for a long hunt) and
-                     # test_offline_isolation.py, which runs fresh interpreters to prove that
-                     # summary and verdict never load the network code); fixtures are synthetic,
-                     # built in conftest.py and the *_helpers.py, schema_examples.py, imap_peer.py (a
-                     # scripted IMAP server), help_golden.py (the recorded --help texts) or tmp_path
-specs/               # spec-driven development: requirements → design → tasks per feature
-docs/stack.md        # each technology of the stack, why it was chosen, what to study first
-docs/json-schema.md  # every field of the three --json documents and the compatibility promise
-docs/stability.md    # what is public (commands, exit codes, JSON, config) and what is not; deprecation
-docs/releasing.md    # the maintainer's release steps (PyPI trusted publishing, TestPyPI dry run)
-CHANGELOG.md         # Keep a Changelog; a change a user would notice goes in [Unreleased] in the same PR
-scripts/             # benchmark_ingest.py: times the reading of synthetic reports (not a test; issue #70)
-docs/demo/           # build_demo.py makes the invented reports and runs the CLI to write verdict.cast,
-                     # the recording behind the README demo (see its docstring for the SVG and the
-                     # page captures); tidy_svg.py pins the SVG text to a character grid;
-                     # docs/images/ holds the README pictures
-.githooks/           # versioned pre-commit hook (core.hooksPath)
-.claude/             # Claude Code hooks: format on edit, validate at turn end, guard uv.lock
-.github/             # CI, CodeQL, dependency review, weekly pip-audit, the release workflow (release.yml),
-                     # Dependabot, issue/PR templates
-uv.lock              # never edit by hand (generated; a hook blocks it)
+src/mailvigil/   # the package
+tests/           # pytest, one file per module; fixtures are synthetic (conftest.py and helpers)
+specs/           # spec-driven development: requirements → design → tasks per feature
+docs/            # stack.md, json-schema.md, stability.md, referencia/, demo/, images/
+scripts/         # benchmark_ingest.py: times the reading of synthetic reports (not a test)
+.githooks/       # versioned pre-commit hook (core.hooksPath)
+.claude/         # Claude Code hooks: format on edit, validate at turn end, guard uv.lock
+.github/         # CI, CodeQL, dependency review, weekly pip-audit, release, Dependabot, templates
+CHANGELOG.md     # Keep a Changelog; a change a user would notice goes in [Unreleased] in the same PR
+uv.lock          # never edit by hand (generated; a hook blocks it)
 ```
 
-> ⚠️ **Zero runtime dependencies is the product promise** (offline, nothing to install but the
-> tool). `dependencies = []` in `pyproject.toml`, and the CI `package` job fails if the wheel
-> declares any `Requires-Dist`. Dev tools go in `[dependency-groups] dev`. Parsing uses the
-> standard library only (`argparse`, `tomllib`, `xml.etree`, `xml.parsers.expat`, `zipfile`,
-> `gzip`, `ipaddress`).
+### Before you touch…
 
-> ⚠️ **The one-domain path is the loop of one** (spec 010): its text, `--json` and `--html` stay
-> byte for byte as they were; the envelope and the folder of pages are for two or more domains.
+| You are changing | Read first |
+|---|---|
+| `reports/` (readers, XML, mail) | specs `002` and `007`, and the hostile-input line below |
+| `config.py`, `senders.py` | spec `003` (ADR-8: what may name a sender) |
+| `summary.py`, `verdict.py` | specs `004` and `005`; the thresholds live in `verdict.py` only |
+| `render_json.py`, exit codes | [docs/json-schema.md](docs/json-schema.md), [docs/stability.md](docs/stability.md), spec `006` |
+| `messages/` | spec `006` (ADR-9: accents and ASCII folding) |
+| `htmlkit.py`, `render_html.py`, `html_*` | spec `008` and the markup line below |
+| `fetch/`, `cli_fetch.py` | spec `009` (ADR-2, ADR-3, ADR-10) and the network line below |
+| several domains in one run | spec `010` |
 
-> ⚠️ **Markup is built in `htmlkit.py` only.** Text from a report reaches the HTML page only through
-> `text()`, which escapes it into a `Safe`; never write a tag, an attribute or a `Safe(...)` anywhere
-> else, and keep the page free of script, network and `url()` (`test_render_html_hostile.py` feeds
-> the attacks).
+### Do not regress
 
-> ⚠️ **`imaplib` and `ssl` are imported in `fetch/imap.py` only**, and that module is loaded inside
-> `cli_fetch.run_fetch`, never at import: `summary` and `verdict` never load the network code. The TLS
-> context always verifies the certificate (no `--insecure`, no plain IMAP, no STARTTLS; `--cafile`
-> only adds an authority to the system's, ADR-10); the
-> mailbox is only read (`BODY.PEEK`, no flag, no delete); the password is never an argument, an
-> environment variable or a log line. See spec 009, ADR-2 (the library's default context does not
-> verify) and ADR-3 (bounds live in the connection).
+Each line is the short form of a section of [docs/referencia/invariants.md](docs/referencia/invariants.md).
 
-> ⚠️ **Reports are hostile input.** The parser refuses any XML containing `DOCTYPE` or `ENTITY`
-> (entity expansion) inside `reports/xmlsafe.py`, and `reports/reader.py` caps the decompressed
-> size at `MAX_BYTES` (5 MiB, against zip bombs) by counting the bytes actually read, never a
-> declared size. The same parser also refuses a document nested past `MAX_DEPTH` levels or holding
-> more than `MAX_ELEMENTS` elements (`Reason.XML_TOO_COMPLEX`, spec 002 ADR-8), because the byte cap
-> alone does not bound the cost of the tree. Each defense has tests that feed the attack; keep it so
-> when touching them, and keep `xmlsafe.py` the only module that creates an XML parser. The starting point was the script in
-> the maintainer's site repository (`site-ryan-morais/scripts/relatorios_dmarc.py`).
+- ⚠️ **Zero runtime dependencies** is the product promise: `dependencies = []`, and the CI `package` job fails if the wheel declares one ([why](docs/referencia/invariants.md#zero-runtime-dependencies)).
+- ⚠️ **The one-domain path is the loop of one**: its text, `--json` and `--html` stay byte for byte as they were ([more](docs/referencia/invariants.md#the-one-domain-path-is-the-loop-of-one)).
+- ⚠️ **Markup is built in `htmlkit.py` only**; the page has no script, no network and no `url()` ([more](docs/referencia/invariants.md#markup-is-built-in-htmlkitpy-only)).
+- ⚠️ **`imaplib` and `ssl` are imported in `fetch/imap.py` only**, loaded inside `run_fetch`; the TLS context always verifies, the mailbox is only read, the password is never an argument or a log line ([more](docs/referencia/invariants.md#imaplib-and-ssl-are-imported-in-fetchimappy-only)).
+- ⚠️ **Reports are hostile input**: no `DOCTYPE`/`ENTITY`, a 5 MiB cap counted as bytes are read, bounded depth and elements; `xmlsafe.py` is the only module that creates an XML parser ([more](docs/referencia/invariants.md#reports-are-hostile-input)).
+- ⚠️ **Never use a real DMARC report** in tests, docs, issues or PRs; fixtures are synthetic ([more](docs/referencia/invariants.md#never-use-a-real-dmarc-report)).
 
-> ⚠️ **Never use a real DMARC report** in tests, docs, issues or PRs: it carries IP addresses and
-> domains. Fixtures are synthetic. `*.xml.gz`, `*.xml.zip` and `reports/` are git-ignored except
-> under `tests/`.
 
 ## Conventions
 
-- **Language:** code, commits, branches, docstrings and docs in English (open source; rule from
-  `/idioma`). User-facing CLI text: English (default) and Brazilian Portuguese, chosen only by
-  `--lang` (no locale detection). English is ASCII; Portuguese has accents on a stream that carries
+- **Language:** code, commits, branches, docstrings and docs in English (open source). User-facing CLI text:
+  English (default) and Brazilian Portuguese, chosen only by `--lang` (no locale detection). English is ASCII; Portuguese has accents on a stream that carries
   them and the same text folded to ASCII otherwise (spec 006 ADR-9). The one documentation
   exception is `README.pt-BR.md`, the Portuguese README for the Brazilian audience (a user-facing
   text, so the product's audience language): keep it in step with `README.md`, whose headings
   `tests/test_readme_pt_br.py` compares.
-- **File style:** follow `/estilo-arquivos` for each file type (docstrings with `Args:` /
-  `Returns:`, full annotations, `# why` comments); do not copy its rules here.
+- **File style:** follow the file you are editing: docstrings with `Args:` / `Returns:`, full
+  annotations and `# why` comments.
 - **Python floor:** 3.12, tested in CI together with 3.13, 3.14 and the newest stable release (3.15), on Linux and
   on Windows (the one runner outside the `ubuntu-26.04` rule, so "OS Independent" is tested). Ruff and black
   target `py312` and mypy runs with `python_version = "3.12"`, so syntax newer than the floor
@@ -252,28 +143,26 @@ uv.lock              # never edit by hand (generated; a hook blocks it)
   `main` and by hand; CodeQL (as a workflow, not the default setup) on `main`, PRs and weekly;
   dependency review on PRs. Review the triggers if the repository ever goes private again.
 - **Weekly `pip-audit.yml`** audits `uv.lock` every Monday 09:00 (São Paulo). A red run means a
-  known CVE in the lock: answer with `/atualizar-dependencias`.
+  known CVE in the lock: update the locked version of the affected dependency.
 
 ## Spec-driven workflow
 
 Features are written down in `specs/NNN-name/` (`requirements.md` → `design.md` → `tasks.md`)
-with a human approval gate between phases; use `/spec`. Flow per task: issue → branch → PR →
-`/fechar-sessao`. Claude opens PRs and never merges. At the end of a session that changed
-architecture, commands or the CLI, run `/atualizar-docs` and then `/fechar-sessao`.
+with a human approval gate between phases (see `specs/README.md`). Flow per task: issue → branch →
+PR. A change to the architecture, the commands or the CLI updates the README, this file and
+`docs/stack.md` in the same PR.
 
-**A feature with an interface** (the HTML report, spec 008, was the first) needs a mockup the
-maintainer approved before any code: Claude builds it in the Artifact with `/nova-interface` (390
-and 1280 px, two or three alternatives, one recommended) and writes no interface file until the
-"ok". This is a global rule (`~/.claude/CLAUDE.md`); the 008 choice is recorded in
+**A feature with an interface** (the HTML report, spec 008, was the first) needs a mockup approved
+before any code (two or three alternatives checked at 390 and 1280 px, one recommended), and no
+interface file is written until the maintainer approves one. The 008 choice is recorded in
 `specs/README.md`.
 
 ## Dependencies
 
 `uv` manages everything: `pyproject.toml` holds the floors (`>=`) and `uv.lock` the exact
 versions. Commit both together (`uv lock --check` must pass). Dependabot (`uv` and
-`github-actions`, Sundays, 7-day cooldown) opens the routine PRs; review them with
-`/revisar-dependabot`.
+`github-actions`, Sundays, 7-day cooldown) opens the routine PRs.
 
-> Publishing (PyPI, GitHub Releases, posts) is the maintainer's act, never Claude's. Claude
-> prepares the package, the README and the CI. A vulnerability in a published version is reported
-> privately (private vulnerability reporting), never in a public issue, PR or commit.
+> Publishing (PyPI, GitHub Releases) is the maintainer's act. A vulnerability in a published
+> version is reported privately (private vulnerability reporting), never in a public issue, PR or
+> commit.

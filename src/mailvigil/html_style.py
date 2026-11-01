@@ -1,7 +1,7 @@
 """
 The look of the HTML report: the palette as data and the stylesheet built from it (spec 008).
 
-The colours come from the mockup the maintainer approved (WebVigil's slate palette). They are kept
+The colours come from the mockup approved for the report (a slate palette). They are kept
 as two dicts, light and dark, so the stylesheet states each one once and a test can measure the
 contrast of every pair that matters (4.5:1 for text, 3:1 for a graphic that carries meaning,
 RF-07) instead of trusting the eye. The dark palette applies by ``prefers-color-scheme`` alone,

@@ -408,7 +408,7 @@ block. (RF-09)
 - **Docs:** the README (status rows, Quick start gains `mailvigil verdict` with an invented
   example, the exit codes stay "provisional"), `docs/stack.md` (`IntEnum`, integer comparison of
   thresholds, `argparse` parent parsers), `CLAUDE.md` (the two modules and the command in the
-  architecture block and the status paragraph). `/atualizar-docs` at the end. The `specs/README.md`
+  architecture block and the status paragraph). The docs are updated at the end. The `specs/README.md`
   row moves to `in progress`, then `done`.
 
 ## Risks

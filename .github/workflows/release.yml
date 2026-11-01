@@ -1,6 +1,7 @@
 # Release pipeline: builds the sdist and the wheel once, then publishes that exact build to PyPI
 # with Trusted Publishing (OIDC): no token is stored anywhere. Only the maintainer starts it.
-# Procedure and one-time setup: docs/releasing.md.
+# PyPI trusts this repository, this workflow and the two environments below (one Trusted Publisher
+# per index).
 #
 #   release (published)   build -> publish to pypi.org   (environment `pypi`, needs an approval)
 #   workflow_dispatch     build -> publish to test.pypi.org (environment `testpypi`), the dry run

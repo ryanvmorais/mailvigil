@@ -10,7 +10,7 @@ origin: conception
 
 # 003 — Config and senders — Tasks
 
-Each stage is one pull request (issue → branch → PR); Claude opens it and never merges. Inside a
+Each stage is one pull request (issue → branch → PR). Inside a
 stage, tests come first: write the test that feeds the input, watch it fail for the right reason,
 then write the code. Every refusal test expects `ConfigError` and asserts `.reason` and `.key`.
 Every file a test needs is written in `tmp_path` as explicit bytes, from invented domains
@@ -104,7 +104,7 @@ first and alone), the loader, then identification, then the close.
   whichever is missing. — RF-08
 - [x] Zero-dependency guard: `uv build`, then check the wheel metadata has no `Requires-Dist` and
   holds `text.py`, `config.py` and `senders.py`, importable from the built wheel. — RNF-01
-- [x] Run `/atualizar-docs`: the README gains the file format (with the quoted-dotted-selector note
+- [x] Update the docs: the README gains the file format (with the quoted-dotted-selector note
   and the advice to start with an empty `[senders]`), its "Configuration" row and `CLAUDE.md`'s
   architecture block gain the new modules, and `docs/stack.md` gains `tomllib`, `difflib` and
   `types.MappingProxyType`. The README status stays "library built, not wired to the CLI" until the

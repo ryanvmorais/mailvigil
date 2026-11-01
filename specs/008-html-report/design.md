@@ -358,7 +358,7 @@ data (`example.com`, documentation IP ranges) and provisional texts.
 | C · Cards | totals as number cards, a stacked bar of the mix, the rules as pills | the **stacked bar** is kept; the number cards and the pills are not |
 
 Decisions carried over from the mockup: the verdict first and large; the colour of the banner follows
-the answer; WebVigil's visual language (slate palette, 0.5 rem radius, icon plus word on every
+the answer; a slate visual language (palette, 0.5 rem radius, icon plus word on every
 badge, 4.5:1 contrast, dark mode from the system); the senders table scrolls inside its own box at
 phone width; the max width of the page is 1040 px.
 

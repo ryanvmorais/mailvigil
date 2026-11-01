@@ -421,9 +421,8 @@ deeper than 8 levels is not searched past that point, and a linked folder is nev
 - **`.gitignore`:** already ignores real reports and allows `tests/**/*.xml.gz|zip`. The new tests
   build their fixtures in memory or in `tmp_path`, so no fixture file is committed.
 - **Docs:** `docs/stack.md` gains the standard-library modules this spec relies on (`expat`,
-  `zipfile`, `gzip`, `ipaddress`); `/atualizar-docs` at the end of the implementation. The
+  `zipfile`, `gzip`, `ipaddress`); the docs are updated at the end of the implementation. The
   `specs/README.md` row for `002` moves to `in progress`, then `done`.
-- **The site repository's script** is not changed.
 
 ## Risks
 
@@ -445,7 +444,7 @@ deeper than 8 levels is not searched past that point, and a linked folder is nev
    real report) with invented domains.
 2. **Real providers deviate from the RFC.** Mitigation: every optional element has a default and
    unknown elements are ignored; only `count`, the period and `pct` are strict. Before the first
-   release the maintainer runs the layer over the real reports of his domain locally and reports
+   release the maintainer runs the layer over real reports of a domain they own, locally, and reports
    refusals as `skipped` reasons, without committing or pasting the reports. *Run on 2026-10-27:
    the maintainer reported no refusal that looked legitimate; the counts were not shared.*
 3. **5 MiB may be too small for a very busy domain.** The source script never hit it. A refusal is
