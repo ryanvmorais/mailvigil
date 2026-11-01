@@ -115,8 +115,8 @@ def test_both_readmes_have_the_same_exit_code_rows() -> None:
 
 
 @_needs_both
-def test_both_readmes_have_the_same_milestone_rows() -> None:
-    assert _table_rows(_PORTUGUESE, "Marco") == _table_rows(_ENGLISH, "Milestone")
+def test_both_readmes_have_the_same_command_rows() -> None:
+    assert _table_rows(_PORTUGUESE, "Comando") == _table_rows(_ENGLISH, "Command")
 
 
 @_needs_both
