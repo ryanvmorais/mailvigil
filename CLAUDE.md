@@ -217,8 +217,8 @@ uv.lock              # never edit by hand (generated; a hook blocks it)
 
 ## Conventions
 
-- **Language:** code, commits, branches, docstrings and docs in English (open source). User-facing CLI text: English (default) and Brazilian Portuguese, chosen only by
-  `--lang` (no locale detection). English is ASCII; Portuguese has accents on a stream that carries
+- **Language:** code, commits, branches, docstrings and docs in English (open source). User-facing CLI text:
+  English (default) and Brazilian Portuguese, chosen only by `--lang` (no locale detection). English is ASCII; Portuguese has accents on a stream that carries
   them and the same text folded to ASCII otherwise (spec 006 ADR-9). The one documentation
   exception is `README.pt-BR.md`, the Portuguese README for the Brazilian audience (a user-facing
   text, so the product's audience language): keep it in step with `README.md`, whose headings
@@ -267,5 +267,6 @@ interface file is written until the maintainer approves one. The 008 choice is r
 versions. Commit both together (`uv lock --check` must pass). Dependabot (`uv` and
 `github-actions`, Sundays, 7-day cooldown) opens the routine PRs.
 
-> Publishing (PyPI, GitHub Releases) is the maintainer's act. A vulnerability in a published version is reported
-> privately (private vulnerability reporting), never in a public issue, PR or commit.
+> Publishing (PyPI, GitHub Releases) is the maintainer's act. A vulnerability in a published
+> version is reported privately (private vulnerability reporting), never in a public issue, PR or
+> commit.
