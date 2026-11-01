@@ -5,11 +5,17 @@ All notable changes to MailVigil are written here. The format follows
 [Semantic Versioning](https://semver.org/); what counts as a breaking change is in
 [docs/stability.md](docs/stability.md).
 
-The `v0.1` to `v0.10` milestones in the README are the steps the project was built in, each
+The `v0.1` to `v0.10` milestones are the steps the project was built in, each
 designed as a spec under [`specs/`](specs/). None of them was released on its own: `1.0.0` is the
 first release and contains `v0.1` to `v0.9`, and `v0.10` (several domains) arrived in `1.6.0`.
 
 ## [Unreleased]
+
+### Changed
+
+- The README (and `README.pt-BR.md`) opens "What it does" with the question the verdict answers and its five
+  rules, then a table of the three commands (what each tells you, what it reads, whether it uses the
+  network) and what you can rely on, instead of a table of build milestones.
 
 ## [1.7.0] - 2026-10-31
 
@@ -180,7 +186,7 @@ first release and contains `v0.1` to `v0.9`, and `v0.10` (several domains) arriv
 
 ### Added
 
-The first release. It gathers the milestones `v0.1` to `v0.9` described in the README.
+The first release. It gathers the milestones `v0.1` to `v0.9` built as specs under `specs/`.
 
 - **Reading reports.** `summary`, `verdict` and the other commands read DMARC aggregate reports
   from files and folders: `.xml`, `.gz` and `.zip`, and also `.eml` and `.mbox` mail, where the

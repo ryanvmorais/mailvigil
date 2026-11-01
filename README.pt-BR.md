@@ -45,22 +45,39 @@ digitados para a gravação e a espera entre as duas execuções foi cortada. A 
 
 ## O que ele faz
 
-O MailVigil é construído marco a marco, cada um desenhado primeiro como uma spec, em
-[`specs/`](specs/). Os marcos são o histórico da construção, não versões publicadas: a `1.0.0` é a
-primeira versão e contém do `v0.1` ao `v0.9`; o `v0.10` veio com a `1.6.0`.
+O MailVigil responde a uma pergunta: **é seguro mover a sua política de DMARC para `p=reject`?** Ele
+lê os relatórios agregados que os seus provedores enviam, agrupa o tráfego por remetente e dá um
+veredito com um critério declarado. O veredito é `READY` só quando as cinco regras valem, `TOO EARLY`
+quando ainda há dados de menos e `NOT READY` quando uma origem está falhando ([um exemplo](#o-veredito)):
 
-| Marco | Foco | Status |
-|---|---|---|
-| `v0.1` | Ler uma pasta ou arquivos (`.zip`, `.gz`, `.xml`), filtrar por domínio; entrada hostil: limitar o tamanho descompactado (zip bombs) e recusar XML com `DOCTYPE` ou `ENTITY` (expansão de entidades) | entregue |
-| `v0.2` | Configuração: um arquivo TOML com o seu domínio e um mapa de seletor DKIM para nome do serviço; uma assinatura só vale sob o seu próprio domínio | entregue |
-| `v0.3` | `mailvigil summary`: por remetente e por situação (ok, frágil, com falha), falhas em destaque | entregue |
-| `v0.4` | `mailvigil verdict`: "Pronto para `reject`?" com um critério declarado: 28 dias cobertos, relatórios em 80% dos dias, 100 mensagens, nenhuma falha de remetente reconhecido, no máximo 0,5% das mensagens falhando de origens não reconhecidas | entregue |
-| `v0.5` | `--json` e códigos de saída estáveis para scripts e CI; o texto em inglês ou português do Brasil (`--lang pt-BR`) | entregue |
-| `v0.6` | Mensagens de e-mail como entrada: `.eml` e `.mbox`, com o anexo do relatório extraído em memória | entregue |
-| `v0.7` | `mailvigil verdict --html`: uma página estática com o veredito, cada regra diante do seu limite e as mensagens dia a dia; sem script, sem rede, aberta direto do disco | entregue |
-| `v0.8` | `mailvigil fetch`: baixa as mensagens de relatório de uma caixa de correio por IMAP para uma pasta, opt-in, somente leitura, sempre sobre TLS verificado | entregue |
-| `v0.9` | Endurecimento antes do release: limites para a contagem e o período de um relatório, um dia conta como coberto por tempo, avisos para dados velhos e para um remetente de relatórios que ficou quieto, e códigos de saída distintos para um bug, Ctrl+C e um pipe fechado | entregue |
-| `v0.10` | Vários domínios numa execução: um arquivo com `[[domains]]` ou `--domain` repetido, um resumo e um veredito por domínio, o `--json` como um envelope só, o `--html` como uma pasta de páginas, e domínios internacionalizados escritos como se leem | entregue |
+- os relatórios cobrem pelo menos 28 dias;
+- chegaram relatórios em pelo menos 80% desses dias;
+- foram vistas pelo menos 100 mensagens;
+- nenhuma mensagem de um remetente reconhecido falhou;
+- no máximo 0,5% das mensagens de origens não reconhecidas falharam.
+
+### Comandos
+
+| Comando | O que ele diz | Lê | Rede |
+|---|---|---|---|
+| `summary` | Quem envia e-mail como o seu domínio: por remetente e por situação (ok, frágil, com falha), falhas primeiro | Uma pasta ou arquivos: `.xml`, `.zip`, `.gz`, `.eml`, `.mbox` | Nenhuma |
+| `verdict` | Pronto para `p=reject`, com cada regra diante do seu limite. `--html` escreve uma página estática ([Relatório HTML](#relatório-html)); `--json` escreve um documento para scripts e CI ([JSON](#json)) | O mesmo | Nenhuma |
+| `fetch` | Baixa as mensagens de relatório de uma caixa de correio para uma pasta; somente leitura, sobre TLS verificado ([Fetch](#fetch)) | A sua caixa de correio, por IMAP | **Só IMAP** |
+
+Também: vários domínios numa execução ([Vários domínios](#vários-domínios)), o texto em inglês ou
+português do Brasil com `--lang pt-BR` ([Idioma](#idioma)) e códigos de saída estáveis
+([Códigos de saída](#códigos-de-saída)).
+
+### Em que você pode confiar
+
+- **Offline.** Os seus relatórios nunca são enviados a ninguém. Só o `fetch` usa a rede, e só para
+  chegar à sua própria caixa de correio.
+- **Arquivo hostil é esperado.** O tamanho descompactado tem limite (zip bombs) e XML com `DOCTYPE`
+  ou `ENTITY` é recusado (expansão de entidades).
+- **Um critério declarado.** Todo veredito mostra a regra que decidiu e diz o que os relatórios não
+  cobrem.
+- **Um contrato.** Os comandos, os códigos de saída, os documentos do `--json` e o arquivo de
+  configuração só mudam numa versão major ([docs/stability.md](docs/stability.md), em inglês).
 
 Fora do plano, de propósito: indexar no Elasticsearch, um painel web servido pela ferramenta e o
 envio de e-mail, cada um com o seu motivo em [Não-objetivos permanentes][non-goals] (em inglês).

@@ -42,22 +42,39 @@ two runs is cut. The recording is [`docs/demo/verdict.cast`](https://github.com/
 
 ## What it does
 
-MailVigil is built milestone by milestone, each one designed as a spec first, under
-[`specs/`](https://github.com/ryanvmorais/mailvigil/tree/main/specs). The milestones are the history of the build, not published versions: `1.0.0` is
-the first release and contains `v0.1` to `v0.9`; `v0.10` came with `1.6.0`.
+MailVigil answers one question: **is it safe to move your DMARC policy to `p=reject`?** It reads the
+aggregate reports your providers send, groups the traffic by sender, and gives a verdict with a
+stated criterion. The verdict is `READY` only when all five rules hold, `TOO EARLY` when there is
+too little data yet, and `NOT READY` when a source is failing ([an example](#the-verdict)):
 
-| Milestone | Focus | Status |
-|---|---|---|
-| `v0.1` | Read a folder or files (`.zip`, `.gz`, `.xml`), filter by domain; hostile input: cap the decompressed size (zip bombs) and refuse XML with `DOCTYPE` or `ENTITY` (entity expansion) | shipped |
-| `v0.2` | Configuration: a TOML file with your domain and a map from DKIM selector to service name; a signature only counts under your own domain | shipped |
-| `v0.3` | `mailvigil summary`: per sender and per situation (ok, fragile, failing), failures highlighted | shipped |
-| `v0.4` | `mailvigil verdict`: "Ready for `reject`?" with a declared criterion: 28 days covered, reports on 80% of the days, 100 messages, no failure from a recognized sender, at most 0.5% of the messages failing from unrecognized sources | shipped |
-| `v0.5` | `--json` and stable exit codes for scripts and CI; the text in English or Brazilian Portuguese (`--lang pt-BR`) | shipped |
-| `v0.6` | Mail messages as input: `.eml` and `.mbox`, the report attachment taken out in memory | shipped |
-| `v0.7` | `mailvigil verdict --html`: one static page with the verdict, each rule against its limit and the messages day by day; no script, no network, opened from disk | shipped |
-| `v0.8` | `mailvigil fetch`: download the report messages from a mailbox over IMAP into a folder, opt-in, read-only, always over verified TLS | shipped |
-| `v0.9` | Hardening before the release: bounds on a report's count and period, a day counts as covered by time, notes for old data and for a reporter that went quiet, and distinct exit codes for a bug, Ctrl+C and a closed pipe | shipped |
-| `v0.10` | Several domains in one run: a `[[domains]]` file or a repeated `--domain`, one summary and one verdict per domain, `--json` as one envelope, `--html` as a folder of pages, and internationalized domains written as they are read | shipped |
+- the reports cover at least 28 days;
+- reports arrived on at least 80% of those days;
+- at least 100 messages were seen;
+- no message from a recognized sender failed;
+- at most 0.5% of the messages from unrecognized sources failed.
+
+### Commands
+
+| Command | What it tells you | Reads | Network |
+|---|---|---|---|
+| `summary` | Who sends mail as your domain: per sender and per situation (ok, fragile, failing), failures first | A folder or files: `.xml`, `.zip`, `.gz`, `.eml`, `.mbox` | None |
+| `verdict` | Ready for `p=reject`, with each rule against its limit. `--html` writes one static page ([HTML report](#html-report)); `--json` writes a document for scripts and CI ([JSON](#json)) | The same | None |
+| `fetch` | Downloads the report messages of a mailbox into a folder; read-only, over verified TLS ([Fetch](#fetch)) | Your mailbox, over IMAP | **IMAP only** |
+
+Also: several domains in one run ([Several domains](#several-domains)), the text in English or
+Brazilian Portuguese with `--lang pt-BR` ([Language](#language)) and stable exit codes
+([Exit codes](#exit-codes)).
+
+### What you can rely on
+
+- **Offline.** Your reports are never sent to anyone. Only `fetch` uses the network, and only to
+  reach your own mailbox.
+- **Hostile files are expected.** The decompressed size is capped (zip bombs) and XML with `DOCTYPE`
+  or `ENTITY` is refused (entity expansion).
+- **A stated criterion.** Every verdict shows the rule that decided it and says what the reports do
+  not cover.
+- **A contract.** The commands, the exit codes, the `--json` documents and the configuration file
+  change only in a major version ([docs/stability.md](https://github.com/ryanvmorais/mailvigil/blob/main/docs/stability.md)).
 
 Not planned, on purpose: indexing in Elasticsearch, a web dashboard served by the tool and sending
 e-mail, each with its reason in [Permanent non-goals][non-goals].
