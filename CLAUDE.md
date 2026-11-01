@@ -17,8 +17,7 @@ one run (spec 010) are built. Everything
 is specified in [specs/](specs/) first. The repository has been public since
 2026-10-27; releasing and announcing are the maintainer's acts.
 
-Conversation with the maintainer (Ryan) and plan files are in Portuguese; everything in the
-repository is English.
+Everything in the repository is English, except `README.pt-BR.md` (see Conventions).
 
 ## Common commands
 
@@ -210,8 +209,7 @@ uv.lock              # never edit by hand (generated; a hook blocks it)
 > declared size. The same parser also refuses a document nested past `MAX_DEPTH` levels or holding
 > more than `MAX_ELEMENTS` elements (`Reason.XML_TOO_COMPLEX`, spec 002 ADR-8), because the byte cap
 > alone does not bound the cost of the tree. Each defense has tests that feed the attack; keep it so
-> when touching them, and keep `xmlsafe.py` the only module that creates an XML parser. The starting point was the script in
-> the maintainer's site repository (`site-ryan-morais/scripts/relatorios_dmarc.py`).
+> when touching them, and keep `xmlsafe.py` the only module that creates an XML parser.
 
 > ⚠️ **Never use a real DMARC report** in tests, docs, issues or PRs: it carries IP addresses and
 > domains. Fixtures are synthetic. `*.xml.gz`, `*.xml.zip` and `reports/` are git-ignored except
@@ -219,15 +217,14 @@ uv.lock              # never edit by hand (generated; a hook blocks it)
 
 ## Conventions
 
-- **Language:** code, commits, branches, docstrings and docs in English (open source; rule from
-  `/idioma`). User-facing CLI text: English (default) and Brazilian Portuguese, chosen only by
+- **Language:** code, commits, branches, docstrings and docs in English (open source). User-facing CLI text: English (default) and Brazilian Portuguese, chosen only by
   `--lang` (no locale detection). English is ASCII; Portuguese has accents on a stream that carries
   them and the same text folded to ASCII otherwise (spec 006 ADR-9). The one documentation
   exception is `README.pt-BR.md`, the Portuguese README for the Brazilian audience (a user-facing
   text, so the product's audience language): keep it in step with `README.md`, whose headings
   `tests/test_readme_pt_br.py` compares.
-- **File style:** follow `/estilo-arquivos` for each file type (docstrings with `Args:` /
-  `Returns:`, full annotations, `# why` comments); do not copy its rules here.
+- **File style:** follow the file you are editing: docstrings with `Args:` / `Returns:`, full
+  annotations and `# why` comments.
 - **Python floor:** 3.12, tested in CI together with 3.13, 3.14 and the newest stable release (3.15), on Linux and
   on Windows (the one runner outside the `ubuntu-26.04` rule, so "OS Independent" is tested). Ruff and black
   target `py312` and mypy runs with `python_version = "3.12"`, so syntax newer than the floor
@@ -250,28 +247,25 @@ uv.lock              # never edit by hand (generated; a hook blocks it)
   `main` and by hand; CodeQL (as a workflow, not the default setup) on `main`, PRs and weekly;
   dependency review on PRs. Review the triggers if the repository ever goes private again.
 - **Weekly `pip-audit.yml`** audits `uv.lock` every Monday 09:00 (São Paulo). A red run means a
-  known CVE in the lock: answer with `/atualizar-dependencias`.
+  known CVE in the lock: update the locked version of the affected dependency.
 
 ## Spec-driven workflow
 
 Features are written down in `specs/NNN-name/` (`requirements.md` → `design.md` → `tasks.md`)
-with a human approval gate between phases; use `/spec`. Flow per task: issue → branch → PR →
-`/fechar-sessao`. Claude opens PRs and never merges. At the end of a session that changed
-architecture, commands or the CLI, run `/atualizar-docs` and then `/fechar-sessao`.
+with a human approval gate between phases (see `specs/README.md`). Flow per task: issue → branch →
+PR. A change to the architecture, the commands or the CLI updates the README, this file and
+`docs/stack.md` in the same PR.
 
-**A feature with an interface** (the HTML report, spec 008, was the first) needs a mockup the
-maintainer approved before any code: Claude builds it in the Artifact with `/nova-interface` (390
-and 1280 px, two or three alternatives, one recommended) and writes no interface file until the
-"ok". This is a global rule (`~/.claude/CLAUDE.md`); the 008 choice is recorded in
+**A feature with an interface** (the HTML report, spec 008, was the first) needs a mockup approved
+before any code (two or three alternatives checked at 390 and 1280 px, one recommended), and no
+interface file is written until the maintainer approves one. The 008 choice is recorded in
 `specs/README.md`.
 
 ## Dependencies
 
 `uv` manages everything: `pyproject.toml` holds the floors (`>=`) and `uv.lock` the exact
 versions. Commit both together (`uv lock --check` must pass). Dependabot (`uv` and
-`github-actions`, Sundays, 7-day cooldown) opens the routine PRs; review them with
-`/revisar-dependabot`.
+`github-actions`, Sundays, 7-day cooldown) opens the routine PRs.
 
-> Publishing (PyPI, GitHub Releases, posts) is the maintainer's act, never Claude's. Claude
-> prepares the package, the README and the CI. A vulnerability in a published version is reported
+> Publishing (PyPI, GitHub Releases) is the maintainer's act. A vulnerability in a published version is reported
 > privately (private vulnerability reporting), never in a public issue, PR or commit.
