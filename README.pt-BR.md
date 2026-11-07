@@ -33,6 +33,8 @@ implantando o DMARC, e roda inteiro na sua máquina: seus relatórios nunca são
 **Instalação:** `pipx install mailvigil` ou `uv tool install mailvigil` (Python 3.12 ou mais novo,
 nada além disso). Depois, `mailvigil verdict --config mailvigil.toml reports/ --lang pt-BR`.
 
+**Site:** [mailvigil.ryanmorais.com.br](https://mailvigil.ryanmorais.com.br/)
+
 ![Um terminal rodando mailvigil verdict numa pasta de relatórios DMARC: NOT READY para p=reject com código de saída 4 e, um mês de relatórios depois, READY para p=reject com código de saída 0](docs/images/mailvigil-dmarc-verdict-terminal-demo.svg)
 
 *Duas execuções reais sobre relatórios inventados (`example.com`, endereços de documentação): o

@@ -32,6 +32,8 @@ out DMARC, and it runs entirely on your machine: your reports are never sent to 
 **Install:** `pipx install mailvigil` or `uv tool install mailvigil` (Python 3.12 or newer, nothing
 else). Then `mailvigil verdict --config mailvigil.toml reports/`.
 
+**Website:** [mailvigil.ryanmorais.com.br/en/](https://mailvigil.ryanmorais.com.br/en/)
+
 ![A terminal running mailvigil verdict on a folder of DMARC reports: NOT READY for p=reject with exit code 4, then, a month of reports later, READY for p=reject with exit code 0](https://raw.githubusercontent.com/ryanvmorais/mailvigil/main/docs/images/mailvigil-dmarc-verdict-terminal-demo.svg)
 
 *Two real runs on invented reports (`example.com`, documentation addresses): the first period is
