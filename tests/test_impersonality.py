@@ -38,8 +38,8 @@ _NAME_ALLOWED = frozenset({"LICENSE", "pyproject.toml", "tests/test_impersonalit
 _PERSONAL_TOOLS = re.compile(
     r"(?<![\w/.~-])/(?:idioma|spec|estilo-arquivos|fechar-sessao|atualizar-docs|"
     r"revisar-dependabot|nova-interface|stack|novo-projeto|atualizar-dependencias|"
-    r"preparar-release|auditoria-seguranca|qualidade-python|limpar-branches|"
-    r"auditar-impessoalidade)(?![\w/.-])|~/\.claude"
+    r"preparar-release|atualizar-ferramentas|qualidade-python|limpar-branches|"
+    r"enxugar-memoria|auditoria-[a-z]+)(?![\w/.-])|~/\.claude"
 )
 
 # ---------------------------------------------------------------------------
