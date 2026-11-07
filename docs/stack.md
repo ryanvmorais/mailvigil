@@ -336,8 +336,9 @@ never a traceback.
 
 ### Ruff
 
-The linter, and the import sorter (it replaces flake8 and isort). Rules `E F I UP B SIM C4 RUF S`
-(`S` is the security family, from flake8-bandit), line length 100, `target-version = "py312"`.
+The linter, and the import sorter (it replaces flake8 and isort). Rules `E F I UP B SIM C4 RUF S D`
+(`S` is the security family, from flake8-bandit; `D` is pydocstyle with the Google convention, so the
+form of a docstring is part of the gate), line length 100, `target-version = "py312"`.
 
 **Why this:** against flake8 plus a pile of plugins, one fast tool configured in `pyproject.toml`.
 Targeting `py312` makes the lint reject syntax newer than the floor, so it fails on your machine

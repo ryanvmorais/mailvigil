@@ -86,14 +86,14 @@ _LIBRARY_ERRORS = (OSError, UnicodeError, imaplib.IMAP4.error, FetchRefused)
 
 
 def quote(text: str) -> str:
-    """
+    r"""
     Make an IMAP quoted string.
 
     Args:
         text (str): The text, printable ASCII; ``imaplib`` sends its arguments as they are.
 
     Returns:
-        str: The text between double quotes, with ``\\`` and ``"`` escaped.
+        str: The text between double quotes, with ``\`` and ``"`` escaped.
     """
     return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
 

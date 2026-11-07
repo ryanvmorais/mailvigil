@@ -1,4 +1,4 @@
-"""
+r"""
 Build the README demo: invented reports, a real run of the CLI and the recording of it.
 
 The script writes two folders of synthetic aggregate reports for ``example.com`` (a period that is
@@ -10,14 +10,14 @@ The picture files are made from the output of this script with two tools that ar
 project (nothing is added to ``pyproject.toml``):
 
     uv run python docs/demo/build_demo.py WORKDIR
-    npx svg-term-cli --in docs/demo/verdict.cast --out docs/images/<name>.svg \\
+    npx svg-term-cli --in docs/demo/verdict.cast --out docs/images/<name>.svg \
         --window --no-cursor --width 80 --height 29
     uv run python docs/demo/tidy_svg.py docs/images/<name>.svg    # pins the letters to the grid
 
 The page captures come from WORKDIR/before, with an absolute path for ``--screenshot``:
 
     uv run mailvigil verdict --config mailvigil.toml reports/ --html > report.html
-    chrome --headless=new --screenshot=/abs/light.png --window-size=1280,1278 \\
+    chrome --headless=new --screenshot=/abs/light.png --window-size=1280,1278 \
         file:///.../report.html
 
 For the dark one, copy ``report.html`` with ``@media (prefers-color-scheme:dark)`` replaced by

@@ -447,10 +447,10 @@ def fetch_document(outcome: FetchOutcome) -> dict[str, object]:
 
 
 def dumps(document: dict[str, object]) -> str:
-    """
+    r"""
     Write a document as JSON: indented, ASCII only and without a trailing newline.
 
-    ``ensure_ascii`` turns a non-ASCII letter into a ``\\uXXXX`` escape, so no console encoding can
+    ``ensure_ascii`` turns a non-ASCII letter into a ``\uXXXX`` escape, so no console encoding can
     corrupt it (RF-01). ``allow_nan=False`` makes a stray ``NaN`` an error instead of invalid JSON;
     the documents hold no float, so it never fires.
 
