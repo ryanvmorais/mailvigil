@@ -98,7 +98,13 @@ src = ["src", "tests"]
 [tool.ruff.lint]
 # pycodestyle, pyflakes, isort, pyupgrade, bugbear, flake8-simplify,
 # flake8-comprehensions, ruff-native, flake8-bandit (security).
-select = ["E", "F", "I", "UP", "B", "SIM", "C4", "RUF", "S"]
+select = ["E", "F", "I", "UP", "B", "SIM", "C4", "RUF", "S", "D", "D213"]
+# D212 is off and D213 on: the docstring style here puts the summary on the second line, under a
+# `"""` of its own. The Google convention (below) keeps D212 and drops D213, so D213 is selected by
+# name to override it.
+# D205 is off too: a module docstring opens with a summary paragraph that wraps over a few lines,
+# then a blank line; the rule wants a one-line summary.
+ignore = ["D212", "D205"]
 
 [tool.ruff.lint.per-file-ignores]
 # The names say "password", the values are never one: an enum member, a message key.
@@ -110,10 +116,16 @@ select = ["E", "F", "I", "UP", "B", "SIM", "C4", "RUF", "S"]
 "docs/demo/*.py" = ["S603"]
 # Pytest: `assert` is the idiom, the secrets are invented, the subprocesses run this interpreter or
 # `git` on fixtures, and the XML parsed is the repository's own synthetic reports.
-"tests/**/*.py" = ["S101", "S105", "S106", "S314", "S603"]
+# Test functions and classes are named for what they check; only the module docstring (D100) is
+# required there, as `/estilo-arquivos` says.
+"tests/**/*.py" = ["S101", "S105", "S106", "S314", "S603", "D101", "D102", "D103", "D104", "D105", "D106", "D107"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["mailvigil"]
+
+[tool.ruff.lint.pydocstyle]
+# Google sections (`Args:`, `Returns:`, `Raises:`), as in the docstrings.
+convention = "google"
 
 # --- Format (black) ---------------------------------------------------------
 [tool.black]

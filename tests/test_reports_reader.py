@@ -295,7 +295,8 @@ def test_zip_header_declaring_a_smaller_size_is_refused(tmp_path: Path, make_zip
 def test_zip_bomb_is_refused_whatever_its_header_declares(
     tmp_path: Path, make_zip: _MakeZip
 ) -> None:
-    """The cap rests on the bytes produced: a header declaring a tiny size does not slip a bomb in.
+    """
+    The cap rests on the bytes produced: a header declaring a tiny size does not slip a bomb in.
 
     ``zipfile`` honors the declared size, so the lie ends in a CRC failure rather than in an
     oversized read; either way the bomb is refused and nothing past the cap is returned.
