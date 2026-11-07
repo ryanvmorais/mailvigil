@@ -71,56 +71,63 @@ class Answer(StrEnum):
     TOO_EARLY = "too_early"
     NOT_READY = "not_ready"
 
-class RuleKind(StrEnum):
-    DATA = "data"          # is there enough evidence to answer at all
-    PROBLEM = "problem"    # is there something wrong already
 
-class RuleId(IntEnum):     # the stable ids of RF-02
+class RuleKind(StrEnum):
+    DATA = "data"  # is there enough evidence to answer at all
+    PROBLEM = "problem"  # is there something wrong already
+
+
+class RuleId(IntEnum):  # the stable ids of RF-02
     PERIOD = 1
     COVERAGE = 2
     VOLUME = 3
     RECOGNIZED_FAILURES = 4
     UNRECOGNIZED_FAILURES = 5
 
+
 class Rule:
     id: RuleId
     kind: RuleKind
-    measured: int          # days, days with reports, messages, failing messages
-    whole: int             # the denominator of a share, 0 when the rule is not a share
-    needed: int            # the threshold, in the unit of the rule (see below)
-    at_least: bool         # True: pass when measured >= needed; False: when <= needed
+    measured: int  # days, days with reports, messages, failing messages
+    whole: int  # the denominator of a share, 0 when the rule is not a share
+    needed: int  # the threshold, in the unit of the rule (see below)
+    at_least: bool  # True: pass when measured >= needed; False: when <= needed
     passed: bool
-    missing: int           # how much a failed data rule lacks (days, messages), else 0
+    missing: int  # how much a failed data rule lacks (days, messages), else 0
+
 
 class NoteKind(StrEnum):
-    FRAGILE = "fragile"                    # numbers: fragile, spf_only, total messages
-    PARTIAL_POLICY = "partial_policy"      # numbers: pct
-    POLICY_CHANGED = "policy_changed"      # texts: the earlier p values, oldest first
+    FRAGILE = "fragile"  # numbers: fragile, spf_only, total messages
+    PARTIAL_POLICY = "partial_policy"  # numbers: pct
+    POLICY_CHANGED = "policy_changed"  # texts: the earlier p values, oldest first
     SUBDOMAIN_POLICY = "subdomain_policy"  # texts: sp, np ("" when absent)
     CURRENTLY_QUARANTINE = "currently_quarantine"
     SILENT_REPORTER = "silent_reporter"
     STALE = "stale"
+
 
 class Note:
     kind: NoteKind
     numbers: tuple[int, ...] = ()
     texts: tuple[str, ...] = ()
 
-class LeftOut:                             # RF-09: what the Summary did not count
-    skipped: int = 0                       # files refused (unsafe, too large, malformed, unreadable)
-    duplicates: int = 0                    # reports dropped as already seen
-    other_domain: int = 0                  # reports of another domain
+
+class LeftOut:  # RF-09: what the Summary did not count
+    skipped: int = 0  # files refused (unsafe, too large, malformed, unreadable)
+    duplicates: int = 0  # reports dropped as already seen
+    other_domain: int = 0  # reports of another domain
+
 
 class Verdict:
     domain: str
     answer: Answer
-    enforcing: str                         # latest p, lower case; "" without reports
-    rules: tuple[Rule, ...]                # always the five, in id order
-    deciding: RuleId | None                # the rule the reason and the next step are about
-    recognized_failing: tuple[FailingSource, ...]    # all of them, worst first (from 004)
+    enforcing: str  # latest p, lower case; "" without reports
+    rules: tuple[Rule, ...]  # always the five, in id order
+    deciding: RuleId | None  # the rule the reason and the next step are about
+    recognized_failing: tuple[FailingSource, ...]  # all of them, worst first (from 004)
     unrecognized_failing: tuple[FailingSource, ...]  # all of them, worst first
-    notes: tuple[Note, ...]                # in the order of NoteKind
-    left_out: LeftOut = LeftOut()          # RF-09; the default keeps a hand-built Verdict valid
+    notes: tuple[Note, ...]  # in the order of NoteKind
+    left_out: LeftOut = LeftOut()  # RF-09; the default keeps a hand-built Verdict valid
 ```
 
 The units of `needed` are fixed per rule and documented on the constants: days (rule 1), percent of
@@ -133,10 +140,10 @@ exactly when the answer is `ready`.
 ### verdict.py — the constants (RNF-05)
 
 ```python
-MIN_DAYS_SPANNED = 28            # rule 1
-MIN_COVERAGE_PERCENT = 80        # rule 2
-MIN_MESSAGES = 100               # rule 3
-MAX_UNRECOGNIZED_PER_MILLE = 5   # rule 5: 0.5% of all messages
+MIN_DAYS_SPANNED = 28  # rule 1
+MIN_COVERAGE_PERCENT = 80  # rule 2
+MIN_MESSAGES = 100  # rule 3
+MAX_UNRECOGNIZED_PER_MILLE = 5  # rule 5: 0.5% of all messages
 ```
 
 `render_verdict.py` builds the "needed" column and its explanation from these same names, never from

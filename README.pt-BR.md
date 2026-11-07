@@ -9,7 +9,7 @@
 [![PyPI](https://img.shields.io/pypi/v/mailvigil)](https://pypi.org/project/mailvigil/)
 [![Release](https://img.shields.io/github/v/release/ryanvmorais/mailvigil)](https://github.com/ryanvmorais/mailvigil/releases)
 ![Lint](https://img.shields.io/badge/lint-ruff-261230)
-![Formatação](https://img.shields.io/badge/estilo-black-000000)
+![Formatação](https://img.shields.io/badge/estilo-ruff%20format-261230)
 ![Tipos](https://img.shields.io/badge/tipos-mypy%20strict-2A6DB2)
 ![Licença](https://img.shields.io/badge/licença-Apache%202.0-blue)
 
@@ -550,7 +550,7 @@ git config core.hooksPath .githooks
 uv run ruff check .
 
 # Confira a formatação
-uv run black --check .
+uv run ruff format --check .
 
 # Confira os tipos (strict)
 uv run mypy

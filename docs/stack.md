@@ -336,7 +336,7 @@ never a traceback.
 
 ### Ruff
 
-The linter, and the import sorter (it replaces flake8 and isort). Rules `E F I UP B SIM C4 RUF S`
+The linter, the import sorter and the code formatter (it replaces flake8, isort and black). Rules `E F I UP B SIM C4 RUF S`
 (`S` is the security family, from flake8-bandit), line length 100, `target-version = "py312"`.
 
 **Why this:** against flake8 plus a pile of plugins, one fast tool configured in `pyproject.toml`.
@@ -344,22 +344,11 @@ Targeting `py312` makes the lint reject syntax newer than the floor, so it fails
 instead of a user's.
 
 **Learn:** `ruff check --fix`, `select` / `ignore` in `[tool.ruff.lint]`, reading a rule with
-`ruff rule <code>`.
+`ruff rule <code>`; and `ruff format --check .` (what the gate runs) and `ruff format .` (what the
+hook runs), with the "magic trailing comma". The formatter takes no options beyond line length and
+target version, so formatting is never a review topic.
 
 **Docs:** [docs.astral.sh/ruff](https://docs.astral.sh/ruff/)
-
-### Black
-
-The code formatter. No options beyond line length and target version, so formatting is never a
-review topic.
-
-**Why this:** against Ruff's own formatter, black is the long-established default, and the
-hooks run `ruff check --fix` then `black`.
-
-**Learn:** `black --check .` (what the gate runs) and `black .` (what the hook runs), and the
-"magic trailing comma".
-
-**Docs:** [black.readthedocs.io](https://black.readthedocs.io/)
 
 ### mypy (strict)
 

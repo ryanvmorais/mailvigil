@@ -66,24 +66,28 @@ neither the parser nor `ingest`.
 ## Data model
 
 ```python
-Kind = Literal["xml", "gz", "zip"]            # reader.py: what an attachment is stored as
+Kind = Literal["xml", "gz", "zip"]  # reader.py: what an attachment is stored as
+
 
 @dataclass(frozen=True, slots=True)
-class Attachment:                              # mail.py: a part that may be a report
-    name: str      # file name, decoded and cleaned (clean_text, 255 chars); "" when it has none
-    kind: Kind     # from the name's suffix, else from the content type (ADR-9)
-    data: bytes    # the transfer encoding already undone
+class Attachment:  # mail.py: a part that may be a report
+    name: str  # file name, decoded and cleaned (clean_text, 255 chars); "" when it has none
+    kind: Kind  # from the name's suffix, else from the content type (ADR-9)
+    data: bytes  # the transfer encoding already undone
+
 
 @dataclass(frozen=True, slots=True)
-class Source:                                  # discovery.py
+class Source:  # discovery.py
     path: Path
     explicit: bool  # True: the user named this file; False: a folder search found it
 
+
 @dataclass(frozen=True, slots=True)
-class Document:                                # ingest.py, private: what the loop parses
+class Document:  # ingest.py, private: what the loop parses
     xml: bytes
-    source: str     # the display origin, becomes Report.source_file
-    part: str       # "#3 report.zip" for a message, "" for a loose file; goes on a refusal
+    source: str  # the display origin, becomes Report.source_file
+    part: str  # "#3 report.zip" for a message, "" for a loose file; goes on a refusal
+
 
 # model.py: SkippedFile(path, reason, detail) gains a last field, so every old call still works:
 #     part: str = ""   # "#3 report.zip": the message and the attachment, "" for a loose file
@@ -180,7 +184,7 @@ exceed `MAX_BYTES`, `decompressed_too_large` when an archive inflates past it.
 
 ```python
 for source in sources:
-    for item in _documents(source):                # Document | SkippedFile
+    for item in _documents(source):  # Document | SkippedFile
         if isinstance(item, SkippedFile):
             skipped.append(item)
             continue

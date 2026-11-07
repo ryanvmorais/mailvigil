@@ -117,6 +117,7 @@ no console encoding can corrupt it (RF-01).
 @dataclass(frozen=True, slots=True)
 class Plural:
     """A phrase with a count in it, in its two forms; ``one`` is used for exactly 1."""
+
     one: str
     many: str
 

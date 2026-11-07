@@ -234,9 +234,7 @@ def test_finish_ends_in_exactly_one_newline() -> None:
 def test_mypy_rejects_a_plain_str_where_markup_is_expected(tmp_path: Path) -> None:
     snippet = tmp_path / "snippet.py"
     snippet.write_text(
-        "from mailvigil.htmlkit import el, text\n"
-        "good = el('p', text('x'))\n"
-        "bad = el('p', 'x')\n",
+        "from mailvigil.htmlkit import el, text\ngood = el('p', text('x'))\nbad = el('p', 'x')\n",
         encoding="utf-8",
     )
     stdout, _, status = mypy_api.run(

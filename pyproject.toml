@@ -3,7 +3,7 @@
 #
 #   [project]                        metadata (no runtime dependencies, by design)
 #   [dependency-groups] dev          lint / type / test tooling (installed by default)
-#   [tool.*]                         config for ruff, black, mypy, coverage, pytest
+#   [tool.*]                         config for ruff (lint and format), mypy, coverage, pytest
 #
 # Exact versions of the whole graph are pinned in uv.lock (`uv lock`); the lines
 # below are lower-bound floors only.
@@ -62,7 +62,6 @@ Issues = "https://github.com/ryanvmorais/mailvigil/issues"
 
 [dependency-groups]
 dev = [
-    "black>=26.10.1",
     "hypothesis>=6.170.9",
     "mypy>=2.4.0",
     "pytest>=9.2.0",
@@ -88,12 +87,15 @@ include = [
     "/LICENSE",
 ]
 
-# --- Lint (ruff: replaces flake8 + isort, reads pyproject natively) ----------
+# --- Lint and format (ruff: replaces flake8, isort and black, reads pyproject natively) ---
 [tool.ruff]
 line-length = 100
 # The lint target is the floor, so syntax newer than 3.12 fails here instead of on a user's machine.
 target-version = "py312"
 src = ["src", "tests"]
+
+# `ruff format` is the formatter: it reads `line-length` and `target-version` from this table, and its
+# defaults (double quotes, magic trailing comma) are black's, so no `[tool.ruff.format]` is needed.
 
 [tool.ruff.lint]
 # pycodestyle, pyflakes, isort, pyupgrade, bugbear, flake8-simplify,
@@ -114,11 +116,6 @@ select = ["E", "F", "I", "UP", "B", "SIM", "C4", "RUF", "S"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["mailvigil"]
-
-# --- Format (black) ---------------------------------------------------------
-[tool.black]
-line-length = 100
-target-version = ["py312"]
 
 # --- Types (mypy, strict) --------------------------------------------------
 [tool.mypy]

@@ -1,6 +1,6 @@
 # CI pipeline (GitHub Actions). Three independent jobs, each mirroring a slice of the local
 # quality gate (.githooks/pre-commit) so that a green check means the same as a clean checkout:
-#   quality   ruff, black, mypy and pytest on every Python the classifiers claim, 3.12 (the floor)
+#   quality   ruff, ruff format, mypy and pytest on every Python the classifiers claim, 3.12 (the floor)
 #             to 3.15 (the newest stable), on Linux and on Windows
 #   package   `uv build`: the metadata renders on PyPI, the wheel has no runtime dependency, and
 #             it installs and runs in a clean environment (the release ships this exact build)
@@ -68,8 +68,8 @@ jobs:
       - name: Ruff
         run: uv run ruff check .
 
-      - name: Black
-        run: uv run black --check .
+      - name: Ruff format
+        run: uv run ruff format --check .
 
       - name: Mypy
         run: uv run mypy

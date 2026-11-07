@@ -65,56 +65,61 @@ All types are `@dataclass(frozen=True, slots=True)` and every collection is a tu
 
 ```python
 class Situation(StrEnum):
-    OK = "ok"              # DKIM and SPF both evaluated pass
-    FRAGILE = "fragile"    # exactly one of them
-    FAILING = "failing"    # neither
+    OK = "ok"  # DKIM and SPF both evaluated pass
+    FRAGILE = "fragile"  # exactly one of them
+    FAILING = "failing"  # neither
+
 
 class Counts:
     ok: int = 0
-    dkim_only: int = 0     # fragile: DKIM passed, SPF did not   (Resolved decision 7)
-    spf_only: int = 0      # fragile: SPF passed, DKIM did not
+    dkim_only: int = 0  # fragile: DKIM passed, SPF did not   (Resolved decision 7)
+    spf_only: int = 0  # fragile: SPF passed, DKIM did not
     failing: int = 0
     # properties: fragile = dkim_only + spf_only;  total = ok + fragile + failing
 
+
 class SenderRow:
-    outcome: Outcome                   # from 003: KNOWN, FOREIGN_DOMAIN, FAILING_SIGNATURE, UNKNOWN
-    service: str                       # the service name when KNOWN, else ""
-    source_ip: str                     # the IP when not KNOWN, else ""
-    selectors: tuple[str, ...]         # configured selectors seen on a non-KNOWN row, sorted
+    outcome: Outcome  # from 003: KNOWN, FOREIGN_DOMAIN, FAILING_SIGNATURE, UNKNOWN
+    service: str  # the service name when KNOWN, else ""
+    source_ip: str  # the IP when not KNOWN, else ""
+    selectors: tuple[str, ...]  # configured selectors seen on a non-KNOWN row, sorted
     counts: Counts
+
 
 class FailingSource:
     outcome: Outcome
-    service: str                       # as in SenderRow
-    selectors: tuple[str, ...]         # as in SenderRow, for this source only
-    source_ip: str                     # always set: the IP the failing messages came from
-    messages: int                      # failing messages, at least 1
-    dkim: tuple[str, ...]              # reasons seen, sorted: "fail", "none", "unaligned"
-    spf: tuple[str, ...]               # same vocabulary
+    service: str  # as in SenderRow
+    selectors: tuple[str, ...]  # as in SenderRow, for this source only
+    source_ip: str  # always set: the IP the failing messages came from
+    messages: int  # failing messages, at least 1
+    dkim: tuple[str, ...]  # reasons seen, sorted: "fail", "none", "unaligned"
+    spf: tuple[str, ...]  # same vocabulary
     override_reasons: tuple[str, ...]  # receiver override types, sorted, unique, comments dropped
 
+
 class Period:
-    begin: datetime                    # earliest `begin`, UTC
-    end: datetime                      # latest `end`, UTC
-    first_day: date                    # the UTC day `begin` falls on
-    last_day: date                     # the last UTC day any report touches (see ADR-3)
-    days_spanned: int                  # first_day to last_day, inclusive
-    days_with_reports: int             # days in that span touched by at least one report
+    begin: datetime  # earliest `begin`, UTC
+    end: datetime  # latest `end`, UTC
+    first_day: date  # the UTC day `begin` falls on
+    last_day: date  # the last UTC day any report touches (see ADR-3)
+    days_spanned: int  # first_day to last_day, inclusive
+    days_with_reports: int  # days in that span touched by at least one report
+
 
 class Summary:
     domain: str
-    selectors_configured: int          # len(config.senders)
+    selectors_configured: int  # len(config.senders)
     reports: int
-    reporters: int                     # distinct reporting organizations, as given
-    period: Period | None              # None only when there are no reports
-    policy: PolicyPublished | None     # the latest report's, None only when there are no reports
-    earlier_p: tuple[str, ...]         # other `p` values seen in the period, oldest first
+    reporters: int  # distinct reporting organizations, as given
+    period: Period | None  # None only when there are no reports
+    policy: PolicyPublished | None  # the latest report's, None only when there are no reports
+    earlier_p: tuple[str, ...]  # other `p` values seen in the period, oldest first
     totals: Counts
-    recognized_messages: int           # messages of KNOWN records
-    senders: tuple[SenderRow, ...]     # every row, ordered: total desc, label asc
-    failing: tuple[FailingSource, ...] # every failing source, ordered: messages desc, label asc
-    skipped: tuple[SkippedFile, ...]   # ordered by path
-    skipped_by_reason: tuple[tuple[Reason, int], ...]   # count desc, reason value asc
+    recognized_messages: int  # messages of KNOWN records
+    senders: tuple[SenderRow, ...]  # every row, ordered: total desc, label asc
+    failing: tuple[FailingSource, ...]  # every failing source, ordered: messages desc, label asc
+    skipped: tuple[SkippedFile, ...]  # ordered by path
+    skipped_by_reason: tuple[tuple[Reason, int], ...]  # count desc, reason value asc
     duplicates: int
     other_domain: int
 ```

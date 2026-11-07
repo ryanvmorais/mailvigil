@@ -69,55 +69,78 @@ are already sanitized (RF-05); the fields below are strings unless said otherwis
 ```python
 class Reason(StrEnum):
     UNSUPPORTED_EXTENSION = "unsupported_extension"
-    UNREADABLE = "unreadable"                    # missing, no permission, not a regular file
-    FILE_TOO_LARGE = "file_too_large"            # on-disk size over the cap
+    UNREADABLE = "unreadable"  # missing, no permission, not a regular file
+    FILE_TOO_LARGE = "file_too_large"  # on-disk size over the cap
     DECOMPRESSED_TOO_LARGE = "decompressed_too_large"
-    NOT_AN_ARCHIVE = "not_an_archive"            # corrupt or unsupported zip / gzip
+    NOT_AN_ARCHIVE = "not_an_archive"  # corrupt or unsupported zip / gzip
     NO_XML_MEMBER = "no_xml_member"
     MULTIPLE_XML_MEMBERS = "multiple_xml_members"
-    FORBIDDEN_DECLARATION = "forbidden_declaration"   # DOCTYPE or ENTITY
+    FORBIDDEN_DECLARATION = "forbidden_declaration"  # DOCTYPE or ENTITY
     MALFORMED_XML = "malformed_xml"
-    NOT_A_REPORT = "not_a_report"                # wrong root or foreign namespace
+    NOT_A_REPORT = "not_a_report"  # wrong root or foreign namespace
     UNSUPPORTED_VERSION = "unsupported_version"
-    INVALID_FIELD = "invalid_field"              # count, period, pct
+    INVALID_FIELD = "invalid_field"  # count, period, pct
+
 
 class ReportRefused(Exception):
     reason: Reason
-    detail: str          # short, English, never echoes report content except the parser position
+    detail: str  # short, English, never echoes report content except the parser position
 
-class DkimResult:  domain, selector, result
-class SpfResult:   domain, result
-class OverrideReason:  type, comment
+
+class DkimResult:
+    domain, selector, result
+
+
+class SpfResult:
+    domain, result
+
+
+class OverrideReason:
+    type, comment
+
 
 class Record:
-    source_ip: str                    # normalized by `ipaddress` when valid, else sanitized as-is
-    count: int                        # >= 0
-    disposition: str                  # "none" by default
-    dkim_evaluated: str               # policy_evaluated/dkim: "pass" | "fail" | ""
-    spf_evaluated: str                # policy_evaluated/spf
+    source_ip: str  # normalized by `ipaddress` when valid, else sanitized as-is
+    count: int  # >= 0
+    disposition: str  # "none" by default
+    dkim_evaluated: str  # policy_evaluated/dkim: "pass" | "fail" | ""
+    spf_evaluated: str  # policy_evaluated/spf
     override_reasons: tuple[OverrideReason, ...]
-    header_from: str                  # lower case
-    dkim: tuple[DkimResult, ...]      # every auth_results/dkim block, in order
-    spf: tuple[SpfResult, ...]        # every auth_results/spf block (RFC 9990 allows several)
+    header_from: str  # lower case
+    dkim: tuple[DkimResult, ...]  # every auth_results/dkim block, in order
+    spf: tuple[SpfResult, ...]  # every auth_results/spf block (RFC 9990 allows several)
+
 
 class PolicyPublished:
-    domain: str                       # lower case
-    p: str                            # "?" when absent, as in the source script
-    sp: str; np: str; adkim: str; aspf: str; testing: str; discovery_method: str   # "" when absent
-    pct: int                          # 0..100, default 100
+    domain: str  # lower case
+    p: str  # "?" when absent, as in the source script
+    sp: str
+    np: str
+    adkim: str
+    aspf: str
+    testing: str
+    discovery_method: str  # "" when absent
+    pct: int  # 0..100, default 100
+
 
 class Report:
-    reporter: str                     # report_metadata/org_name, "?" when absent
+    reporter: str  # report_metadata/org_name, "?" when absent
     report_id: str
-    begin: datetime                   # aware, UTC
-    end: datetime                     # aware, UTC, >= begin
+    begin: datetime  # aware, UTC
+    end: datetime  # aware, UTC, >= begin
     policy: PolicyPublished
     records: tuple[Record, ...]
-    source_file: str                  # file name, display only
+    source_file: str  # file name, display only
 
-class SkippedFile:   path: Path; reason: Reason; detail: str
+
+class SkippedFile:
+    path: Path
+    reason: Reason
+    detail: str
+
+
 class IngestionResult:
-    reports: tuple[Report, ...]       # discovery order
+    reports: tuple[Report, ...]  # discovery order
     skipped: tuple[SkippedFile, ...]  # discovery order
     duplicates: int
     other_domain: int
@@ -164,8 +187,8 @@ in item 4 is the actual guard, and it is the one exercised by the bomb tests.
 
 ```python
 parser = expat.ParserCreate(namespace_separator="}")
-parser.StartDoctypeDeclHandler = _refuse      # any <!DOCTYPE ...>
-parser.EntityDeclHandler = _refuse            # any <!ENTITY ...>, defense in depth
+parser.StartDoctypeDeclHandler = _refuse  # any <!DOCTYPE ...>
+parser.EntityDeclHandler = _refuse  # any <!ENTITY ...>, defense in depth
 parser.buffer_text = True
 # Start/End/CharacterData handlers feed an ElementTree.TreeBuilder
 parser.Parse(xml, True)

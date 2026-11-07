@@ -151,8 +151,7 @@ def month(failing_days: frozenset[int] = frozenset({2, 3}), length: int = 29) ->
         Summary: The summary.
     """
     days = {
-        _FIRST
-        + timedelta(days=index): Counts(
+        _FIRST + timedelta(days=index): Counts(
             ok=250, dkim_only=40, failing=6 if index + 1 in failing_days else 0
         )
         for index in range(length)

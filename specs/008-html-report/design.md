@@ -61,13 +61,14 @@ and never `html.escape` themselves. `summary.py` still imports no renderer.
 ```python
 @dataclass(frozen=True, slots=True)
 class DayCounts:
-    day: date           # the UTC day a report's period begins on
-    reports: int        # reports that begin that day
-    counts: Counts      # their messages per situation
+    day: date  # the UTC day a report's period begins on
+    reports: int  # reports that begin that day
+    counts: Counts  # their messages per situation
+
 
 # on Summary, both defaulted so nothing else has to change:
-days: tuple[DayCounts, ...] = ()                     # sorted by day, only days with a report
-covered: tuple[tuple[date, date], ...] = ()          # merged [first, last] day intervals
+days: tuple[DayCounts, ...] = ()  # sorted by day, only days with a report
+covered: tuple[tuple[date, date], ...] = ()  # merged [first, last] day intervals
 ```
 
 Both are **sparse**: their size is bounded by the number of reports, never by the length of the
@@ -115,26 +116,35 @@ Blocks 3 to 7 are `section` elements with an `aria-labelledby` heading; the docu
 def render_html(summary: Summary, verdict: Verdict, messages: Messages = ENGLISH) -> str:
     """The whole document, ASCII only, ending in a newline."""
 
+
 # htmlkit.py
-Safe = NewType("Safe", str)            # markup that is already safe to concatenate
-def text(value: str) -> Safe: ...      # escapes; the only way a str becomes Safe
-def el(name: str, *children: Safe, **attrs: str) -> Safe: ...   # attribute values escaped
-def raw(markup: str) -> Safe: ...      # for the constant CSS and the constant SVG paths; a test
-                                       # greps the call sites so no variable reaches it
-def finish(document: Safe) -> str: ... # ASCII with numeric character references
+Safe = NewType("Safe", str)  # markup that is already safe to concatenate
+
+
+def text(value: str) -> Safe: ...  # escapes; the only way a str becomes Safe
+def el(name: str, *children: Safe, **attrs: str) -> Safe: ...  # attribute values escaped
+def raw(markup: str) -> Safe:
+    ...  # for the constant CSS and the constant SVG paths; a test
+    # greps the call sites so no variable reaches it
+
+
+def finish(document: Safe) -> str: ...  # ASCII with numeric character references
 ```
 
 ```python
 # cli.py: on the verdict subparser only
-verdict_parser.add_argument("--html", action="store_true",
-    help="print one self-contained HTML page (redirect it to a file); not with --json")
+verdict_parser.add_argument(
+    "--html",
+    action="store_true",
+    help="print one self-contained HTML page (redirect it to a file); not with --json",
+)
 ```
 
 `main` refuses the pair before any work:
 
 ```python
 if args.command == "verdict" and args.json and args.html:
-    parser.error("argument --html: not allowed with argument --json")   # exit 2
+    parser.error("argument --html: not allowed with argument --json")  # exit 2
 ```
 
 `summary --html` is an unknown option, so argparse already ends with exit 2 (question 2).

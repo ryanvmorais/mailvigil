@@ -15,7 +15,7 @@
 set -euo pipefail
 
 #######################################
-# Run the quality sequence: ruff, black, mypy, pytest.
+# Run the quality sequence: ruff, ruff format, mypy, pytest.
 # Globals:
 #   None
 # Arguments:
@@ -27,8 +27,8 @@ main() {
   echo "[pre-commit] ruff check..."
   uv run ruff check .
 
-  echo "[pre-commit] black --check..."
-  uv run black --check .
+  echo "[pre-commit] ruff format --check..."
+  uv run ruff format --check .
 
   echo "[pre-commit] mypy..."
   uv run mypy

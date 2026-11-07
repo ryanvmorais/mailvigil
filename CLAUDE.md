@@ -44,12 +44,12 @@ uv run pytest tests/test_smoke.py::test_version_is_exposed
 
 # The quality gate, in the same order as the pre-commit hook and the CI
 uv run ruff check .
-uv run black --check .
+uv run ruff format --check .
 uv run mypy
 uv run pytest --cov
 
 # Format what you changed (the Claude hook does this on every edit)
-uv run ruff check --fix . && uv run black .
+uv run ruff check --fix . && uv run ruff format .
 
 # Activate the versioned pre-commit hook (once per clone)
 git config core.hooksPath .githooks
@@ -122,20 +122,20 @@ Each line is the short form of a section of [docs/referencia/invariants.md](docs
 - **File style:** follow the file you are editing: docstrings with `Args:` / `Returns:`, full
   annotations and `# why` comments.
 - **Python floor:** 3.12, tested in CI together with 3.13, 3.14 and the newest stable release (3.15), on Linux and
-  on Windows (the one runner outside the `ubuntu-26.04` rule, so "OS Independent" is tested). Ruff and black
-  target `py312` and mypy runs with `python_version = "3.12"`, so syntax newer than the floor
+  on Windows (the one runner outside the `ubuntu-26.04` rule, so "OS Independent" is tested). Ruff (lint and
+  format) targets `py312` and mypy runs with `python_version = "3.12"`, so syntax newer than the floor
   fails the lint. Review when 3.12 reaches end of life (2028-10-31).
 - **Commits:** Conventional Commits (`feat`, `fix`, `docs`, `chore`, `ci`, `deps`…), squash-merged.
 
 ## Quality and automation
 
-- **Gate:** `ruff` → `black --check` → `mypy` (strict, over `src`) → `pytest --cov`. The same
+- **Gate:** `ruff check` → `ruff format --check` → `mypy` (strict, over `src`) → `pytest --cov`. The same
   sequence runs in `.githooks/pre-commit` and in `.github/workflows/ci.yml`. The repository allows
   squash merges only, and the `proteger-main` ruleset requires a pull request, linear history and
   the `Quality (Python 3.12)`, `Quality (Python 3.15)` and `Package` checks; `pip-audit`, CodeQL and
   dependency review are not required, so a new CVE cannot block the PR that fixes it.
 - **Claude Code hooks** (`.claude/`, run with `python`): `project_format` (PostToolUse: ruff `--fix`
-  + black on the edited `.py`), `validate` (Stop: ruff + mypy when a `.py` under `src/` or `tests/`
+  + `ruff format` on the edited `.py`), `validate` (Stop: ruff + mypy when a `.py` under `src/` or `tests/`
   changed; pytest is left to the pre-commit hook because it is heavy), `guard_generated`
   (PreToolUse: blocks editing `uv.lock`), `session_start` (warns about a missing `.venv` or an
   inactive `core.hooksPath`).

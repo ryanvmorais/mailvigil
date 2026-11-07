@@ -59,48 +59,62 @@ All types are `@dataclass(frozen=True, slots=True)` (RNF-04).
 
 ```python
 class ConfigReason(StrEnum):
-    UNREADABLE = "unreadable"                  # missing, no permission, folder, not a regular file
-    FILE_TOO_LARGE = "file_too_large"          # over 64 KiB
+    UNREADABLE = "unreadable"  # missing, no permission, folder, not a regular file
+    FILE_TOO_LARGE = "file_too_large"  # over 64 KiB
     NOT_UTF8 = "not_utf8"
-    MALFORMED_TOML = "malformed_toml"          # includes a document too deeply nested to parse
-    UNKNOWN_KEY = "unknown_key"                # top-level key or table the format does not define
+    MALFORMED_TOML = "malformed_toml"  # includes a document too deeply nested to parse
+    UNKNOWN_KEY = "unknown_key"  # top-level key or table the format does not define
     MISSING_DOMAIN = "missing_domain"
-    INVALID_DOMAIN = "invalid_domain"          # not a string, empty, not a plausible host name
-    NON_ASCII_DOMAIN = "non_ascii_domain"      # write the xn-- form
-    WRONG_TYPE = "wrong_type"                  # `senders` is not a table
+    INVALID_DOMAIN = "invalid_domain"  # not a string, empty, not a plausible host name
+    NON_ASCII_DOMAIN = "non_ascii_domain"  # write the xn-- form
+    WRONG_TYPE = "wrong_type"  # `senders` is not a table
     INVALID_SELECTOR = "invalid_selector"
     DUPLICATE_SELECTOR = "duplicate_selector"  # two keys differing only by case
-    INVALID_SERVICE_NAME = "invalid_service_name"   # not a string, blank, too long, nested value
-    FORBIDDEN_CHARACTER = "forbidden_character"     # control, format or separator in a name
-    INVALID_FETCH_VALUE = "invalid_fetch_value"     # a [fetch] value of the wrong type or range (ADR-7)
-    PASSWORD_NOT_ALLOWED = "password_not_allowed"   # a [fetch] key that would hold a password (ADR-7)
-    INVALID_SPF_DOMAIN = "invalid_spf_domain"       # an [spf] key that is not a plausible host name (ADR-8)
-    FOREIGN_SPF_DOMAIN = "foreign_spf_domain"       # an [spf] key outside the configured domain (ADR-8)
-    INVALID_IP_RANGE = "invalid_ip_range"           # an [ips] key that is no range, or too wide (ADR-8)
-    DUPLICATE_KEY = "duplicate_key"                 # two keys of [spf] or [ips] that mean the same (ADR-8)
+    INVALID_SERVICE_NAME = "invalid_service_name"  # not a string, blank, too long, nested value
+    FORBIDDEN_CHARACTER = "forbidden_character"  # control, format or separator in a name
+    INVALID_FETCH_VALUE = (
+        "invalid_fetch_value"  # a [fetch] value of the wrong type or range (ADR-7)
+    )
+    PASSWORD_NOT_ALLOWED = (
+        "password_not_allowed"  # a [fetch] key that would hold a password (ADR-7)
+    )
+    INVALID_SPF_DOMAIN = (
+        "invalid_spf_domain"  # an [spf] key that is not a plausible host name (ADR-8)
+    )
+    FOREIGN_SPF_DOMAIN = "foreign_spf_domain"  # an [spf] key outside the configured domain (ADR-8)
+    INVALID_IP_RANGE = "invalid_ip_range"  # an [ips] key that is no range, or too wide (ADR-8)
+    DUPLICATE_KEY = "duplicate_key"  # two keys of [spf] or [ips] that mean the same (ADR-8)
+
 
 class ConfigError(Exception):
     reason: ConfigReason
-    key: str        # the key it concerns, cleaned and cut by clean_text; "" for file-level reasons
-    detail: str     # short English, for logs
+    key: str  # the key it concerns, cleaned and cut by clean_text; "" for file-level reasons
+    detail: str  # short English, for logs
+
 
 class Config:
-    domain: str                     # normalized: lower case, no trailing dot
-    senders: Mapping[str, str]      # selector (lower case) -> service name; a read-only view
-    fetch: FetchSettings            # [fetch]: host, user, port, folder; None for a missing key (ADR-7)
-    spf: Mapping[str, str]          # SPF domain (lower case) -> service name; empty by default (ADR-8)
-    ranges: Mapping[IPv4Network | IPv6Network, str]   # canonical range -> service name; empty by default (ADR-8)
+    domain: str  # normalized: lower case, no trailing dot
+    senders: Mapping[str, str]  # selector (lower case) -> service name; a read-only view
+    fetch: FetchSettings  # [fetch]: host, user, port, folder; None for a missing key (ADR-7)
+    spf: Mapping[str, str]  # SPF domain (lower case) -> service name; empty by default (ADR-8)
+    ranges: Mapping[
+        IPv4Network | IPv6Network, str
+    ]  # canonical range -> service name; empty by default (ADR-8)
+
 
 class Outcome(StrEnum):
-    KNOWN = "known"                         # a configured selector, passing, under the owner's domain
-    FOREIGN_DOMAIN = "foreign_domain"       # a configured selector signed under someone else's domain
-    FAILING_SIGNATURE = "failing_signature" # a configured selector, owner's domain, signature not "pass"
-    UNKNOWN = "unknown"                     # no configured selector at all
+    KNOWN = "known"  # a configured selector, passing, under the owner's domain
+    FOREIGN_DOMAIN = "foreign_domain"  # a configured selector signed under someone else's domain
+    FAILING_SIGNATURE = (
+        "failing_signature"  # a configured selector, owner's domain, signature not "pass"
+    )
+    UNKNOWN = "unknown"  # no configured selector at all
+
 
 class Identification:
     outcome: Outcome
-    service: str = ""      # the service name when KNOWN, else ""
-    selector: str = ""     # the configured selector that matched; "" when UNKNOWN
+    service: str = ""  # the service name when KNOWN, else ""
+    selector: str = ""  # the configured selector that matched; "" when UNKNOWN
 ```
 
 `ConfigError` has the same shape as 002's `ReportRefused` plus the `key` (RF-07), and `ConfigReason`

@@ -2,7 +2,7 @@
 PostToolUse hook (project scope) — layer 1: the project's single formatter.
 
 Runs on the file that was just written or edited:
-    .py  -> ruff check --fix + black   (from the uv-managed ``.venv``)
+    .py  -> ruff check --fix + ruff format   (from the uv-managed ``.venv``)
 
 Cross-platform: finds the ``.venv`` Python on Windows (Scripts/python.exe) and on Unix
 (bin/python). While the ``.venv`` does not exist, it does nothing. It never blocks (always exits
@@ -39,7 +39,7 @@ def venv_python() -> Path | None:
 
 def format_python(path: Path) -> None:
     """
-    Apply ruff's safe fixes and black to one Python file.
+    Apply ruff's safe fixes and ruff's formatter to one Python file.
 
     Args:
         path (Path): The file to format.
@@ -48,7 +48,7 @@ def format_python(path: Path) -> None:
     if py is None:
         return
     subprocess.run([str(py), "-m", "ruff", "check", "--fix", str(path)], capture_output=True)
-    subprocess.run([str(py), "-m", "black", str(path)], capture_output=True)
+    subprocess.run([str(py), "-m", "ruff", "format", str(path)], capture_output=True)
 
 
 def main() -> None:
