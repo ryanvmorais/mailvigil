@@ -1,7 +1,7 @@
 # Changelog
 
 All notable changes to MailVigil are written here. The format follows
-[Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the versions follow
+[Keep a Changelog](https://keepachangelog.com/en/2.0.0/) and the versions follow
 [Semantic Versioning](https://semver.org/); what counts as a breaking change is in
 [docs/stability.md](docs/stability.md).
 
