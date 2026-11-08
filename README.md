@@ -3,15 +3,15 @@
 **English** · [Português (Brasil)](https://github.com/ryanvmorais/mailvigil/blob/main/README.pt-BR.md)
 
 ![Python](https://img.shields.io/badge/Python-3.12+-3776AB?logo=python&logoColor=white)
-![deps](https://img.shields.io/badge/deps-uv-DE5FE9)
+![deps](https://img.shields.io/badge/deps-uv-DE5FE9?logo=uv&logoColor=white)
 ![runtime deps](https://img.shields.io/badge/runtime%20deps-0-brightgreen)
-[![CI](https://github.com/ryanvmorais/mailvigil/actions/workflows/ci.yml/badge.svg)](https://github.com/ryanvmorais/mailvigil/actions/workflows/ci.yml)
-[![PyPI](https://img.shields.io/pypi/v/mailvigil)](https://pypi.org/project/mailvigil/)
-[![Release](https://img.shields.io/github/v/release/ryanvmorais/mailvigil)](https://github.com/ryanvmorais/mailvigil/releases)
-![Lint](https://img.shields.io/badge/lint-ruff-261230)
-![Format](https://img.shields.io/badge/style-black-000000)
-![Types](https://img.shields.io/badge/types-mypy%20strict-2A6DB2)
-![License](https://img.shields.io/badge/license-Apache%202.0-blue)
+[![CI](https://img.shields.io/github/actions/workflow/status/ryanvmorais/mailvigil/ci.yml?label=CI&logo=githubactions&logoColor=white)](https://github.com/ryanvmorais/mailvigil/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/mailvigil?logo=pypi&logoColor=white)](https://pypi.org/project/mailvigil/)
+[![Release](https://img.shields.io/github/v/release/ryanvmorais/mailvigil?logo=github&logoColor=white)](https://github.com/ryanvmorais/mailvigil/releases)
+![lint](https://img.shields.io/badge/lint-ruff-261230?logo=ruff&logoColor=white)
+![style](https://img.shields.io/badge/style-black-000000?logo=black&logoColor=white)
+![types](https://img.shields.io/badge/types-mypy%20strict-2A6DB2)
+![license](https://img.shields.io/badge/license-Apache%202.0-blue?logo=apache&logoColor=white)
 
 **MailVigil is an offline, zero-dependency DMARC report analyzer: a command-line tool that reads
 the aggregate reports (RUA) your mail providers send you and tells you, in plain language, who is
