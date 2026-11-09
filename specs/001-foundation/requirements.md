@@ -1,6 +1,6 @@
 ---
 feature: Foundation — package skeleton, local quality gate, CI and supply-chain hygiene
-status: approved
+status: done
 date: 2026-10-27
 related: []
 origin: conception
@@ -223,7 +223,9 @@ and a US$ 0 budget (CI stops when the minutes run out). That shapes several requ
 4. **`astral-sh/setup-uv` pinned to v10.3.0** at the start: v10.3.2 was inside the 7-day cooldown.
 5. **CI on pull requests and by hand only**, because of the Free plan's minute budget.
 6. **The first CI run is the acceptance test of RF-03 to RF-06.** Until the workflows pass on
-   GitHub, those requirements are verified only by running the same steps locally.
+   GitHub, those requirements are verified only by running the same steps locally. Verified on
+   2026-10-27: the four workflows passed on PR #3 (run 40602354923), and the `Package` guard and
+   the weekly `pip-audit` were exercised on GitHub the same day.
 
 ## Tests
 

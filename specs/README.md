@@ -48,14 +48,14 @@ file says where the spec is.
 
 ## Roadmap
 
-Delivery is the milestone of the build (`v0.x`), as in the README. No milestone was published: the
+Delivery is the milestone of the build (`v0.x`), as recorded in this table. No milestone was published: the
 first release is `1.0.0` and contains `v0.1` to `v0.9`; `v0.10` came with `1.6.0`. `v0.9`
 (hardening before the release) has no spec of its own: it amends 002, 004, 005, 006 and 009. A
 spec still to be built has no milestone yet (`—`).
 
 | Spec | Scope | Delivery | Status |
 |---|---|---|---|
-| [`001-foundation`](001-foundation/) | package skeleton, `mailvigil --version`, the local quality gate, CI, supply-chain hygiene | `v0.1` | **in progress** |
+| [`001-foundation`](001-foundation/) | package skeleton, `mailvigil --version`, the local quality gate, CI, supply-chain hygiene | `v0.1` | **done** |
 | [`002-report-ingestion`](002-report-ingestion/) | read folders and files (`.zip`, `.gz`, `.xml`), domain filter, the hostile-input defenses, the report record model | `v0.1` | **done** |
 | [`003-config-and-senders`](003-config-and-senders/) | TOML config with the domain and the DKIM selector → service name map, and sender identification | `v0.2` | **done** |
 | [`004-summary`](004-summary/) | per-sender and per-situation summary (ok, fragile, failing), failures highlighted, and the first command (`mailvigil summary`) | `v0.3` | **done** |
@@ -108,4 +108,4 @@ one means writing a spec that answers the reason, not adding a flag.
 > Since stage 1 of 006 the codes are no longer provisional and `--json` exists on `summary` and
 > `verdict`; the table lives in `cli_common.py` and the schema in `docs/json-schema.md`.
 
-There is no gold-standard spec yet; once `001-foundation` is `done`, use it as the format reference.
+The gold-standard spec, the format reference for a new one, is [`001-foundation`](001-foundation/).

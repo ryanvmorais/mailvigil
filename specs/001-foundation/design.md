@@ -1,6 +1,6 @@
 ---
 feature: Foundation — package skeleton, local quality gate, CI and supply-chain hygiene
-status: approved
+status: done
 date: 2026-10-27
 related:
   - 001-foundation/requirements.md

@@ -1,6 +1,6 @@
 ---
 feature: Foundation — package skeleton, local quality gate, CI and supply-chain hygiene
-status: in progress
+status: done
 date: 2026-10-27
 related:
   - 001-foundation/requirements.md
@@ -63,10 +63,12 @@ changes code unless a job fails.
   — RF-05, RNF-01
 - [x] Trigger `Weekly pip-audit` with `workflow_dispatch` and confirm it passes. Done on
   2026-10-27: run 40602805245 passed in 15 s. — RF-06, ADR-4
-- [ ] Confirm Dependabot is active (Insights → Dependency graph → Dependabot, or its first Sunday
+- [x] Confirm Dependabot is active (Insights → Dependency graph → Dependabot, or its first Sunday
   PRs) for `uv` and `github-actions`, with the 7-day cooldown and the grouping. The version-update
-  runs for `uv` and `github-actions` already succeeded on 2026-10-27; the cooldown and the grouping
-  show on the first Sunday PRs (2026-11-01). — RF-06, ADR-3
-- [ ] Mark the spec `done`, update the roadmap row in `specs/README.md`, and record the first green
+  runs for `uv` and `github-actions` already succeeded on 2026-10-27; the first Sunday PRs
+  (2026-11-01) came grouped (#163 for `github-actions`, #162 for `uv`), and the cooldown is set to
+  7 days in `.github/dependabot.yml`. — RF-06, ADR-3
+- [x] Mark the spec `done`, update the roadmap row in `specs/README.md`, and record the first green
   run in "Resolved decisions" 6 of `requirements.md`. — RF-03 to RF-06
-- [ ] Quality gate. — result recorded when run: ___ (the CI run URL)
+- [x] Quality gate. — result recorded when run: CI on `main` passed on 2026-11-08 (run
+  [42481736362](https://github.com/ryanvmorais/mailvigil/actions/runs/42481736362)).
