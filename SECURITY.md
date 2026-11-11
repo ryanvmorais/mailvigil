@@ -12,7 +12,7 @@ Only the latest release receives security fixes. A fix comes out as a patch rele
 ## Reporting a Vulnerability
 
 Please report security issues in MailVigil itself **privately**, through GitHub Security
-Advisories: open the repository's **Security** tab and choose **Report a vulnerability**.
+Advisories: open the repository's **Security and quality** tab and choose **Report a vulnerability**.
 Do not open a public issue or pull request for it.
 
 Include what is needed to reproduce it: the MailVigil version (`mailvigil --version`) or commit,
