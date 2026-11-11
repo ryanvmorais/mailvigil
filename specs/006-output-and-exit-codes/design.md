@@ -44,7 +44,7 @@ src/mailvigil/
     __init__.py      #      re-exports Messages, Plural, ENGLISH, PORTUGUESE, language_by_code
     model.py         #      Plural and the frozen dataclasses of templates, grouped by area
     en.py            #      ENGLISH: today's text, moved, not rewritten
-    pt_br.py         #      PORTUGUESE: ASCII only
+    pt_br.py         #      PORTUGUESE: ASCII only (superseded by ADR-9)
   render.py          # CHANGED  takes a Messages (default ENGLISH); words from it, layout stays
   render_verdict.py  # CHANGED  same
   cli.py             # CHANGED  --json, --lang, the exit-code table without "provisional"
@@ -156,7 +156,7 @@ language (RNF-05).
 
 - `ENGLISH` holds today's sentences, moved verbatim, so the 004 and 005 renderer tests pass
   untouched (RNF-02). `PORTUGUESE` is written after the inventory, ASCII only (Resolved decision 4)
-  and checked by a test that encodes every template to ASCII.
+  and checked by a test that encodes every template to ASCII (both superseded by ADR-9).
 - `language_by_code(code) -> Messages` maps the two accepted codes. The CLI accepts the code in any
   case (`pt-br` and `pt-BR`) and rejects anything else as a usage error (RF-07).
 - Pluralization is `Plural.of`: Portuguese uses the singular for exactly 1, as English does, so one
@@ -465,8 +465,8 @@ is the norm for both ends, a pipe included.
 - **Schema page:** the example is extracted and compared with the real output; the set of keys is
   compared with the documented list.
 - **Catalog:** both languages construct (no missing field); every enum-keyed mapping covers its
-  enum; every template encodes to ASCII; both have the same placeholders per field; no template is
-  empty.
+  enum; every template encodes to ASCII (superseded by ADR-9); both have the same placeholders per
+  field; no template is empty.
 - **Renderers in both languages:** each answer's title, the answer word and the section order; every
   line within 80 columns on the stress inputs; the same numbers in both; the English output
   byte-equal to the moved one (the unedited suites).

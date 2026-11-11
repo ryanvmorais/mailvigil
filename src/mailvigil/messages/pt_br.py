@@ -60,8 +60,8 @@ _COMMON = CommonMessages(
 # Summary
 # ---------------------------------------------------------------------------
 
-# O que o ``summary`` diz, no mesmo molde de ``en.py``; o bloco "fora" e comum a mensagem de
-# nenhum relatório.
+# What ``summary`` says, in the same mould as ``en.py``; the "fora" block is shared with the
+# no-reports message.
 _SUMMARY = SummaryMessages(
     title="Resumo do MailVigil para {domain}",
     key_config="config",
@@ -136,7 +136,7 @@ _SUMMARY = SummaryMessages(
 # Verdict
 # ---------------------------------------------------------------------------
 
-# O que o ``verdict`` diz, no mesmo molde de ``en.py``.
+# What ``verdict`` says, in the same mould as ``en.py``.
 _VERDICT = VerdictMessages(
     title="Veredito do MailVigil para {domain}",
     enforcing="já em p=reject: {words}",
@@ -303,11 +303,11 @@ _REFUSALS = RefusalMessages(
 # Fetch
 # ---------------------------------------------------------------------------
 
-# Muitos planos gratuitos de e-mail não têm IMAP, e um provedor que o desligou responde como uma
-# senha errada ou como um servidor fora do ar; as duas frases que parecem isso dizem o que fazer.
+# Many free mail plans have no IMAP, and a provider that has it off answers like a bad login or a
+# server that is down; the two phrases that look like that say what to do.
 _IMAP_HINT = "; seu provedor precisa liberar o IMAP, senão baixe os relatórios à mão e use summary"
 
-# O que o fetch diz, no mesmo molde de en.py.
+# What ``fetch`` prints, in the same mould as ``en.py``.
 _FETCH = FetchMessages(
     title="Mensagens de relatório baixadas da caixa de e-mail.",
     key_matched="Encontradas:",
@@ -350,7 +350,7 @@ _FETCH = FetchMessages(
 # HTML
 # ---------------------------------------------------------------------------
 
-# O que so o relatório HTML diz; o resto da página le as areas acima.
+# What only the HTML report says; the rest of the page reads the areas above.
 _HTML = HtmlMessages(
     lang="pt-BR",
     page_title="Relatório DMARC de {domain}",
