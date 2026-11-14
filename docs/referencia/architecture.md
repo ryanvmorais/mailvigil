@@ -55,6 +55,8 @@ src/mailvigil/
   summary.py         # summarize(result, config) → frozen Summary: rows per sender, failing sources, period,
                      # policy, what was left out (spec 004), the messages per day (`DayCounts`, spec 008,
                      # internal: not in `--json`), what each reporter sent (`ReporterActivity`, internal),
+                     # the five measures of the rules without each reporter (`WithoutReporter`, spec 011,
+                     # internal),
                      # the SPF domains that passed on a row not recognized (`spf_domains`, ADR-8);
                      # a day is covered when the merged report periods cover 12 h of it; never imports render
   render.py          # render_summary(summary, config_source, messages) → 80-column text;

@@ -11,6 +11,7 @@ which is already sanitized.
 
 from __future__ import annotations
 
+from bisect import bisect_left
 from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -199,6 +200,30 @@ class ReporterActivity:
 
 
 @dataclass(frozen=True, slots=True)
+class WithoutReporter:
+    """
+    The five measures of the rules as they would be without one organization's reports (spec 011).
+
+    Attributes:
+        name (str): The organization, as the reports gave it (already cleaned).
+        messages (int): Its own messages, so the note can give its share.
+        days_spanned (int): The days the other reports span; 0 when there are none.
+        days_with_reports (int): The days the other reports cover (``MIN_COVERED_SECONDS``).
+        total (int): The messages of the other reports.
+        recognized_failing (int): Their failing messages under a recognized sender.
+        unrecognized_failing (int): Their other failing messages.
+    """
+
+    name: str
+    messages: int
+    days_spanned: int
+    days_with_reports: int
+    total: int
+    recognized_failing: int
+    unrecognized_failing: int
+
+
+@dataclass(frozen=True, slots=True)
 class Summary:
     """
     Everything the reports of one domain say, added up.
@@ -234,6 +259,10 @@ class Summary:
             ``period.days_with_reports`` is counted from. Default: none.
         reporter_activity (tuple[ReporterActivity, ...]): One entry per reporting organization, the
             one with most messages first. Default: none.
+        without_reporter (tuple[WithoutReporter, ...]): One entry per reporting organization, in
+            the order of ``reporter_activity``: what the rules of the verdict would measure without
+            its reports (spec 011); internal, the ``--json`` documents do not carry it. Default:
+            none.
     """
 
     domain: str
@@ -257,6 +286,7 @@ class Summary:
     days: tuple[DayCounts, ...] = ()
     covered: tuple[tuple[date, date], ...] = ()
     reporter_activity: tuple[ReporterActivity, ...] = ()
+    without_reporter: tuple[WithoutReporter, ...] = ()
 
 
 # ---------------------------------------------------------------------------
@@ -400,6 +430,48 @@ class _Source:
         self.override_reasons: set[str] = set()
 
 
+class _Reporters:
+    """What each reporting organization sent while the reports are being added up (spec 011)."""
+
+    __slots__ = ("failing", "first_begin", "known_failing", "last_day", "messages")
+
+    def __init__(self) -> None:
+        """Start with no organization."""
+        self.messages: Counter[str] = Counter()
+        self.known_failing: Counter[str] = Counter()
+        self.failing: Counter[str] = Counter()
+        self.first_begin: dict[str, datetime] = {}
+        self.last_day: dict[str, date] = {}
+
+    def add_report(self, report: Report) -> None:
+        """
+        Widen the bounds of the organization of one report.
+
+        Args:
+            report (Report): The report.
+        """
+        name = report.reporter
+        last = _days_touched(report)[1]
+        self.first_begin[name] = min(report.begin, self.first_begin.get(name, report.begin))
+        self.last_day[name] = max(last, self.last_day.get(name, last))
+
+    def add_record(self, name: str, count: int, known: bool, failing: bool) -> None:
+        """
+        Count the messages of one record for its organization.
+
+        Args:
+            name (str): The organization of the report.
+            count (int): The messages of the record, more than zero.
+            known (bool): Whether the record came from a recognized sender.
+            failing (bool): Whether neither DKIM nor SPF passed.
+        """
+        self.messages[name] += count
+        if failing:
+            self.failing[name] += count
+            if known:
+                self.known_failing[name] += count
+
+
 def _owner_spf_domains(record: Record, domain: str) -> set[str]:
     """
     Collect the SPF domains that passed under the owner's domain: the ones ``[spf]`` could name.
@@ -461,7 +533,114 @@ def _days_touched(report: Report) -> tuple[date, date]:
     return first, (report.end - timedelta(microseconds=1)).date()
 
 
-def _covered(reports: tuple[Report, ...]) -> tuple[tuple[date, date], ...]:
+def _merged(reports: Iterable[Report]) -> list[tuple[datetime, datetime]]:
+    """
+    Merge the periods of the reports in time, so that overlaps are not added twice.
+
+    Args:
+        reports (Iterable[Report]): The reports.
+
+    Returns:
+        list[tuple[datetime, datetime]]: The ``[begin, end)`` spans, ordered, none touching the
+            next; a report of zero length covers nothing and gives no span.
+    """
+    spans = sorted((report.begin, report.end) for report in reports if report.end > report.begin)
+    merged: list[tuple[datetime, datetime]] = []
+    for begin, end in spans:
+        if merged and begin <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+        else:
+            merged.append((begin, end))
+    return merged
+
+
+def _on_days(
+    begin: datetime, end: datetime
+) -> tuple[tuple[tuple[date, int], ...], tuple[date, date] | None]:
+    """
+    Split a span of time by UTC day: the seconds on its end days and the whole days between.
+
+    Only the first and the last day of a span can be partly covered; the days between are covered
+    whole, so they are one range and not a loop over the length of the span (RNF-09). The coverage
+    of the run and the time one organization covers alone are both split here, so they cannot
+    disagree about a day (spec 011, ADR-3).
+
+    Args:
+        begin (datetime): Start of the span, UTC.
+        end (datetime): End of the span, exclusive, after ``begin``.
+
+    Returns:
+        tuple[tuple[tuple[date, int], ...], tuple[date, date] | None]: The ``(day, seconds)`` of
+            the first and the last day (one pair when the span stays in one day), and the
+            ``[first, last]`` range of the whole days between them, ``None`` when there is none.
+    """
+    first = begin.date()
+    last = (end - timedelta(microseconds=1)).date()
+    if first == last:
+        return ((first, int((end - begin).total_seconds())),), None
+    next_midnight = datetime.combine(first + timedelta(days=1), time.min, tzinfo=UTC)
+    last_midnight = datetime.combine(last, time.min, tzinfo=UTC)
+    ends = (
+        (first, int((next_midnight - begin).total_seconds())),
+        (last, int((end - last_midnight).total_seconds())),
+    )
+    if (last - first).days > 1:
+        return ends, (first + timedelta(days=1), last - timedelta(days=1))
+    return ends, None
+
+
+def _day_seconds(
+    merged: list[tuple[datetime, datetime]],
+) -> tuple[Counter[date], list[tuple[date, date]]]:
+    """
+    Read the seconds the merged spans cover on each day they cover only in part.
+
+    Args:
+        merged (list[tuple[datetime, datetime]]): The spans from ``_merged``.
+
+    Returns:
+        tuple[Counter[date], list[tuple[date, date]]]: The seconds per end day of a span, added
+            when several spans share a day, and the ranges of the days covered whole.
+    """
+    seconds: Counter[date] = Counter()
+    whole: list[tuple[date, date]] = []
+    for begin, end in merged:
+        ends, inner = _on_days(begin, end)
+        for day, covered in ends:
+            seconds[day] += covered
+        if inner is not None:
+            whole.append(inner)
+    return seconds, whole
+
+
+def _intervals(
+    seconds: Counter[date], whole: list[tuple[date, date]]
+) -> tuple[tuple[date, date], ...]:
+    """
+    Join the days covered enough into ``[first, last]`` intervals.
+
+    Args:
+        seconds (Counter[date]): The seconds per day covered in part, from ``_day_seconds``.
+        whole (list[tuple[date, date]]): The ranges of the days covered whole.
+
+    Returns:
+        tuple[tuple[date, date], ...]: The intervals, ordered, with at least one day between two
+            of them. Days that follow each other are one interval, so a gap is exactly a hole.
+    """
+    ranges = [*whole]
+    ranges.extend((day, day) for day, covered in seconds.items() if covered >= MIN_COVERED_SECONDS)
+    intervals: list[tuple[date, date]] = []
+    for first, last in sorted(ranges):
+        if intervals and (first - intervals[-1][1]).days <= 1:
+            intervals[-1] = (intervals[-1][0], max(intervals[-1][1], last))
+        else:
+            intervals.append((first, last))
+    return tuple(intervals)
+
+
+def _covered(
+    merged: list[tuple[datetime, datetime]],
+) -> tuple[tuple[tuple[date, date], ...], Counter[date]]:
     """
     Find the UTC days the reports cover, as ``[first, last]`` intervals.
 
@@ -476,48 +655,17 @@ def _covered(reports: tuple[Report, ...]) -> tuple[tuple[date, date], ...]:
     about which days have a report (spec 008, ADR-3).
 
     Args:
-        reports (tuple[Report, ...]): The reports kept.
+        merged (list[tuple[datetime, datetime]]): The merged periods of the reports, from
+            ``_merged``.
 
     Returns:
-        tuple[tuple[date, date], ...]: The intervals, ordered, with at least one day between two of
-            them; empty without reports or when no day is covered enough.
+        tuple[tuple[tuple[date, date], ...], Counter[date]]: The intervals, ordered, with at least
+            one day between two of them (empty without reports or when no day is covered enough),
+            and the seconds of the days covered in part, which the time one organization covers
+            alone is taken from (spec 011, ADR-3), so the two cannot disagree about a day.
     """
-    # 1. Merge the periods in time. A report of zero length covers nothing.
-    spans = sorted((report.begin, report.end) for report in reports if report.end > report.begin)
-    merged: list[tuple[datetime, datetime]] = []
-    for begin, end in spans:
-        if merged and begin <= merged[-1][1]:
-            merged[-1] = (merged[-1][0], max(merged[-1][1], end))
-        else:
-            merged.append((begin, end))
-
-    # 2. Only the first and the last day of a merged period can be partly covered; the days between
-    #    are covered whole, so they are one range and not a loop over the length of the period
-    #    (RNF-09). Several periods can share a day, so the partial seconds are added per day.
-    seconds: Counter[date] = Counter()
-    ranges: list[tuple[date, date]] = []
-    for begin, end in merged:
-        first = begin.date()
-        last = (end - timedelta(microseconds=1)).date()
-        if first == last:
-            seconds[first] += int((end - begin).total_seconds())
-            continue
-        next_midnight = datetime.combine(first + timedelta(days=1), time.min, tzinfo=UTC)
-        last_midnight = datetime.combine(last, time.min, tzinfo=UTC)
-        seconds[first] += int((next_midnight - begin).total_seconds())
-        seconds[last] += int((end - last_midnight).total_seconds())
-        if (last - first).days > 1:
-            ranges.append((first + timedelta(days=1), last - timedelta(days=1)))
-    ranges.extend((day, day) for day, covered in seconds.items() if covered >= MIN_COVERED_SECONDS)
-
-    # 3. Days that follow each other are one interval, so a gap is exactly a hole in the list.
-    intervals: list[tuple[date, date]] = []
-    for first, last in sorted(ranges):
-        if intervals and (first - intervals[-1][1]).days <= 1:
-            intervals[-1] = (intervals[-1][0], max(intervals[-1][1], last))
-        else:
-            intervals.append((first, last))
-    return tuple(intervals)
+    seconds, whole = _day_seconds(merged)
+    return _intervals(seconds, whole), seconds
 
 
 def _period(reports: tuple[Report, ...], covered: tuple[tuple[date, date], ...]) -> Period | None:
@@ -566,6 +714,168 @@ def _activity(reports: tuple[Report, ...]) -> tuple[ReporterActivity, ...]:
         ReporterActivity(name, messages[name], last_end[name])
         for name in sorted(messages, key=lambda name: (-messages[name], name))
     )
+
+
+# ---------------------------------------------------------------------------
+# Without each organization (spec 011, ADR-2, ADR-3)
+# ---------------------------------------------------------------------------
+
+
+def _exclusive(reports: tuple[Report, ...]) -> dict[str, list[tuple[datetime, datetime]]]:
+    """
+    Find the stretches of time where exactly one organization has a report open (ADR-3).
+
+    One sweep over the start and the end of every period, with a count of the reports each
+    organization has open: two events per report, so the work follows the reports and not the
+    distance between them. A report of zero length covers nothing and gives no event.
+
+    Args:
+        reports (tuple[Report, ...]): The reports kept.
+
+    Returns:
+        dict[str, list[tuple[datetime, datetime]]]: Per organization that covers some time alone,
+            its ``[begin, end)`` stretches, ordered and never overlapping.
+    """
+    events = sorted(
+        (
+            event
+            for report in reports
+            if report.end > report.begin
+            for event in ((report.begin, 1, report.reporter), (report.end, -1, report.reporter))
+        ),
+        key=lambda event: event[0],
+    )
+    open_reports: Counter[str] = Counter()
+    active: set[str] = set()
+    stretches: dict[str, list[tuple[datetime, datetime]]] = {}
+    previous: datetime | None = None
+    index = 0
+    while index < len(events):
+        moment = events[index][0]
+        # why: the time since the last event belongs to whoever was open before this one
+        if previous is not None and len(active) == 1:
+            (only,) = active
+            stretches.setdefault(only, []).append((previous, moment))
+        # Every event at one moment is applied before the next stretch is measured, so a report
+        # that ends where another begins leaves no gap and no stretch of zero length.
+        while index < len(events) and events[index][0] == moment:
+            _moment, delta, name = events[index]
+            open_reports[name] += delta
+            if open_reports[name]:
+                active.add(name)
+            else:
+                active.discard(name)
+            index += 1
+        previous = moment
+    return stretches
+
+
+def _lost_days(
+    stretches: list[tuple[datetime, datetime]],
+    spans: tuple[list[date], list[date]],
+    seconds: Counter[date],
+) -> int:
+    """
+    Count the covered days a run would lose without the time one organization covers alone.
+
+    A whole day inside a stretch is lost (no one else covers any of it). A day where a stretch
+    begins or ends keeps the seconds the merged periods give it today minus the seconds covered
+    alone, and is lost when it was covered enough and the rest is not.
+
+    Args:
+        stretches (list[tuple[datetime, datetime]]): The time the organization covers alone.
+        spans (tuple[list[date], list[date]]): The first and the last day of each merged period
+            of every report, in the order of ``_merged``.
+        seconds (Counter[date]): The seconds of the days the merged periods cover in part.
+
+    Returns:
+        int: The days to take from ``days_with_reports``.
+    """
+    firsts, lasts = spans
+    lost = 0
+    alone: Counter[date] = Counter()
+    for begin, end in stretches:
+        ends, inner = _on_days(begin, end)
+        for day, covered in ends:
+            alone[day] += covered
+        if inner is not None:
+            lost += (inner[1] - inner[0]).days + 1
+    for day, covered in alone.items():
+        # why: a day strictly between the end days of a merged period is covered whole today,
+        # and the merged periods never overlap, so the last one beginning before it is the one
+        index = bisect_left(firsts, day) - 1
+        today = 24 * 3600 if index >= 0 and day < lasts[index] else seconds[day]
+        if today >= MIN_COVERED_SECONDS > today - covered:
+            lost += 1
+    return lost
+
+
+def _without_reporter(
+    reports: tuple[Report, ...],
+    activity: tuple[ReporterActivity, ...],
+    tallies: _Reporters,
+    totals: Counts,
+    coverage: tuple[Period | None, list[tuple[datetime, datetime]], Counter[date]],
+) -> tuple[WithoutReporter, ...]:
+    """
+    Measure the run without each organization from its tallies and one sweep (ADR-2, ADR-3).
+
+    Removing reports can only remove covered time, and the time it removes is exactly the time no
+    other organization covered. The bounds of the period without an organization are the first of
+    the others in two lists sorted once. The work is a sort and a sweep over the reports, never a
+    summary per organization.
+
+    Args:
+        reports (tuple[Report, ...]): The reports kept.
+        activity (tuple[ReporterActivity, ...]): The organizations, in the order of the result.
+        tallies (_Reporters): What each organization sent, from the loop of ``summarize``.
+        totals (Counts): All the messages of the run per situation.
+        coverage (tuple[Period | None, list[tuple[datetime, datetime]], Counter[date]]): The
+            period of the run (``None`` only without reports), its merged periods and the seconds
+            of the days they cover in part, as ``summarize`` computed them for the run.
+
+    Returns:
+        tuple[WithoutReporter, ...]: One entry per organization, in the order of ``activity``.
+    """
+    period, merged, seconds = coverage
+    if period is None:
+        return ()
+    spans = (
+        [begin.date() for begin, _end in merged],
+        [(end - timedelta(microseconds=1)).date() for _begin, end in merged],
+    )
+    stretches = _exclusive(reports)
+    # why: the bound of the others is the first of each list that is not the organization itself,
+    # so two lists sorted once serve every organization
+    by_begin = sorted(tallies.first_begin, key=lambda name: (tallies.first_begin[name], name))[:2]
+    by_last = sorted(tallies.last_day, key=lambda name: (-tallies.last_day[name].toordinal(), name))
+    by_last = by_last[:2]
+    known_failing = sum(tallies.known_failing.values())
+
+    entries = []
+    for entry in activity:
+        name = entry.name
+        first_other = next((other for other in by_begin if other != name), None)
+        last_other = next((other for other in by_last if other != name), None)
+        if first_other is None or last_other is None:
+            days, with_reports = 0, 0
+        else:
+            days = (tallies.last_day[last_other] - tallies.first_begin[first_other].date()).days + 1
+            lost = _lost_days(stretches.get(name, []), spans, seconds)
+            with_reports = period.days_with_reports - lost
+        known = known_failing - tallies.known_failing[name]
+        entries.append(
+            WithoutReporter(
+                name=name,
+                messages=tallies.messages[name],
+                days_spanned=days,
+                days_with_reports=with_reports,
+                total=totals.total - tallies.messages[name],
+                recognized_failing=known,
+                unrecognized_failing=totals.failing - tallies.failing[name] - known,
+            )
+        )
+    return tuple(entries)
 
 
 def _policy(reports: tuple[Report, ...]) -> tuple[PolicyPublished | None, tuple[str, ...]]:
@@ -619,8 +929,10 @@ def summarize(result: IngestionResult, config: Config) -> Summary:
     recognized = 0
     day_reports: Counter[date] = Counter()
     day_tallies: dict[date, _Tally] = {}
+    reporters = _Reporters()
 
     for report in result.reports:
+        reporters.add_report(report)
         # 0. The messages of a report go to the day its period begins (spec 008, ADR-3).
         begin_day = report.begin.date()
         day_reports[begin_day] += 1
@@ -642,6 +954,7 @@ def summarize(result: IngestionResult, config: Config) -> Summary:
             row.tally.add(dkim_ok, spf_ok, record.count)
             totals.add(dkim_ok, spf_ok, record.count)
             day_tally.add(dkim_ok, spf_ok, record.count)
+            reporters.add_record(report.reporter, record.count, known, not (dkim_ok or spf_ok))
             spf_domains = set() if known else _owner_spf_domains(record, config.domain)
             if known:
                 recognized += record.count
@@ -710,7 +1023,11 @@ def summarize(result: IngestionResult, config: Config) -> Summary:
 
     policy, earlier_p = _policy(result.reports)
     reasons = Counter(file.reason for file in result.skipped)
-    covered = _covered(result.reports)
+    merged = _merged(result.reports)
+    covered, seconds = _covered(merged)
+    period = _period(result.reports, covered)
+    activity = _activity(result.reports)
+    total_counts = totals.freeze()
 
     return Summary(
         domain=config.domain,
@@ -719,10 +1036,10 @@ def summarize(result: IngestionResult, config: Config) -> Summary:
         ip_ranges_configured=len(config.ranges),
         reports=len(result.reports),
         reporters=len({report.reporter for report in result.reports}),
-        period=_period(result.reports, covered),
+        period=period,
         policy=policy,
         earlier_p=earlier_p,
-        totals=totals.freeze(),
+        totals=total_counts,
         recognized_messages=recognized,
         senders=senders,
         failing=failing,
@@ -738,5 +1055,8 @@ def summarize(result: IngestionResult, config: Config) -> Summary:
             for day in sorted(day_tallies)
         ),
         covered=covered,
-        reporter_activity=_activity(result.reports),
+        reporter_activity=activity,
+        without_reporter=_without_reporter(
+            result.reports, activity, reporters, total_counts, (period, merged, seconds)
+        ),
     )

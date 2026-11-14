@@ -11,8 +11,9 @@ from __future__ import annotations
 
 import dataclasses
 import itertools
+import random
 from dataclasses import FrozenInstanceError
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from enum import StrEnum
 from ipaddress import ip_network
 from pathlib import Path
@@ -41,6 +42,7 @@ from mailvigil.summary import (
     SenderRow,
     Situation,
     Summary,
+    WithoutReporter,
     classify,
     summarize,
 )
@@ -188,8 +190,9 @@ def test_counts_derive_fragile_and_total() -> None:
         DayCounts(_BEGIN.date()),
         Period(_BEGIN, _END, _BEGIN.date(), _END.date(), 1, 1),
         Summary("example.com"),
+        WithoutReporter("reporter.example.net", 0, 0, 0, 0, 0, 0),
     ],
-    ids=["Counts", "SenderRow", "FailingSource", "DayCounts", "Period", "Summary"],
+    ids=["Counts", "SenderRow", "FailingSource", "DayCounts", "Period", "Summary", "Without"],
 )
 def test_every_part_of_the_model_is_frozen(instance: object) -> None:
     """Assigning to a field of the model raises, so a summary cannot change under a reader."""
@@ -226,6 +229,7 @@ def test_summary_has_the_fields_of_the_design_and_no_display_text() -> None:
         "days",
         "covered",
         "reporter_activity",
+        "without_reporter",
     }
     assert [name for name, kind in fields.items() if kind == "str"] == ["domain"]
 
@@ -243,6 +247,7 @@ def test_every_collection_of_a_summary_is_a_tuple() -> None:
         "days",
         "covered",
         "reporter_activity",
+        "without_reporter",
     ):
         assert isinstance(getattr(summary, name), tuple)
     assert isinstance(summary.senders[0].selectors, tuple)
@@ -1183,3 +1188,265 @@ def test_the_summary_counts_what_the_configuration_maps() -> None:
         summary.spf_domains_configured,
         summary.ip_ranges_configured,
     ) == (1, 2, 1)
+
+
+# ---------------------------------------------------------------------------
+# Without each organization (spec 011, RF-01, ADR-2, ADR-3)
+# ---------------------------------------------------------------------------
+
+# Three invented reporting organizations, so no real one is named (RNF-07).
+_A = "a.example.net"
+_B = "b.example.org"
+_C = "c.example.net"
+
+
+def by(reporter: str, begin: datetime, end: datetime, report_id: str, *records: Record) -> Report:
+    """
+    Build a report of ``example.com`` from one organization, for a period, with these records.
+
+    Args:
+        reporter (str): The reporting organization.
+        begin (datetime): Start of the period.
+        end (datetime): End of the period.
+        report_id (str): The id the reporter gave it.
+        *records (Record): The rows, in document order.
+
+    Returns:
+        Report: The report.
+    """
+    return dataclasses.replace(dated(begin, end, report_id, reporter), records=records)
+
+
+def oracle(reports: tuple[Report, ...]) -> tuple[WithoutReporter, ...]:
+    """
+    Measure the run without each organization the simple way: summarize again without it (ADR-2).
+
+    Args:
+        reports (tuple[Report, ...]): The reports of the run.
+
+    Returns:
+        tuple[WithoutReporter, ...]: One entry per organization, in the order of
+            ``reporter_activity``, with the five measures read from the summary of the others.
+    """
+    entries = []
+    for activity in summary_of_reports(*reports).reporter_activity:
+        others = tuple(report for report in reports if report.reporter != activity.name)
+        rest = summary_of_reports(*others)
+        recognized = sum(s.messages for s in rest.failing if s.outcome is Outcome.KNOWN)
+        entries.append(
+            WithoutReporter(
+                name=activity.name,
+                messages=activity.messages,
+                days_spanned=rest.period.days_spanned if rest.period else 0,
+                days_with_reports=rest.period.days_with_reports if rest.period else 0,
+                total=rest.totals.total,
+                recognized_failing=recognized,
+                unrecognized_failing=rest.totals.failing - recognized,
+            )
+        )
+    return tuple(entries)
+
+
+# The three kinds of record the rules tell apart: a failure under a recognized sender (rule 4), a
+# failure from an unknown address (rule 5) and messages that pass (only the volume, rule 3).
+_KNOWN_FAIL = failing_record(count=3, dkim=(signed(),))
+_UNKNOWN_FAIL = failing_record(ip="203.0.113.9", count=2)
+_OK = record(count=5)
+
+# The report sets of the design (Tests), each checked entry by entry against the oracle.
+_REPORT_SETS: dict[str, tuple[Report, ...]] = {
+    "one organization": (
+        by(_A, at(1), at(2), "1", _OK, _KNOWN_FAIL),
+        by(_A, at(2), at(3), "2", _UNKNOWN_FAIL),
+    ),
+    "two that overlap": (
+        by(_A, at(1), at(3, 12), "1", _OK),
+        by(_B, at(2, 6), at(4), "2", _OK, _UNKNOWN_FAIL),
+    ),
+    "two that alternate days": tuple(
+        by(_A if day % 2 else _B, at(day), at(day + 1), str(day), _OK) for day in range(1, 9)
+    ),
+    "a day covered half by each": (
+        by(_A, at(1), at(1, 12), "1", _OK),
+        by(_B, at(1, 12), at(2), "2", _OK),
+        by(_A, at(2), at(3), "3", _OK),
+    ),
+    "periods that touch at midnight": (
+        by(_A, at(1), at(3), "1", _OK),
+        by(_B, at(3), at(5), "2", _OK),
+        by(_C, at(5), at(6), "3", _OK),
+    ),
+    "a zero-length report": (
+        by(_A, at(1), at(3), "1", _OK),
+        by(_B, at(9, 6), at(9, 6), "2", _OK),
+        by(_B, at(2), at(2), "3"),
+    ),
+    "records with count 0": (
+        by(_A, at(1), at(2), "1", record(count=0), failing_record(count=0)),
+        by(_B, at(1), at(3), "2", _OK),
+    ),
+    "failures under a known sender and under an unknown one": (
+        by(_A, at(1), at(2), "1", _KNOWN_FAIL, _OK),
+        by(_B, at(1), at(2), "2", _UNKNOWN_FAIL, _KNOWN_FAIL),
+        by(_C, at(2), at(3), "3", _UNKNOWN_FAIL),
+    ),
+    "reports that do not start at midnight": (
+        by(_A, at(1, 6), at(2, 6), "1", _OK),
+        by(_B, at(2, 6), at(3, 6), "2", _OK),
+        by(_A, at(3, 6), at(4, 6), "3", _OK),
+        by(_C, at(2, 18), at(3, 2), "4", _OK),
+    ),
+}
+
+
+@pytest.mark.parametrize("reports", list(_REPORT_SETS.values()), ids=list(_REPORT_SETS))
+def test_the_measures_without_each_organization_equal_a_summary_of_the_others(
+    reports: tuple[Report, ...],
+) -> None:
+    """Entry by entry, in the order of ``reporter_activity``, as summarizing again would say."""
+    summary = summary_of_reports(*reports)
+
+    assert summary.without_reporter == oracle(reports)
+    assert [e.name for e in summary.without_reporter] == [a.name for a in summary.reporter_activity]
+
+
+def random_reports(seed: int) -> tuple[Report, ...]:
+    """
+    Build a run of short and long, overlapping and touching reports from a few organizations.
+
+    Args:
+        seed (int): The seed, so each run of the test builds the same reports.
+
+    Returns:
+        tuple[Report, ...]: Between one and twelve reports from up to four organizations, with
+            periods on the hour inside two weeks and some records failing.
+    """
+    # why: a seeded generator so each run builds the same periods; nothing here is a secret
+    rng = random.Random(seed)  # noqa: S311
+    reports = []
+    for index in range(rng.randint(1, 12)):
+        begin = at(1) + timedelta(hours=rng.randrange(14 * 24))
+        end = begin + timedelta(hours=rng.choice((0, 1, 6, 11, 12, 13, 24, 25, 48, 100)))
+        records = rng.sample((_OK, _KNOWN_FAIL, _UNKNOWN_FAIL, record(count=0)), rng.randint(0, 3))
+        reporter = rng.choice((_A, _B, _C, "d.example.org"))
+        reports.append(by(reporter, begin, end, str(index), *records))
+    return tuple(reports)
+
+
+@pytest.mark.parametrize("seed", range(200))
+def test_the_measures_without_each_organization_agree_with_the_oracle_on_random_runs(
+    seed: int,
+) -> None:
+    """The sweep and summarizing again agree on any mix of periods (ADR-3, its trade-off)."""
+    reports = random_reports(seed)
+
+    assert summary_of_reports(*reports).without_reporter == oracle(reports)
+
+
+def test_a_run_with_no_reports_has_no_entry() -> None:
+    """Nothing reported, nothing to take away."""
+    assert summary_of_reports().without_reporter == ()
+
+
+def days_without(*reports: Report) -> dict[str, tuple[int, int]]:
+    """
+    Read the days spanned and the days with a report without each organization.
+
+    Args:
+        *reports (Report): The reports of the run.
+
+    Returns:
+        dict[str, tuple[int, int]]: Per organization, ``(days_spanned, days_with_reports)``.
+    """
+    entries = summary_of_reports(*reports).without_reporter
+    return {e.name: (e.days_spanned, e.days_with_reports) for e in entries}
+
+
+def test_whole_days_only_one_organization_covers_are_lost_without_it() -> None:
+    """A covers days 1 to 10; B only 1 to 3 and 8 to 10, so days 4 to 7 are covered by A alone."""
+    reports = (
+        *(by(_A, at(day), at(day + 1), str(day)) for day in range(1, 11)),
+        by(_B, at(1), at(4), "b1"),
+        by(_B, at(8), at(11), "b2"),
+    )
+
+    assert days_without(*reports) == {_A: (10, 6), _B: (10, 10)}
+
+
+def test_hours_alone_at_each_end_of_a_day_are_taken_from_what_the_day_keeps() -> None:
+    """Day 5: B covers 08:00 to 19:00 (11 h), A the 13 h around it; each alone keeps its own."""
+    reports = (
+        by(_A, at(5), at(5, 8), "1"),
+        by(_B, at(5, 8), at(5, 19), "2"),
+        by(_A, at(5, 19), at(6), "3"),
+    )
+
+    assert summary_of_reports(*reports).period == Period(
+        at(5), at(6), date(2026, 10, 5), date(2026, 10, 5), 1, 1
+    )
+    assert days_without(*reports) == {_A: (1, 0), _B: (1, 1)}
+
+
+def test_hours_alone_inside_a_day_the_others_cover_enough_lose_nothing() -> None:
+    """Day 5: A alone from 06:00 to 18:00, B from midnight to 06:00 and C from 18:00 on."""
+    reports = (
+        by(_B, at(1), at(5, 6), "1"),
+        by(_A, at(5), at(6), "2"),
+        by(_C, at(5, 18), at(8), "3"),
+    )
+
+    assert days_without(*reports) == {_A: (7, 7), _B: (3, 3), _C: (5, 5)}
+
+
+def test_an_organization_that_covers_nothing_alone_changes_no_day() -> None:
+    """B reports inside the period of A, so without B the days are the same as today."""
+    reports = (by(_A, at(1), at(5), "1"), by(_B, at(2), at(4), "2"))
+
+    assert days_without(*reports) == {_A: (2, 2), _B: (4, 4)}
+
+
+def test_the_organization_with_the_earliest_begin_moves_the_start_of_the_period() -> None:
+    """A begins at noon of day 1; without it the period starts on day 2."""
+    reports = (by(_A, at(1, 12), at(2), "1"), by(_B, at(2), at(5), "2"))
+
+    period = summary_of_reports(*reports).period
+    assert period is not None
+    assert (period.days_spanned, period.days_with_reports) == (4, 4)
+    assert days_without(*reports) == {_A: (3, 3), _B: (1, 1)}
+
+
+def test_the_organization_that_touches_the_last_day_moves_the_end_of_the_period() -> None:
+    """A touches day 4 for one hour; without it the period ends on day 3."""
+    reports = (by(_B, at(1), at(4), "1"), by(_A, at(4), at(4, 1), "2"))
+
+    period = summary_of_reports(*reports).period
+    assert period is not None
+    assert (period.days_spanned, period.days_with_reports) == (4, 3)
+    assert days_without(*reports) == {_A: (3, 3), _B: (1, 0)}
+
+
+def test_the_messages_without_an_organization_are_the_totals_minus_its_own() -> None:
+    """Its messages, known failures and other failures come out of the figures of the run."""
+    reports = (
+        by(_A, at(1), at(2), "1", _OK, _KNOWN_FAIL, _UNKNOWN_FAIL),
+        by(_B, at(1), at(2), "2", _OK, _KNOWN_FAIL),
+    )
+
+    entries = {e.name: e for e in summary_of_reports(*reports).without_reporter}
+
+    assert entries[_A] == WithoutReporter(_A, 10, 1, 1, 8, 3, 0)
+    assert entries[_B] == WithoutReporter(_B, 8, 1, 1, 10, 3, 2)
+
+
+def test_ten_thousand_organizations_give_ten_thousand_entries() -> None:
+    """A folder can hold as many organizations as reports; each still gets its entry (RNF-02)."""
+    hours = timedelta(hours=7)
+    reports = tuple(
+        by(f"org-{n}.example.net", at(1) + n * hours, at(2) + n * hours, str(n), _OK)
+        for n in range(10_000)
+    )
+
+    entries = summary_of_reports(*reports).without_reporter
+
+    assert len(entries) == 10_000
+    assert len({e.name for e in entries}) == 10_000

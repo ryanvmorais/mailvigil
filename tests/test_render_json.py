@@ -40,6 +40,7 @@ from mailvigil.summary import (
     Period,
     SenderRow,
     Summary,
+    WithoutReporter,
     summarize,
 )
 from mailvigil.verdict import Answer, Note, NoteKind, RuleId, Verdict, judge
@@ -620,6 +621,17 @@ def test_the_days_of_a_summary_do_not_reach_the_documents() -> None:
         summary_document(plain, "mailvigil.toml")
     )
     assert dumps(verdict_document(judge(dated))) == dumps(verdict_document(judge(plain)))
+
+
+def test_the_measures_without_each_organization_do_not_reach_the_summary_document() -> None:
+    """Spec 011: ``without_reporter`` is internal and the schema of 006 does not change."""
+    plain = make_summary()
+    entry = WithoutReporter("reporter.example.net", 7, 1, 1, 0, 0, 0)
+    measured = dataclasses.replace(plain, without_reporter=(entry,))
+
+    assert dumps(summary_document(measured, "mailvigil.toml")) == dumps(
+        summary_document(plain, "mailvigil.toml")
+    )
 
 
 def _report(report_id: str, day: int, ip: str, selector: str) -> Report:
