@@ -15,6 +15,7 @@ import json
 import os
 import re
 import sys
+import warnings
 from collections.abc import Callable
 from datetime import date
 from pathlib import Path
@@ -625,6 +626,25 @@ def test_a_user_that_is_not_printable_ascii_is_a_usage_error(
     assert "--user" in err
 
 
+@pytest.mark.parametrize("host", ["", " ", "mail .invalid", "mail\n.invalid"])
+def test_an_empty_or_spaced_host_is_a_usage_error(
+    host: str,
+    tmp_path: Path,
+    password_file: Path,
+    connect: _Connect,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The flag follows the rule of ``host`` in [fetch]; nothing is opened."""
+    argv = _args(tmp_path, password_file)
+    argv[argv.index("--host") + 1] = host
+
+    err = _usage_error(argv, capsys)
+
+    assert "--host" in err
+    assert "--user" not in err
+    assert connect.calls == []
+
+
 def test_the_real_connect_refuses_a_bad_user_before_any_connection(
     tmp_path: Path, password_file: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -646,6 +666,27 @@ def test_no_terminal_and_no_password_file_is_a_usage_error(
     """It does not wait for input: it says how to give the password."""
     monkeypatch.setattr(sys.stdin, "isatty", lambda: False)
     monkeypatch.setattr(getpass, "getpass", _forbidden)
+
+    err = _usage_error(_args(tmp_path, None), capsys)
+
+    assert "--password-file" in err
+    assert connect.calls == []
+
+
+def test_a_prompt_that_would_echo_the_password_is_refused(
+    tmp_path: Path,
+    connect: _Connect,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """``getpass`` warns before it falls back to a read that shows what is typed."""
+
+    def echoing(*_args: object, **_kwargs: object) -> str:
+        warnings.warn("Can not control echo on the terminal.", getpass.GetPassWarning, 2)
+        return "typed in plain sight"
+
+    monkeypatch.setattr(sys.stdin, "isatty", lambda: True)
+    monkeypatch.setattr(getpass, "getpass", echoing)
 
     err = _usage_error(_args(tmp_path, None), capsys)
 

@@ -509,6 +509,8 @@ def test_no_path_builds_an_unverified_context() -> None:
         (ConnectionRefusedError(10061, "refused"), FetchReason.HOST_UNREACHABLE),
         (OSError(113, "no route to host"), FetchReason.HOST_UNREACHABLE),
         (UnicodeError("label empty or too long"), FetchReason.HOST_UNREACHABLE),
+        # ``ssl`` on a server name it cannot use; not the user's ``ValueError``.
+        (ValueError("server_hostname cannot be an empty string"), FetchReason.HOST_UNREACHABLE),
         (TimeoutError("timed out"), FetchReason.TIMEOUT),
         (imaplib.IMAP4.error("bad greeting"), FetchReason.PROTOCOL_ERROR),
         (imaplib.IMAP4.abort("socket error: EOF"), FetchReason.PROTOCOL_ERROR),
@@ -617,6 +619,16 @@ def test_a_rejected_plain_login_is_login_failed_with_no_detail(fake_ssl: _Record
     fake_ssl.login_raises = imaplib.IMAP4.error(f"AUTHENTICATE failed: bad sénha {CANARY}".encode())
     refused = _refused(lambda: _connect(password="sénha"))
     assert refused.reason is FetchReason.LOGIN_FAILED
+    assert refused.detail == ""
+    assert fake_ssl.shutdowns == 1
+
+
+def test_a_connection_lost_during_a_plain_login_shows_no_detail(fake_ssl: _Recorder) -> None:
+    """The whole PLAIN response in base64 holds the password, yet not its base64 alone."""
+    echoed = base64.b64encode("\0reader\0sénha".encode()).decode()
+    fake_ssl.login_raises = imaplib.IMAP4.abort(f"unexpected response: b'{echoed}'")
+    refused = _refused(lambda: _connect(password="sénha"))
+    assert refused.reason is FetchReason.PROTOCOL_ERROR
     assert refused.detail == ""
     assert fake_ssl.shutdowns == 1
 
@@ -733,6 +745,7 @@ def test_the_password_is_scrubbed_in_the_forms_a_utf8_echo_takes() -> None:
     forms = [
         secret,
         secret.encode().decode("ascii", "replace"),  # the bytes of an echo, read as ASCII
+        repr(secret.encode())[2:-1],  # the bytes as imaplib quotes a line it did not expect
         base64.b64encode(secret.encode()).decode(),
     ]
     for form in forms:
@@ -1015,6 +1028,41 @@ def test_a_literal_of_exactly_the_cap_plus_one_is_accepted(
     mailbox = open_mailbox(peer, selected=True)
     assert mailbox.message(3, 100) == b"m" * 101
     assert mailbox._connection.max_literal == LITERAL_OTHER
+    mailbox.close()
+
+
+def test_a_server_that_never_stops_answering_one_command_is_cut(
+    peers: Callable[..., ScriptedPeer], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Each line is short and the run has time left; what one command may read in all is spent."""
+    monkeypatch.setattr(imap, "LITERAL_OTHER", 0)
+    monkeypatch.setattr(imap, "_COMMAND_BYTES", 1000)
+    chatter = b"* OK " + b"x" * 45 + b"\r\n"
+    peer = peers(_script((b"EXAMINE", chatter * 30)))
+    mailbox = open_mailbox(peer)
+    assert _refused(lambda: mailbox.select("INBOX")).reason is FetchReason.PROTOCOL_ERROR
+
+
+def test_two_literals_within_the_cap_but_over_the_budget_are_cut(
+    peers: Callable[..., ScriptedPeer], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(imap, "_COMMAND_BYTES", 150)
+    twice = literal_fetch(3, b"m" * 101) * 2
+    peer = peers(_script((b"BODY.PEEK", lambda tag, _: ok(tag, twice))))
+    mailbox = open_mailbox(peer, selected=True)
+    assert _refused(lambda: mailbox.message(3, 100)).reason is FetchReason.PROTOCOL_ERROR
+
+
+def test_untagged_answers_do_not_pile_up_across_commands(
+    peers: Callable[..., ScriptedPeer],
+) -> None:
+    examine = b"* 3 EXISTS\r\n* FLAGS (\\Seen)\r\n* OK [UIDVALIDITY 77] valid\r\n"
+    peer = peers(_script((b"EXAMINE", examine), (b"UID SEARCH", b"* SEARCH 1\r\n")))
+    mailbox = open_mailbox(peer)
+    mailbox.select("INBOX")
+    assert "FLAGS" in mailbox._connection.untagged_responses  # what the library keeps
+    assert mailbox.search(None).uids == (1,)
+    assert "FLAGS" not in mailbox._connection.untagged_responses
     mailbox.close()
 
 

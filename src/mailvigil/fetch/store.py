@@ -14,6 +14,7 @@ from __future__ import annotations
 import contextlib
 import hashlib
 import os
+import stat
 import tempfile
 import time
 from pathlib import Path
@@ -105,9 +106,15 @@ class Store:
             uid (int): The UID of the message.
 
         Returns:
-            bool: ``True`` when its file is there.
+            bool: ``True`` when its file is there as a regular file, not a link or a folder.
         """
-        return (self.directory / self.name(validity, uid)).is_file()
+        # ``lstat``: a link wearing a message's name is not a saved message, so it is fetched again
+        # (and ``os.replace`` swaps the link itself, never what it points at).
+        try:
+            mode = (self.directory / self.name(validity, uid)).lstat().st_mode
+        except OSError:
+            return False
+        return stat.S_ISREG(mode)
 
     def save(self, validity: int, uid: int, data: bytes) -> None:
         """
@@ -124,7 +131,8 @@ class Store:
         """
         temporary: str | None = None
         try:
-            self.directory.mkdir(parents=True, exist_ok=True)
+            # Only the owner can list what the run saves; a folder that exists keeps its mode.
+            self.directory.mkdir(mode=0o700, parents=True, exist_ok=True)
             # Same directory as the target, so ``os.replace`` stays on one volume and is atomic.
             fd, temporary = tempfile.mkstemp(
                 prefix=_PARTIAL_PREFIX, suffix=_PARTIAL_SUFFIX, dir=self.directory

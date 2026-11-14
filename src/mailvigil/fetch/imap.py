@@ -4,7 +4,8 @@ The one adapter to IMAP: ``imaplib`` and ``ssl`` are imported here and nowhere e
 ``ImapMailbox`` implements the five-method ``Mailbox`` protocol over a connection whose reads are
 bounded (spec 009, ADR-1, ADR-3): a literal the server announces over the current limit is refused
 before one byte of it is read, every read waits at most ``SOCKET_TIMEOUT`` or the time left to the
-run, and a line over ``LINE_LIMIT`` ends the run. The TLS context is built here and always verifies
+run, a line over ``LINE_LIMIT`` ends the run, and so does a command whose answer passes
+``_COMMAND_BYTES`` on top of its literal. The TLS context is built here and always verifies
 the certificate and the host name (ADR-2). The only commands the module can send are ``CAPABILITY``,
 ``LOGIN`` (or ``AUTHENTICATE PLAIN`` for a login outside ASCII, ADR-9), ``EXAMINE``,
 ``UID SEARCH``, ``UID FETCH`` and ``LOGOUT``, and the message is fetched with ``BODY.PEEK`` so it is
@@ -59,6 +60,10 @@ _SUBJECT = '"Report Domain:"'
 
 # A literal is read in slices of this size, so the deadline is looked at between slices.
 _CHUNK = 64 * 1024
+
+# What one command may read in all, on top of the literal it asked for: a search answer of
+# ``LINE_LIMIT`` and room to spare, so a server that never stops talking is cut, not buffered.
+_COMMAND_BYTES = 4 * LINE_LIMIT
 
 # What ``LOGIN`` can carry: printable ASCII, no control character (ADR-5).
 _CREDENTIAL = re.compile(r"[\x20-\x7e]+")
@@ -280,6 +285,7 @@ def _scrub(text: str, secret: str) -> str:
         repr(secret)[1:-1],
         # A server that echoes the UTF-8 bytes is read as ASCII with a replacement per byte.
         utf8.decode("ascii", "replace"),
+        repr(utf8)[2:-1],  # the bytes as "%r" writes them, which is how imaplib quotes a line
         base64.b64encode(utf8).decode("ascii"),
     )
     for form in forms:
@@ -347,7 +353,8 @@ def _refusal_for(
         reason = FetchReason.TLS_FAILED
     elif isinstance(exc, TimeoutError):
         reason = FetchReason.DEADLINE_EXCEEDED if expired else FetchReason.TIMEOUT
-    elif isinstance(exc, (OSError, UnicodeError)):
+    elif isinstance(exc, (OSError, ValueError)):
+        # ``UnicodeError`` (a host name IDNA cannot encode) is a ``ValueError`` too.
         reason = FetchReason.HOST_UNREACHABLE
     elif overlong:
         reason = FetchReason.TOO_MANY_MATCHES
@@ -375,6 +382,8 @@ class _Bounds(imaplib.IMAP4):
         deadline (float): The reading of ``clock`` past which nothing more is read.
         max_literal (int): The biggest literal a server may announce right now.
         overlong (bool): Whether a line passed ``LINE_LIMIT``; the caller reads it after a failure.
+        budget (int): The bytes the current command may still read; ``begin`` sets it, and the
+            greeting and the login share the one the constructor sets.
     """
 
     def __init__(
@@ -401,7 +410,32 @@ class _Bounds(imaplib.IMAP4):
         self.deadline = deadline
         self.max_literal = LITERAL_OTHER
         self.overlong = False
+        self.budget = self.max_literal + _COMMAND_BYTES
         super().__init__(host, port, **options)
+
+    def begin(self) -> None:
+        """
+        Start a command: a fresh budget, and nothing kept of what the last command left unread.
+
+        ``imaplib`` keeps every untagged answer nobody asked for, across commands; without the
+        clear, a budget per command would still let a run hold the sum of them.
+        """
+        self.budget = self.max_literal + _COMMAND_BYTES
+        self.untagged_responses.clear()
+
+    def _spend(self, size: int) -> None:
+        """
+        Take bytes out of the command's budget.
+
+        Args:
+            size (int): The bytes about to be read, or just read.
+
+        Raises:
+            IMAP4.abort: When the budget does not cover them.
+        """
+        if size > self.budget:
+            raise self.abort("the server sent more than one command may read")
+        self.budget -= size
 
     def _arm(self) -> None:
         """
@@ -426,11 +460,13 @@ class _Bounds(imaplib.IMAP4):
             bytes: What arrived; shorter than ``size`` only when the connection ended.
 
         Raises:
-            IMAP4.abort: Before reading anything, when ``size`` is over ``max_literal``.
+            IMAP4.abort: Before reading anything, when ``size`` is over ``max_literal`` or over
+                what is left of the command's budget.
             FetchRefused: ``deadline_exceeded``, between two slices.
         """
         if size > self.max_literal:
             raise self.abort(f"the server announced a literal of {size} bytes, over the limit")
+        self._spend(size)
         parts: list[bytes] = []
         remaining = size
         while remaining > 0:
@@ -452,6 +488,7 @@ class _Bounds(imaplib.IMAP4):
 
         Raises:
             _LineTooLong: When the line passes the limit.
+            IMAP4.abort: When the line passes what is left of the command's budget.
             FetchRefused: ``deadline_exceeded``, when no time is left.
         """
         self._arm()
@@ -466,6 +503,7 @@ class _Bounds(imaplib.IMAP4):
         if len(line) >= LINE_LIMIT and not line.endswith(b"\n"):
             self.overlong = True
             raise _LineTooLong(f"a line of more than {LINE_LIMIT} bytes")
+        self._spend(len(line))
         return line
 
 
@@ -523,6 +561,7 @@ class ImapMailbox:
             FetchRefused: For any of ``_LIBRARY_ERRORS``.
         """
         try:
+            self._connection.begin()
             yield
         except _LIBRARY_ERRORS as exc:
             if not _is_plain_error(exc):
@@ -650,6 +689,7 @@ class ImapMailbox:
         """Say ``LOGOUT`` and drop the connection; a failure here is ignored."""
         if not self._broken:
             with contextlib.suppress(*_LIBRARY_ERRORS):
+                self._connection.begin()
                 self._connection.logout()
         _drop(self._connection)
 
@@ -776,14 +816,18 @@ def connect(
             ssl_context=context,
             timeout=SOCKET_TIMEOUT,
         )
-    except _LIBRARY_ERRORS as exc:
+    except (*_LIBRARY_ERRORS, ValueError) as exc:
+        # ``ssl`` raises ``ValueError`` for a server name it cannot use: the host's problem, not
+        # the user's, so it never reaches the command's ``ValueError`` for ``--user``.
         raise _refusal_for(exc, password, expired=clock() >= deadline) from None
     try:
         _sign_in(connection, user, password)
     except _LIBRARY_ERRORS as exc:
         _drop(connection)
-        # What the server says about a refused login is not shown: it may echo the credentials.
+        # Nothing the server or the library says during the login is shown: it may echo the
+        # credentials in a form no scrub foresees (the whole PLAIN response in base64, for one).
         if _is_plain_error(exc):
             raise FetchRefused(FetchReason.LOGIN_FAILED) from None
-        raise _refusal_for(exc, password, expired=clock() >= deadline) from None
+        refusal = _refusal_for(exc, password, expired=clock() >= deadline)
+        raise FetchRefused(refusal.reason) from None
     return ImapMailbox(connection, password, clock, deadline)
