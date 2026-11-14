@@ -7,7 +7,7 @@ This file guides Claude Code (claude.ai/code) when working in this repository.
 MailVigil is an open-source command-line tool that reads DMARC aggregate reports (RUA, usually
 `.zip`, `.gz` or `.xml`, or still attached to the mail in an `.eml` or `.mbox`) and says, in plain
 language, who is sending mail as a domain and whether it is safe to move the policy to `p=reject`. Python `>=3.12`, standard library only (zero runtime
-dependencies), offline. Version 1.7.0 is on PyPI (1.0.0 on 2026-10-29, 1.1.0 to 1.5.0 on 2026-10-30, 1.6.0 and 1.7.0 on 2026-10-31; `v0.1` to `v0.9` are the milestones of the build, see the roadmap in `specs/README.md`): the CLI answers `mailvigil --version`, `mailvigil summary`
+dependencies), offline. Version 1.7.1 is on PyPI (1.0.0 on 2026-10-29, 1.1.0 to 1.5.0 on 2026-10-30, 1.6.0 and 1.7.0 on 2026-10-31, 1.7.1 on 2026-11-14; `v0.1` to `v0.9` are the milestones of the build, see the roadmap in `specs/README.md`): the CLI answers `mailvigil --version`, `mailvigil summary`
 and `mailvigil verdict` (report ingestion, configuration, sender identification, the summary, the
 verdict on `p=reject` and their texts are built and wired); `--json`, `--lang en|pt-BR` and the stable
 exit codes (a public contract, `docs/json-schema.md`) are built (spec 006 is done), and so is the
@@ -107,7 +107,7 @@ Each line is the short form of a section of [docs/referencia/invariants.md](docs
 - ⚠️ **The one-domain path is the loop of one**: its text, `--json` and `--html` stay byte for byte as they were ([more](docs/referencia/invariants.md#the-one-domain-path-is-the-loop-of-one)).
 - ⚠️ **Markup is built in `htmlkit.py` only**; the page has no script, no network and no `url()` ([more](docs/referencia/invariants.md#markup-is-built-in-htmlkitpy-only)).
 - ⚠️ **`imaplib` and `ssl` are imported in `fetch/imap.py` only**, loaded inside `run_fetch`; the TLS context always verifies, the mailbox is only read, the password is never an argument or a log line ([more](docs/referencia/invariants.md#imaplib-and-ssl-are-imported-in-fetchimappy-only)).
-- ⚠️ **Reports are hostile input**: no `DOCTYPE`/`ENTITY`, a 5 MiB cap counted as bytes are read, bounded depth and elements; `xmlsafe.py` is the only module that creates an XML parser ([more](docs/referencia/invariants.md#reports-are-hostile-input)).
+- ⚠️ **Reports are hostile input**: no `DOCTYPE`/`ENTITY`, a 5 MiB cap counted as bytes are read, bounded depth and elements, a cap per header and per run; an unreadable file is a skipped entry, never the end of the run; `xmlsafe.py` is the only module that creates an XML parser ([more](docs/referencia/invariants.md#reports-are-hostile-input)).
 - ⚠️ **Never use a real DMARC report** in tests, docs, issues or PRs; fixtures are synthetic ([more](docs/referencia/invariants.md#never-use-a-real-dmarc-report)).
 
 

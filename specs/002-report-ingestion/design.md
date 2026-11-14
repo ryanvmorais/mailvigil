@@ -410,6 +410,30 @@ filter changes; it is now at least counted, and the no-reports message names `--
 deeper than 8 levels is not searched past that point, and a linked folder is never entered.
 (RF-06)
 
+### ADR-10 — Two zip methods, every library error mapped, and a cap per run (amendment of 2026-11-14, GHSA-wrrw-x2x3-vvp7)
+
+**Decision.** A zip member opens only when it is stored or deflated (`_ZIP_METHODS`); any other
+method is `NOT_AN_ARCHIVE` before its decompressor starts. `LZMAError` joins the archive errors, and
+an `OSError` raised while an attachment is read from memory is `NOT_AN_ARCHIVE`. In `xmlsafe.py`, a
+`LookupError` or `ValueError` from the parser (an encoding expat cannot use) is `MALFORMED_XML`.
+`ingest_many` counts the records of the reports it keeps, across domains, and past
+`MAX_RECORDS_PER_RUN = 1_000_000` raises `RunTooLarge`; the CLI refuses the run with one line and
+exit code `1`.
+**Alternatives.** (a) Catch every exception around the reader and the parser. (b) Accept every
+method the standard library supports and rely on `MAX_BYTES`. (c) Past the cap, skip the remaining
+files and answer on what was read. (d) A cap in bytes instead of records.
+**Why.** The rule of RF-09 is that a refusal is per file, never global, and it held only for the
+errors this spec had listed. (a) would also turn a bug into a silent skip. (b) does not hold: the
+LZMA decoder reserves the memory its header asks for before `_read_capped` counts a byte, and
+providers send only deflate. (c) gives a verdict on part of the data, which the tool must never do
+quietly. Each document is capped, but a run keeps every record until the end: a record kept costs
+about 800 bytes (`tracemalloc`, Python 3.12, the synthetic reports of `scripts/benchmark_ingest.py`,
+2026-11-14), so a million is under 1 GB, and ten reporters sending 1,000 rows a day for 28 days
+keep 280,000. Records are what stays in memory, so (d) would count the wrong thing.
+**Trade-off.** Members compressed with LZMA, bzip2 or any method other than the two are refused;
+adding a method is a decision in this spec. A domain whose reports hold more than a million records in one run has to read them in
+parts; the constant is the place to raise it, by a decision in this spec. (RF-09)
+
 ## Impact on existing code
 
 - **New package** `src/mailvigil/reports/` and new test files; `cli.py`, `__init__.py` and the

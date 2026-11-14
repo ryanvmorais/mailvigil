@@ -42,6 +42,15 @@ has tests that feed the attack or check the promise; keep it so when touching th
 > more than `MAX_ELEMENTS` elements (`Reason.XML_TOO_COMPLEX`, spec 002 ADR-8), because the byte cap
 > alone does not bound the cost of the tree. Each defense has tests that feed the attack; keep it so
 > when touching them, and keep `xmlsafe.py` the only module that creates an XML parser.
+>
+> A file that cannot be read is one skipped entry, never the end of the run: whatever the standard
+> library raises while it opens an archive, decodes an encoding or parses a mail is mapped to a
+> `Reason` where it happens (spec 002 ADR-10, spec 007 ADR-10). A zip member opens only when it is
+> stored or deflated (`_ZIP_METHODS`), because other decompressors reserve memory before the cap
+> counts a byte; a mail header is refused past `MAX_HEADER_CHARS` (4 KiB) before the `email`
+> parser sees it; and a run stops past `MAX_RECORDS_PER_RUN` (1,000,000) kept records with
+> `RunTooLarge`, because the caps per document do not bound a run. A new decompressor, parser or
+> library call on report data gets the same treatment, with a test that it ends as a refusal.
 
 ## Never use a real DMARC report
 

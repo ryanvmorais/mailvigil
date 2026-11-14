@@ -5,7 +5,7 @@ and the handful of concepts worth learning first if it is new to you.
 
 This is not exhaustive: the full version graph is pinned in `uv.lock`, and per-feature decisions
 live in the `### ADR-N` blocks of `specs/*/design.md`. This page is the map: the *shape* of the
-project and the reasoning behind each piece. The project is released (1.7.0, on PyPI): the
+project and the reasoning behind each piece. The project is released (1.7.1, on PyPI): the
 report-ingestion layer (`mailvigil.reports`), the configuration loader, the sender identification, the summary, the verdict and their texts are built
 and tested (it reads `.eml` and `.mbox` too, spec 007), and `mailvigil summary` and `mailvigil
 verdict` run them end to end, in English or Portuguese (`--lang`), as text or as one JSON document
@@ -114,7 +114,8 @@ environments with a required reviewer.
 Open the `.zip` and `.gz` files the providers send. The one XML member is read with a hard cap on
 the decompressed size (5 MiB), so a small archive that expands into gigabytes (a zip bomb) is
 refused instead of exhausting memory. Nothing is extracted to disk, and a member's name is never
-used as a path.
+used as a path. Only a member that is stored or deflated is opened: the LZMA decoder reserves the
+memory its own header asks for before the cap counts a byte (ADR-10 of spec 002).
 
 **Why this:** against a third-party archive library, these two are in the standard library and
 already stream; the risk is in *how much* you read, which is our code either way. The cap counts
@@ -123,8 +124,9 @@ the bytes actually produced and ignores the size an archive declares, because a 
 
 **Learn:** `ZipFile.infolist()` to find the members (and why `ZipInfo.file_size` is not trusted),
 `ZipFile.open()` as a stream, reading it in a loop up to `MAX_BYTES + 1` (a raw stream may return
-fewer bytes than asked without having ended), `gzip.open()` and the `BadZipFile` / `BadGzipFile`
-errors.
+fewer bytes than asked without having ended), `ZipInfo.compress_type`, `gzip.open()` and the
+`BadZipFile` / `BadGzipFile` errors, and why a decompressor reading from memory can still raise an
+`OSError`.
 
 **Docs:** [zipfile](https://docs.python.org/3/library/zipfile.html),
 [gzip](https://docs.python.org/3/library/gzip.html)
@@ -142,12 +144,17 @@ sender controls, so the work is in the bounds: the parser splits every line into
 a large message of empty parts it spends hundreds of MiB before a check *after* parsing could run.
 The module checks the size and the number of lines first, then counts parts as the parser creates
 them, through a message factory that raises past the limit
-(`policy.default.clone(message_factory=…)` is the seam; ADR-1 and ADR-2 of spec 007). A report that
-is not an attachment, or a message too big, costs one skipped entry and never the run.
+(the policy's `message_factory` is the seam; ADR-1 and ADR-2 of spec 007). The header parser of the
+default policy costs more than linear time and descends once per nested comment, so the policy is a
+subclass whose `header_fetch_parse` refuses a header over 4 KiB before parsing it, and a
+`RecursionError` is a malformed message (ADR-10 of spec 007). A report that is not an attachment, or
+a message too big, costs one skipped entry and never the run.
 
-**Learn:** `BytesFeedParser` (`feed`, `close`), `email.policy.default` and `clone()`, `EmailMessage.get_filename()` and `get_payload(decode=True)`, how a `multipart/*` tree is shaped and why walking
-it with a stack is safer than recursion, why a body can be larger than its own size on disk
-(base64 adds a third).
+**Learn:** `BytesFeedParser` (`feed`, `close`), `email.policy.EmailPolicy`, `clone()` and
+`header_fetch_parse` (headers are kept raw and parsed each time they are read),
+`EmailMessage.get_filename()` and `get_payload(decode=True)`, how a `multipart/*` tree is shaped and
+why walking it with a stack is safer than recursion, why a body can be larger than its own size on
+disk (base64 adds a third).
 
 **Docs:** [email](https://docs.python.org/3/library/email.html),
 [email.policy](https://docs.python.org/3/library/email.policy.html),
