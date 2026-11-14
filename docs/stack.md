@@ -5,7 +5,7 @@ and the handful of concepts worth learning first if it is new to you.
 
 This is not exhaustive: the full version graph is pinned in `uv.lock`, and per-feature decisions
 live in the `### ADR-N` blocks of `specs/*/design.md`. This page is the map: the *shape* of the
-project and the reasoning behind each piece. The project is released (1.7.1, on PyPI): the
+project and the reasoning behind each piece. The project is released (1.7.2, on PyPI): the
 report-ingestion layer (`mailvigil.reports`), the configuration loader, the sender identification, the summary, the verdict and their texts are built
 and tested (it reads `.eml` and `.mbox` too, spec 007), and `mailvigil summary` and `mailvigil
 verdict` run them end to end, in English or Portuguese (`--lang`), as text or as one JSON document
@@ -67,13 +67,16 @@ report records are) next to `enum.StrEnum` (what the refusal reasons are).
 
 The Python package manager and virtual-environment tool (from Astral, the Ruff people). It
 replaces `pip`, `pip-tools`, `virtualenv` and `pipx`. `uv sync` installs the locked graph, `uv
-run` executes inside the environment, and `uv lock` resolves.
+run` executes inside the environment, and `uv lock` resolves. `exclude-newer = "7 days"` in
+`[tool.uv]` keeps a release younger than a week out of the lock, and the CI installs with
+`uv sync --locked`, which fails on a lock that no longer matches `pyproject.toml`.
 
 **Why this:** against Poetry, PDM and plain pip, uv is much faster, uses the standard
 `pyproject.toml` (PEP 621) with a real lockfile (`uv.lock`), and needs no plugins. It also gives
 end users `uv tool install mailvigil` for free.
 
-**Learn:** `uv sync`, `uv run <cmd>`, `uv add --dev <pkg>` and `uv lock --check`; the split
+**Learn:** `uv sync` (and `--locked`), `uv run <cmd>`, `uv add --dev <pkg>`, `uv lock --check` and
+`exclude-newer` with a relative span; the split
 between `[project.dependencies]` (empty here, on purpose) and `[dependency-groups] dev`.
 
 **Docs:** [docs.astral.sh/uv](https://docs.astral.sh/uv/)

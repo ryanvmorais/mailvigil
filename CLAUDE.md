@@ -7,7 +7,7 @@ This file guides Claude Code (claude.ai/code) when working in this repository.
 MailVigil is an open-source command-line tool that reads DMARC aggregate reports (RUA, usually
 `.zip`, `.gz` or `.xml`, or still attached to the mail in an `.eml` or `.mbox`) and says, in plain
 language, who is sending mail as a domain and whether it is safe to move the policy to `p=reject`. Python `>=3.12`, standard library only (zero runtime
-dependencies), offline. Version 1.7.1 is on PyPI (1.0.0 on 2026-10-29, 1.1.0 to 1.5.0 on 2026-10-30, 1.6.0 and 1.7.0 on 2026-10-31, 1.7.1 on 2026-11-14; `v0.1` to `v0.9` are the milestones of the build, see the roadmap in `specs/README.md`): the CLI answers `mailvigil --version`, `mailvigil summary`
+dependencies), offline. Version 1.7.2 is on PyPI (1.0.0 on 2026-10-29, 1.1.0 to 1.5.0 on 2026-10-30, 1.6.0 and 1.7.0 on 2026-10-31, 1.7.1 and 1.7.2 on 2026-11-14; `v0.1` to `v0.9` are the milestones of the build, see the roadmap in `specs/README.md`): the CLI answers `mailvigil --version`, `mailvigil summary`
 and `mailvigil verdict` (report ingestion, configuration, sender identification, the summary, the
 verdict on `p=reject` and their texts are built and wired); `--json`, `--lang en|pt-BR` and the stable
 exit codes (a public contract, `docs/json-schema.md`) are built (spec 006 is done), and so is the
@@ -160,8 +160,9 @@ interface file is written until the maintainer approves one. The 008 choice is r
 ## Dependencies
 
 `uv` manages everything: `pyproject.toml` holds the floors (`>=`) and `uv.lock` the exact
-versions. Commit both together (`uv lock --check` must pass). Dependabot (`uv` and
-`github-actions`, Sundays, 7-day cooldown) opens the routine PRs.
+versions. Commit both together (`uv lock --check` must pass). `exclude-newer = "7 days"` keeps a
+release younger than a week out of the lock, and the CI runs `uv sync --locked`. Dependabot (`uv`
+and `github-actions`, Sundays, 7-day cooldown) opens the routine PRs.
 
 > Publishing (PyPI, GitHub Releases) is the maintainer's act. A vulnerability in a published
 > version is reported privately (private vulnerability reporting), never in a public issue, PR or
