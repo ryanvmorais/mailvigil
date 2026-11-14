@@ -428,7 +428,7 @@ wheels = [
 
 [[package]]
 name = "mailvigil"
-version = "1.7.1"
+version = "1.7.2"
 source = { editable = "." }
 
 [package.dev-dependencies]
