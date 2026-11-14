@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import os
+import stat
 import sys
 import tempfile
 import traceback
@@ -224,12 +225,16 @@ def _write_page(path: Path, page: str) -> None:
         fd, temporary = tempfile.mkstemp(prefix=".mailvigil-", suffix=".tmp", dir=path.parent)
         with os.fdopen(fd, "wb") as handle:
             handle.write(page.encode("ascii"))
-        # ``mkstemp`` makes the file private (0600); a report is made to be read, like the file of
-        # a ``>`` redirect, so it gets the permission the umask allows. ``umask`` can only be read
-        # by setting it, so it is put back at once.
-        umask = os.umask(0)
-        os.umask(umask)
-        os.chmod(temporary, 0o666 & ~umask)
+        # ``mkstemp`` makes the file private (0600); the page gets what a ``>`` redirect would give:
+        # the mode of the file it replaces, else the permission the umask allows. ``umask`` can
+        # only be read by setting it, so it is put back at once.
+        try:
+            mode = stat.S_IMODE(os.stat(path).st_mode)
+        except OSError:
+            umask = os.umask(0)
+            os.umask(umask)
+            mode = 0o666 & ~umask
+        os.chmod(temporary, mode)
         os.replace(temporary, path)
         temporary = None
     finally:
