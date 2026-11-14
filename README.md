@@ -113,7 +113,10 @@ mailbox = "Example Mail (staff mailboxes)"
   shows under SPF (a `bounce.` subdomain of yours, say), it must be your domain or a subdomain of
   it, and the match is exact. A domain of a shared service (`amazonses.com`) can never align with
   your domain, so MailVigil refuses it instead of keeping a line that never matches. When a row is
-  unrecognized, the summary lists the SPF domains that passed under your domain on it.
+  unrecognized, the summary lists the SPF domains that passed under your domain on it. SPF says
+  which servers may send for that name, so when its record includes a shared provider, every
+  customer of that provider passes as well: use `[spf]` for a name whose record lists only servers
+  you control, and prefer a DKIM selector otherwise.
 - **`[ips]` names a sender by address range** (a CIDR block or a single address, IPv4 or IPv6) and
   only counts on a record that also passed DKIM or SPF under your domain: the address says who
   connected, not that the mail is yours. Use it for servers you alone control; a range on shared
@@ -199,6 +202,10 @@ MailVigil is deliberately small. For each limit below, what to reach for instead
 - **It reads only the reports you give it.** Mail that no receiver reports on, and senders that
   were quiet in the period, are not covered, and the verdict says so under every answer. *Instead:*
   collect a full cycle first; the verdict asks for 28 days.
+- **It trusts the numbers in the reports.** Aggregate reports are not signed, so a file that did
+  not come from a real receiver counts the same as one that did, in the figures and in the
+  verdict. *Instead:* read only reports from receivers you recognize (the summary counts the
+  reporting organizations), and keep the reports folder writable by you alone.
 - **`fetch` has no OAuth.** It logs in with a name and a password, so Microsoft 365 and Google
   accounts without an app password are not supported (see [Fetch](#fetch)). *Instead:* save the
   report messages from your mail client into a folder as `.eml` files and point `summary` at it.

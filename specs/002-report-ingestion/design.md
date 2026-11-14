@@ -258,7 +258,7 @@ With `now`, a report whose `end` is later than `now + FUTURE_TOLERANCE` (one day
 with `INVALID_FIELD`; the caller reads the clock, so `ingest` stays free of one.
 
 ```text
-wanted = domain.strip().lower().rstrip(".")      # empty -> ValueError: a programming error
+wanted = normalize_domain(domain)                # empty -> ValueError: a programming error
 files, skipped = discover(paths)
 for file in files:
     try:    report = parse_report(read_xml(file), source=file.name)
@@ -433,6 +433,21 @@ keep 280,000. Records are what stays in memory, so (d) would count the wrong thi
 **Trade-off.** Members compressed with LZMA, bzip2 or any method other than the two are refused;
 adding a method is a decision in this spec. A domain whose reports hold more than a million records in one run has to read them in
 parts; the constant is the place to raise it, by a decision in this spec. (RF-09)
+
+### ADR-11 — Only ASCII letters change case (amendment of 2026-11-14)
+
+**Decision.** Domains from a report (`_text(..., lower=True)` in the parser), `normalize_domain` in
+`text.py` and the selector a report gives (`senders.py`, spec 003) lower-case `A` to `Z` only, with
+`ascii_lower`; every other character stays as it is.
+**Alternatives.** (a) `str.lower`, as before. (b) `str.casefold` with an NFKC normalization, so a
+look-alike becomes the name it imitates on purpose.
+**Why.** `str.lower` maps a few letters outside ASCII onto ASCII ones (the Kelvin sign becomes
+`k`), so a look-alike name in a report could equal a configured one and be counted as the domain
+or name its sender. The configuration turns a name outside ASCII into its `xn--` form before it
+compares (003), so a comparison in ASCII loses nothing. (b) does the opposite of what is wanted.
+**Trade-off.** A report that writes a name outside ASCII in capitals keeps the capitals; such a
+name never equals a configured one anyway. Selectors written in the configuration file keep
+`str.lower`: the person who wrote them is the one being protected.
 
 ## Impact on existing code
 

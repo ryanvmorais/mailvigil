@@ -492,6 +492,31 @@ an argument, a variable or a stored value; the certificate is always checked.
   instead of argparse's own marker; and `--config` on `fetch` does not behave like on `summary` when
   it is left out. The help says so, and so does the README.
 
+### ADR-13 — A budget per command, nothing shown from the login, and a stricter folder (amendment of 2026-11-14)
+
+- **Decision:** five rules close what ADR-3, ADR-5 and ADR-6 left open.
+  1. Each command may read `max_literal + _COMMAND_BYTES` (`4 × LINE_LIMIT`) in all: `begin()`,
+     called by `_guard` before every command and before `LOGOUT`, sets that budget and clears the
+     untagged answers `imaplib` keeps from the command before; `read` and `readline` spend it, and
+     past it the connection aborts (`protocol_error`). The greeting and the login share the budget
+     the constructor sets.
+  2. A failure during the login shows no detail at all, whatever its kind; the reason stays.
+  3. `--host` follows the rule of `host` in `[fetch]` (not empty, no space, no control or format
+     character) as a usage error, and a `ValueError` from the library while the connection opens
+     is `host_unreachable`, so the only `ValueError` out of `connect` is the user's.
+  4. When `getpass` cannot turn the echo off, its warning is an error and the run ends with the
+     usage error of a missing terminal, before the password is read.
+  5. `Store.has` counts only a regular file (`lstat`), and a folder the run creates is `0700`.
+- **Alternatives:** a cap on the number of untagged lines (a count says nothing about size); a scrub
+  that also knows the base64 of the whole `PLAIN` response (one more form to foresee, and the next
+  one would be missed); letting an echoed password prompt through with a warning.
+- **Why:** each line and each literal had a cap, but `imaplib` keeps every untagged answer, so a
+  server that never stopped talking grew the memory until the deadline. A login echo can come back
+  in a form the scrub does not know, and nothing in a failed login is worth that risk. The other
+  three make the flag, the prompt and the folder say what they already promised.
+- **Trade-off:** a server whose single answer passes 4 MB besides a literal is refused; the
+  constant is the place to raise it. A folder made by an earlier version keeps its mode.
+
 ## Impact
 
 - **New:** the `fetch/` package, `render_fetch.py`, the `fetch` subcommand, twelve reason sentences

@@ -120,7 +120,9 @@ mailbox = "Example Mail (staff mailboxes)"
   subdomínio dele, e a comparação é exata. O domínio de um serviço compartilhado (`amazonses.com`)
   nunca alinha com o seu, então o MailVigil o recusa em vez de guardar uma linha que nunca casa.
   Quando uma linha não é reconhecida, o resumo lista os domínios SPF que passaram sob o seu domínio
-  nela.
+  nela. O SPF diz quais servidores podem enviar por aquele nome, então, quando o registro dele
+  inclui um provedor compartilhado, todo cliente desse provedor passa também: use `[spf]` para um
+  nome cujo registro lista só servidores que você controla e, fora disso, prefira um seletor DKIM.
 - **`[ips]` dá nome a um remetente por faixa de endereços** (um bloco CIDR ou um endereço, IPv4 ou
   IPv6) e só vale num registro que também passou no DKIM ou no SPF sob o seu domínio: o endereço diz
   quem conectou, não que o e-mail é seu. Use para servidores só seus; uma faixa de hospedagem
@@ -209,6 +211,10 @@ O MailVigil é pequeno de propósito. Para cada limite abaixo, o que usar no lug
 - **Ele lê só os relatórios que você der.** E-mail que nenhum receptor reporta, e remetentes que
   ficaram quietos no período, não são cobertos, e o veredito diz isso sob toda resposta. *No
   lugar:* colete um ciclo completo primeiro; o veredito pede 28 dias.
+- **Ele confia nos números dos relatórios.** Relatórios agregados não são assinados, então um
+  arquivo que não veio de um receptor real conta igual a um que veio, nos números e no
+  veredito. *No lugar:* leia só relatórios de receptores que você reconhece (o resumo conta as
+  organizações que reportaram) e deixe a pasta de relatórios gravável só por você.
 - **O `fetch` não tem OAuth.** Ele entra com nome e senha, então contas do Microsoft 365 e do
   Google sem senha de app não são suportadas (veja [Fetch](#fetch)). *No lugar:* salve as
   mensagens de relatório do seu cliente de e-mail numa pasta como arquivos `.eml` e aponte o
