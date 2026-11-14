@@ -341,6 +341,26 @@ only caller is `ingest`, and the tests that call it are updated).
 - **Trade-off:** a part named `report.zip` that is not a zip reaches the reader and is refused as
   `not_an_archive`, which is the right answer.
 
+### ADR-10 — A cap on one header, and every parser error a refusal (amendment of 2026-11-14, GHSA-wrrw-x2x3-vvp7)
+
+- **Decision:** a fifth bound, `MAX_HEADER_CHARS = 4 * 1024`: the parser's policy is a subclass of
+  `EmailPolicy` whose `header_fetch_parse` refuses a longer value as `message_too_complex` before
+  the default policy parses it. `RecursionError` joins `_MESSAGE_ERRORS`, so it is
+  `malformed_message`. An attachment whose reader raises is refused alone (ADR-10 of 002), so a
+  mailbox is read to its end.
+- **Alternatives:** a cap on the length of a line; a regular expression over the raw headers before
+  parsing; `policy.compat32`.
+- **Why:** the header parser of the default policy spends time that grows faster than the header
+  and descends once per nested comment, and the four bounds of ADR-1 and ADR-2 do not limit one
+  header: a folded header can be many short lines. `header_fetch_parse` is where every read of a
+  header goes through, during parsing and after, so the check cannot be skipped, and a report's
+  `Content-Type` or `Content-Disposition` is under 200 characters (a line may hold 998, RFC 5322).
+  A regular expression over raw mail would also catch body lines; `compat32` parses parameters with
+  the same kind of cost. Before this, an error from an attachment of an `.mbox` message escaped to
+  the mailbox loop, which took it as the mailbox being unreadable and stopped there.
+- **Trade-off:** a mail with a header over 4 KiB is refused even when that header is not one the
+  reader needs; the constant is the place to raise it, by a decision in this spec.
+
 ## Impact on existing code
 
 - **Changed signatures:** `discover` (its return type), `SkippedFile` (a last field with a default),
