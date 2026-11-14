@@ -13,7 +13,8 @@ verdict on `p=reject` and their texts are built and wired); `--json`, `--lang en
 exit codes (a public contract, `docs/json-schema.md`) are built (spec 006 is done), and so is the
 static HTML page of `verdict --html` (spec 008 is done). `mailvigil fetch` (spec 009, IMAP into a
 folder, opt-in) is built too; it is the only command that touches the network. Several domains in
-one run (spec 010) are built. Everything
+one run (spec 010) are built, and so is the verdict note when a `ready` rests on one reporting
+organization (spec 011). Everything
 is specified in [specs/](specs/) first. The repository has been public since
 2026-10-27; releasing and announcing are the maintainer's acts.
 

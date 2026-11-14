@@ -213,7 +213,8 @@ O MailVigil é pequeno de propósito. Para cada limite abaixo, o que usar no lug
   lugar:* colete um ciclo completo primeiro; o veredito pede 28 dias.
 - **Ele confia nos números dos relatórios.** Relatórios agregados não são assinados, então um
   arquivo que não veio de um receptor real conta igual a um que veio, nos números e no
-  veredito. *No lugar:* leia só relatórios de receptores que você reconhece (o resumo conta as
+  veredito. Quando um `READY` depende só dos relatórios de uma organização, o veredito diz isso
+  numa nota. *No lugar:* leia só relatórios de receptores que você reconhece (o resumo conta as
   organizações que reportaram) e deixe a pasta de relatórios gravável só por você.
 - **O `fetch` não tem OAuth.** Ele entra com nome e senha, então contas do Microsoft 365 e do
   Google sem senha de app não são suportadas (veja [Fetch](#fetch)). *No lugar:* salve as

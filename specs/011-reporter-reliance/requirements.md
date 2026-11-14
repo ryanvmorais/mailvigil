@@ -1,6 +1,6 @@
 ---
 feature: A note when the answer rests on one reporting organization
-status: in progress
+status: done
 date: 2026-11-14
 related:
   - 004-summary/requirements.md

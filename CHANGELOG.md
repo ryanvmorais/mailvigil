@@ -5,9 +5,10 @@ All notable changes to MailVigil are written here. The format follows
 [Semantic Versioning](https://semver.org/); what counts as a breaking change is in
 [docs/stability.md](docs/stability.md).
 
-The `v0.1` to `v0.10` milestones are the steps the project was built in, each
+The `v0.1` to `v0.11` milestones are the steps the project was built in, each
 designed as a spec under [`specs/`](specs/). None of them was released on its own: `1.0.0` is the
-first release and contains `v0.1` to `v0.9`, and `v0.10` (several domains) arrived in `1.6.0`.
+first release and contains `v0.1` to `v0.9`, `v0.10` (several domains) arrived in `1.6.0`, and
+`v0.11` (the note on one reporting organization) is under [Unreleased].
 
 ## [Unreleased]
 
@@ -20,6 +21,11 @@ first release and contains `v0.1` to `v0.9`, and `v0.10` (several domains) arriv
   answer and the exit code do not change. In `--json` it is a note of the new `kind`
   `reporter_reliance` (see [docs/json-schema.md](docs/json-schema.md)); a consumer must accept a
   note `kind` it does not know.
+
+### Changed
+
+- The README (and `README.pt-BR.md`) says, among the limits, that a `ready` resting on one
+  reporting organization carries this note, and the terminal demo shows it.
 
 ## [1.7.2] - 2026-11-14
 
