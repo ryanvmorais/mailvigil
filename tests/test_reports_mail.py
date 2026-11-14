@@ -14,7 +14,9 @@ on purpose are lowered with ``monkeypatch`` where the case is about the rule, no
 from __future__ import annotations
 
 import base64
+import inspect
 import io
+import sys
 import tracemalloc
 from collections.abc import Iterator
 from email.message import EmailMessage
@@ -498,7 +500,14 @@ def test_a_deeply_nested_header_is_a_refusal_not_a_crash() -> None:
     """The header parser descends once per nested comment; running out of stack is a refusal."""
     depth = MAX_HEADER_CHARS // 2 - 20
     raw = _with_content_type("text/plain " + "(" * depth + ")" * depth)
-    assert _refusal(raw) is Reason.MALFORMED_MESSAGE
+    # The limit of the process may have been raised by the runner, and a nesting under it parses
+    # fine; a limit set here, a little above the current depth, makes the descent run out of it.
+    previous = sys.getrecursionlimit()
+    sys.setrecursionlimit(len(inspect.stack(0)) + 300)
+    try:
+        assert _refusal(raw) is Reason.MALFORMED_MESSAGE
+    finally:
+        sys.setrecursionlimit(previous)
 
 
 def test_parser_failure_is_a_malformed_message(monkeypatch: pytest.MonkeyPatch) -> None:
