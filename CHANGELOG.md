@@ -11,6 +11,8 @@ first release and contains `v0.1` to `v0.9`, and `v0.10` (several domains) arriv
 
 ## [Unreleased]
 
+## [1.7.2] - 2026-11-14
+
 ### Changed
 
 - The README (and `README.pt-BR.md`) says that the figures trust the reports, which are not signed,
@@ -253,7 +255,8 @@ The first release. It gathers the milestones `v0.1` to `v0.9` built as specs und
   certificate checked, read-only (it changes, moves and deletes nothing and does not mark mail as
   read), with the password asked on the terminal or read from a file.
 
-[Unreleased]: https://github.com/ryanvmorais/mailvigil/compare/v1.7.1...HEAD
+[Unreleased]: https://github.com/ryanvmorais/mailvigil/compare/v1.7.2...HEAD
+[1.7.2]: https://github.com/ryanvmorais/mailvigil/compare/v1.7.1...v1.7.2
 [1.7.1]: https://github.com/ryanvmorais/mailvigil/compare/v1.7.0...v1.7.1
 [1.7.0]: https://github.com/ryanvmorais/mailvigil/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/ryanvmorais/mailvigil/compare/v1.5.0...v1.6.0
