@@ -1,6 +1,6 @@
 ---
 feature: A note when the answer rests on one reporting organization
-status: in progress
+status: done
 date: 2026-11-14
 related:
   - 011-reporter-reliance/requirements.md
@@ -158,16 +158,30 @@ note texts had no entry), and about 45 tests of the CLI, the page and the catalo
 
 ## Stage 4 — Documentation and close (RNF-01, RNF-04)
 
-- [ ] `README.md` and `README.pt-BR.md` (the headings stay in step; `tests/test_readme_pt_br.py`):
+- [x] `README.md` and `README.pt-BR.md` (the headings stay in step; `tests/test_readme_pt_br.py`):
   the "It trusts the numbers in the reports" limit says that the verdict notes when a `ready` rests
   on one organization; the list of notes, if the README has one, gains the new note. — RF-02
-- [ ] The README demo: run `docs/demo/build_demo.py` and rebuild `docs/demo/verdict.cast` and its
+  Result: the README has no list of notes, so only the limit changed, in both files.
+- [x] The README demo: run `docs/demo/build_demo.py` and rebuild `docs/demo/verdict.cast` and its
   picture with the commands in its docstring, adjusting the height if the note adds a line; read the
   new frames; the alt text stays true. — RF-03
-- [ ] `docs/stability.md` (the JSON row: a new note kind is a minor change), `CHANGELOG.md` (the
+  Result: the `READY` run shows the note (every report comes from Example Receiver). The rebuild
+  also brought in the `Next:` line of `[spf]` and `[ips]`, which the old recording predated, and it
+  showed the stale note on both runs, because the periods had fixed dates and the verdict measures
+  their age against today; `build_demo.py` now ends each period the day before it runs (the
+  totals do not depend on the dates). The two screens take 28 and 27 of the 29 lines, so the
+  height stayed; the alt text and the caption stay true.
+- [x] `docs/stability.md` (the JSON row: a new note kind is a minor change), `CHANGELOG.md` (the
   entry of stages 2 and 3 read again), `specs/README.md` (011 `done`, the next milestone in the delivery column).
   `CLAUDE.md` and `docs/stack.md` change only if a line of theirs is no longer true. — RNF-01
-- [ ] A last compatibility pass: the full suite; the wheel declares no `Requires-Dist` (`uv build`
+  Result: 011 is `v0.11`. The `CHANGELOG.md` gained a "Changed" line for the README and the demo,
+  and its opening paragraph names `v0.11`. The overview of `CLAUDE.md` gained spec 011 next to 010;
+  `docs/stack.md` did not change (no new technology).
+- [x] A last compatibility pass: the full suite; the wheel declares no `Requires-Dist` (`uv build`
   and the `package` check); `status: done` in the three files. — RNF-01, RNF-04
-- [ ] Quality gate of the stage (as above), the real result recorded; then the preparation of the
+  Result: `uv build` gave a wheel with no `Requires-Dist`.
+- [x] Quality gate of the stage (as above), the real result recorded; then the preparation of the
   minor version as a separate PR (publishing is the maintainer's). — RNF-06
+  Result (2026-11-14): ruff, black and mypy clean; 3722 passed, 7 skipped (POSIX modes and
+  symbolic links on Windows); coverage 100%. No test changed in this stage. The minor version is
+  prepared in its own pull request.

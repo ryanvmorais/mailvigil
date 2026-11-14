@@ -204,7 +204,8 @@ MailVigil is deliberately small. For each limit below, what to reach for instead
   collect a full cycle first; the verdict asks for 28 days.
 - **It trusts the numbers in the reports.** Aggregate reports are not signed, so a file that did
   not come from a real receiver counts the same as one that did, in the figures and in the
-  verdict. *Instead:* read only reports from receivers you recognize (the summary counts the
+  verdict. When a `READY` rests on the reports of one organization alone, the verdict says so in a
+  note. *Instead:* read only reports from receivers you recognize (the summary counts the
   reporting organizations), and keep the reports folder writable by you alone.
 - **`fetch` has no OAuth.** It logs in with a name and a password, so Microsoft 365 and Google
   accounts without an app password are not supported (see [Fetch](#fetch)). *Instead:* save the
