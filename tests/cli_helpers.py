@@ -56,6 +56,9 @@ def write_window(
     failing: bool = False,
     policy: str = "none",
     domain: str = "example.com",
+    reporter: str = "Example Mail",
+    host: str = "example.net",
+    first_day: int = 0,
 ) -> Path:
     """
     Write one daily report of a domain for each day of a window.
@@ -72,6 +75,12 @@ def write_window(
             sender. Default: ``False``.
         policy (str, optional): The ``p`` the reports publish. Default: ``none``.
         domain (str, optional): The domain the reports are about. Default: ``example.com``.
+        reporter (str, optional): The organization that sends the reports. Default:
+            ``Example Mail``.
+        host (str, optional): The receiver part of the file names, so two organizations can
+            write the same days into one folder. Default: ``example.net``.
+        first_day (int, optional): The day of the window the first report covers, counted from
+            the first day of every window. Default: 0.
 
     Returns:
         Path: The folder.
@@ -85,12 +94,18 @@ def write_window(
         dkim=((domain, "s1", "pass"),),
         spf=((domain, result),),
     )
-    for day in range(days):
+    for day in range(first_day, first_day + days):
         begin = _START + day * _DAY
         end = begin + _DAY - 1
-        name = f"example.net!{domain}!{begin}!{end}.xml"
+        name = f"{host}!{domain}!{begin}!{end}.xml"
         report = make_report_xml(
-            report_id=f"r{day}", begin=begin, end=end, records=[record], p=policy, domain=domain
+            reporter=reporter,
+            report_id=f"r{day}",
+            begin=begin,
+            end=end,
+            records=[record],
+            p=policy,
+            domain=domain,
         )
         (folder / name).write_bytes(report)
     return folder

@@ -21,6 +21,7 @@ from types import MappingProxyType
 
 import pytest
 
+from mailvigil import verdict as verdict_module
 from mailvigil.config import Config
 from mailvigil.reports import (
     IngestionResult,
@@ -37,6 +38,7 @@ from mailvigil.summary import (
     Period,
     ReporterActivity,
     Summary,
+    WithoutReporter,
     summarize,
 )
 from mailvigil.verdict import (
@@ -505,7 +507,9 @@ def test_several_notes_come_in_the_order_of_note_kind() -> None:
         )
     )
     assert note_kinds(verdict) == [
-        kind for kind in NoteKind if kind not in (NoteKind.SILENT_REPORTER, NoteKind.STALE)
+        kind
+        for kind in NoteKind
+        if kind not in (NoteKind.SILENT_REPORTER, NoteKind.REPORTER_RELIANCE, NoteKind.STALE)
     ]
 
 
@@ -656,7 +660,13 @@ def _record(ip: str, count: int, dkim: str, spf: str) -> Record:
     )
 
 
-def _report(report_id: str, day: int, *records: Record, p: str = "none") -> Report:
+def _report(
+    report_id: str,
+    day: int,
+    *records: Record,
+    p: str = "none",
+    reporter: str = "reporter.example.net",
+) -> Report:
     """
     Build one daily report of ``example.com``.
 
@@ -665,13 +675,15 @@ def _report(report_id: str, day: int, *records: Record, p: str = "none") -> Repo
         day (int): The day of October 2026 it starts on.
         *records (Record): Its rows.
         p (str, optional): The ``p`` it publishes. Default: ``none``.
+        reporter (str, optional): The organization that sent it. Default:
+            ``reporter.example.net``.
 
     Returns:
         Report: The report.
     """
     begin = datetime(2026, 10, day, tzinfo=UTC)
     return Report(
-        reporter="reporter.example.net",
+        reporter=reporter,
         report_id=report_id,
         begin=begin,
         end=begin + timedelta(days=1),
@@ -731,6 +743,7 @@ def test_the_answer_and_kind_words_are_the_stable_strings() -> None:
         "subdomain_policy",
         "currently_quarantine",
         "silent_reporter",
+        "reporter_reliance",
         "stale",
     ]
 
@@ -848,3 +861,382 @@ def test_the_worst_answer_of_one_verdict_is_its_own() -> None:
 def test_the_worst_answer_of_nothing_is_a_callers_mistake() -> None:
     with pytest.raises(ValueError, match="at least one"):
         worst_answer([])
+
+
+# ---------------------------------------------------------------------------
+# The reporter-reliance note (spec 011, RF-01, RF-02, RF-04, RNF-03, ADR-1, ADR-4)
+# ---------------------------------------------------------------------------
+
+
+def _resting(summary: Summary, *entries: WithoutReporter) -> Summary:
+    """
+    Give a summary its measures without each organization, one entry per organization.
+
+    Args:
+        summary (Summary): The summary.
+        *entries (WithoutReporter): The entries, in the order of ``reporter_activity``.
+
+    Returns:
+        Summary: The same summary with those entries, and as many organizations as entries.
+    """
+    return dataclasses.replace(summary, without_reporter=entries, reporters=len(entries))
+
+
+def _without(
+    name: str,
+    messages: int,
+    *,
+    days: int = 28,
+    with_reports: int | None = None,
+    total: int | None = None,
+    unrecognized: int = 0,
+) -> WithoutReporter:
+    """
+    Build the measures of a run of 2000 clean messages without one organization's reports.
+
+    Args:
+        name (str): The organization.
+        messages (int): Its own messages.
+        days (int, optional): The days the other reports span. Default: 28.
+        with_reports (int | None, optional): The days they cover. Default: ``days``.
+        total (int | None, optional): Their messages. Default: 2000 minus ``messages``.
+        unrecognized (int, optional): Their unrecognized failing messages. Default: 0.
+
+    Returns:
+        WithoutReporter: The entry; no failure under a recognized sender, as on a ``ready`` run.
+    """
+    return WithoutReporter(
+        name=name,
+        messages=messages,
+        days_spanned=days,
+        days_with_reports=days if with_reports is None else with_reports,
+        total=2000 - messages if total is None else total,
+        recognized_failing=0,
+        unrecognized_failing=unrecognized,
+    )
+
+
+def _reliance(verdict: Verdict) -> list[Note]:
+    """
+    Pick the reporter-reliance notes of a verdict.
+
+    Args:
+        verdict (Verdict): The verdict.
+
+    Returns:
+        list[Note]: Those notes; at most one.
+    """
+    return [note for note in verdict.notes if note.kind is NoteKind.REPORTER_RELIANCE]
+
+
+# Each rule that can turn a ``ready``: without the larger organization, one rule fails; without the
+# smaller, the answer is still ``ready``. The run is 2000 clean messages over 28 days.
+_TURNING = {
+    "period": (
+        make_summary(),
+        _without("big.example.net", 1500, days=20),
+        Note(
+            NoteKind.REPORTER_RELIANCE,
+            (1500, 2000, 2, 1),
+            ("big.example.net", "too_early"),
+        ),
+    ),
+    "coverage": (
+        make_summary(),
+        _without("big.example.net", 1500, with_reports=22),
+        Note(
+            NoteKind.REPORTER_RELIANCE,
+            (1500, 2000, 2, 2),
+            ("big.example.net", "too_early"),
+        ),
+    ),
+    "volume": (
+        make_summary(),
+        _without("big.example.net", 1901),
+        Note(
+            NoteKind.REPORTER_RELIANCE,
+            (1901, 2000, 2, 3),
+            ("big.example.net", "too_early"),
+        ),
+    ),
+    # why: 10 unrecognized failures are within half a percent of 2010 messages, and over it of the
+    # 110 left without the clean organization.
+    "unrecognized share": (
+        make_summary(unrecognized_failing=10),
+        _without("big.example.net", 1900, total=110, unrecognized=10),
+        Note(
+            NoteKind.REPORTER_RELIANCE,
+            (1900, 2010, 2, 5),
+            ("big.example.net", "not_ready"),
+        ),
+    ),
+}
+
+
+@pytest.mark.parametrize(("summary", "turning", "expected"), _TURNING.values(), ids=_TURNING)
+def test_a_ready_answer_resting_on_one_organization_gives_the_note(
+    summary: Summary, turning: WithoutReporter, expected: Note
+) -> None:
+    """Without the organization one rule fails: the note gives its figures and that rule."""
+    other = _without(
+        "small.example.org",
+        summary.totals.total - turning.messages,
+        total=turning.messages,
+    )
+    assert judge(summary).answer is Answer.READY
+
+    verdict = judge(_resting(summary, turning, other))
+
+    assert _reliance(verdict) == [expected]
+    assert verdict.answer is Answer.READY
+
+
+def test_the_walk_goes_past_an_organization_the_answer_does_not_rest_on() -> None:
+    """The larger organization changes nothing; the smaller completes the coverage."""
+    summary = _resting(
+        make_summary(),
+        _without("big.example.net", 1800),
+        _without("small.example.org", 200, with_reports=20, total=1800),
+    )
+
+    assert _reliance(judge(summary)) == [
+        Note(
+            NoteKind.REPORTER_RELIANCE,
+            (200, 2000, 2, 2),
+            ("small.example.org", "too_early"),
+        )
+    ]
+
+
+def test_the_largest_of_two_organizations_the_answer_rests_on_is_named() -> None:
+    """Both qualify; only the first, the one with most messages, gets the note (ADR-4)."""
+    summary = _resting(
+        make_summary(),
+        _without("big.example.net", 1500, days=20),
+        _without("small.example.org", 500, with_reports=20),
+    )
+
+    notes = _reliance(judge(summary))
+
+    assert [note.texts[0] for note in notes] == ["big.example.net"]
+
+
+def test_no_organization_the_answer_rests_on_gives_no_note() -> None:
+    """Each organization alone still passes the five rules."""
+    summary = _resting(
+        make_summary(),
+        _without("big.example.net", 1000),
+        _without("small.example.org", 1000),
+    )
+
+    assert _reliance(judge(summary)) == []
+
+
+@pytest.mark.parametrize(
+    "summary",
+    [make_summary(days=20), make_summary(recognized_failing=1), make_summary(days=0)],
+    ids=["too early", "not ready", "no reports"],
+)
+def test_the_note_is_only_for_a_ready_answer(summary: Summary) -> None:
+    """``too early`` and ``not ready`` keep the policy as it is, so no note qualifies them."""
+    resting = _resting(summary, _without("big.example.net", 1500, days=5))
+
+    assert judge(resting).answer is not Answer.READY
+    assert _reliance(judge(resting)) == []
+
+
+def test_the_note_comes_between_the_silent_reporter_and_the_stale_note() -> None:
+    """The order of ``NoteKind``: the two reporter notes side by side."""
+    summary = _activity(
+        _resting(
+            make_summary(),
+            _without("big.example.net", 1500, days=20),
+            _without("small.example.org", 500),
+        ),
+        ("big.example.net", 1500, timedelta(days=10)),
+        ("small.example.org", 500, timedelta(0)),
+    )
+    assert summary.period is not None
+
+    verdict = judge(summary, summary.period.end + STALE_AFTER + timedelta(days=1))
+
+    assert note_kinds(verdict) == [
+        NoteKind.SILENT_REPORTER,
+        NoteKind.REPORTER_RELIANCE,
+        NoteKind.STALE,
+    ]
+
+
+def _run(*reports: Report) -> Summary:
+    """
+    Summarize built reports of ``example.com`` with no sender configured.
+
+    Args:
+        *reports (Report): The reports.
+
+    Returns:
+        Summary: Their summary.
+    """
+    config = Config("example.com", MappingProxyType({}))
+    return summarize(IngestionResult(reports=reports), config)
+
+
+def _days(reporter: str, first: int, last: int, count: int) -> list[Report]:
+    """
+    Build one clean daily report per day of October 2026 from one organization.
+
+    Args:
+        reporter (str): The organization.
+        first (int): The first day.
+        last (int): The last day, included.
+        count (int): The messages of each report.
+
+    Returns:
+        list[Report]: The reports.
+    """
+    return [
+        _report(
+            f"{reporter}-{day}",
+            day,
+            _record(_OTHER_IP, count, "pass", "pass"),
+            reporter=reporter,
+        )
+        for day in range(first, last + 1)
+    ]
+
+
+def test_a_run_from_one_organization_rests_on_it_alone() -> None:
+    """Without its reports there are none: the period fails first, and the count is one."""
+    summary = _run(*_days("only.example.net", 1, 28, 10))
+
+    verdict = judge(summary)
+
+    assert verdict.answer is Answer.READY
+    assert _reliance(verdict) == [
+        Note(
+            NoteKind.REPORTER_RELIANCE,
+            (280, 280, 1, 1),
+            ("only.example.net", "too_early"),
+        )
+    ]
+
+
+def test_from_the_summary_the_larger_organization_is_named_and_not_the_first_name() -> None:
+    """Two halves of the period; both qualify and the one with most messages is named."""
+    summary = _run(
+        *_days("a-small.example.org", 1, 14, 10),
+        *_days("z-big.example.net", 15, 28, 30),
+    )
+
+    assert _reliance(judge(summary)) == [
+        Note(
+            NoteKind.REPORTER_RELIANCE,
+            (420, 560, 2, 1),
+            ("z-big.example.net", "too_early"),
+        )
+    ]
+
+
+def test_from_the_summary_a_tie_in_messages_is_decided_by_the_name() -> None:
+    """Two halves with the same messages: the name first in order is the one named."""
+    summary = _run(
+        *_days("b.example.net", 1, 14, 10),
+        *_days("a.example.org", 15, 28, 10),
+    )
+
+    assert _reliance(judge(summary)) == [
+        Note(NoteKind.REPORTER_RELIANCE, (140, 280, 2, 1), ("a.example.org", "too_early"))
+    ]
+
+
+def test_from_the_summary_two_organizations_over_the_whole_period_give_no_note() -> None:
+    summary = _run(
+        *_days("a.example.org", 1, 28, 10),
+        *_days("b.example.net", 1, 28, 10),
+    )
+
+    verdict = judge(summary)
+
+    assert verdict.answer is Answer.READY
+    assert _reliance(verdict) == []
+
+
+def test_rule_4_cannot_turn_a_ready_answer() -> None:
+    """A ready run has no recognized failure, and removing reports cannot add one."""
+    for summary in (
+        _run(*_days("only.example.net", 1, 28, 10)),
+        _run(*_days("a.example.org", 1, 14, 10), *_days("b.example.net", 15, 28, 30)),
+        _resting(make_summary(unrecognized_failing=10), _TURNING["unrecognized share"][1]),
+    ):
+        assert judge(summary).answer is Answer.READY
+        assert rule(judge(summary), RuleId.RECOGNIZED_FAILURES).measured == 0
+        assert summary.without_reporter
+        for entry in summary.without_reporter:
+            assert entry.recognized_failing == 0
+
+
+def _without_note(verdict: Verdict) -> Verdict:
+    """
+    Drop the reporter-reliance note of a verdict, to compare the rest with a verdict without it.
+
+    Args:
+        verdict (Verdict): The verdict.
+
+    Returns:
+        Verdict: The same verdict without that note.
+    """
+    kept = tuple(note for note in verdict.notes if note.kind is not NoteKind.REPORTER_RELIANCE)
+    return dataclasses.replace(verdict, notes=kept)
+
+
+@pytest.mark.parametrize(
+    "summary",
+    [
+        *(_resting(summary, turning) for summary, turning, _ in _TURNING.values()),
+        _run(*_days("only.example.net", 1, 28, 10)),
+        _run(*_days("a.example.org", 1, 14, 10), *_days("b.example.net", 15, 28, 30)),
+        _resting(make_summary(days=20, skipped=2), _without("big.example.net", 1500, days=5)),
+        _resting(
+            make_summary(recognized_failing=3),
+            _without("big.example.net", 1500, days=5),
+        ),
+    ],
+)
+def test_the_note_changes_nothing_else_of_the_verdict(summary: Summary) -> None:
+    """Answer, deciding rule, rules, sources and what was left out are as without the entries."""
+    without_entries = dataclasses.replace(summary, without_reporter=())
+
+    verdict = judge(summary)
+
+    assert _without_note(verdict) == judge(without_entries)
+
+
+def test_a_threshold_of_the_verdict_moves_the_note_with_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The check reads the thresholds of ``verdict.py`` and no number of its own (RNF-03)."""
+    rests_on_period = _resting(
+        make_summary(),
+        _without("big.example.net", 1500, days=20),
+        _without("small.example.org", 500),
+    )
+    rests_on_nothing = _resting(
+        make_summary(),
+        _without("big.example.net", 1500),
+        _without("small.example.org", 500),
+    )
+    assert _reliance(judge(rests_on_period))
+    assert not _reliance(judge(rests_on_nothing))
+
+    monkeypatch.setattr(verdict_module, "MIN_DAYS_SPANNED", 20)
+    assert not _reliance(judge(rests_on_period))
+
+    monkeypatch.setattr(verdict_module, "MIN_MESSAGES", 600)
+    assert _reliance(judge(rests_on_nothing)) == [
+        Note(
+            NoteKind.REPORTER_RELIANCE,
+            (1500, 2000, 2, 3),
+            ("big.example.net", "too_early"),
+        )
+    ]
+    assert judge(rests_on_nothing).answer is Answer.READY

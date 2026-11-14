@@ -16,6 +16,7 @@ from pathlib import Path
 from tests.schema_examples import (
     CONFIG_SOURCE,
     example_fetch,
+    example_reliance_verdict,
     example_summaries,
     example_summary,
     example_verdict,
@@ -29,6 +30,7 @@ from mailvigil.render_json import (
     verdict_document,
     verdicts_document,
 )
+from mailvigil.verdict import NoteKind
 
 _PAGE = Path(__file__).resolve().parent.parent / "docs" / "json-schema.md"
 
@@ -135,6 +137,22 @@ def test_the_verdict_example_is_the_real_output() -> None:
     real = verdict_document(example_verdict())
 
     assert _example("A verdict") == json.loads(json.dumps(real))
+
+
+def test_the_reliance_note_example_is_the_real_output() -> None:
+    """The page shows the note ``verdict_document`` writes when the answer rests on one reporter."""
+    real = verdict_document(example_reliance_verdict())
+    notes = [note for note in real["notes"] if note["kind"] == "reporter_reliance"]
+
+    assert [_example("A reporter-reliance note")] == json.loads(json.dumps(notes))
+
+
+def test_every_kind_of_note_is_named_in_the_note_table_in_order() -> None:
+    """A kind added to ``NoteKind`` cannot reach ``--json`` without its row (spec 011, ADR-5)."""
+    body = _page().split("### `note`\n", 1)[1].split("\n### ", 1)[0]
+    row = next(line for line in body.splitlines() if line.startswith("| `kind` |"))
+
+    assert re.findall(r"`([a-z_]+)`", row.split("|")[3]) == [kind.value for kind in NoteKind]
 
 
 def test_the_fetch_example_is_the_real_output() -> None:

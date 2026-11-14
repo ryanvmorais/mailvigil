@@ -502,7 +502,7 @@ def test_several_notes_come_in_the_order_of_their_kinds() -> None:
 def test_every_kind_of_note_has_a_portuguese_text() -> None:
     base = make_verdict()
     for kind in NoteKind:
-        note = Note(kind, numbers=(1, 2, 3), texts=("a", "b"))
+        note = Note(kind, numbers=(1, 2, 3), texts=("a", "too_early"))
         text = verdict_pt(dataclasses.replace(base, notes=(note,)))
         assert len(re.findall(r"(?m)^  - ", text)) == 1
 

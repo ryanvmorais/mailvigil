@@ -10,6 +10,7 @@ same run, since the two must agree (RF-02). The attack strings are in ``test_ren
 
 from __future__ import annotations
 
+import dataclasses
 import itertools
 import re
 from datetime import timedelta
@@ -41,7 +42,7 @@ from mailvigil.render_verdict import (
 )
 from mailvigil.senders import Outcome
 from mailvigil.summary import Counts, FailingSource, SenderRow, Summary
-from mailvigil.verdict import Answer, Verdict, judge
+from mailvigil.verdict import Answer, Note, NoteKind, Verdict, judge
 
 # The README shows this file, so the page must draw the same path (one symbol for the tool).
 _SYMBOL_FILE = (
@@ -285,6 +286,20 @@ def test_every_note_of_the_verdict_is_on_the_page() -> None:
     for note in verdict.notes:
         assert note_sentence(note, ENGLISH) in page.texts
     assert ENGLISH.verdict.notes_title in [text for _level, text in page.headings]
+
+
+def test_the_reliance_note_on_the_page_names_the_answer_as_the_title_does() -> None:
+    """Under ``p=reject`` the page says "BLOCKING REAL MAIL", as the text does (spec 011)."""
+    summary = ready_summary()
+    note = Note(NoteKind.REPORTER_RELIANCE, (1500, 2000, 2, 5), ("big.example.net", "not_ready"))
+    for enforcing, words in (("none", "NOT READY for p=reject"), ("reject", "BLOCKING REAL MAIL")):
+        verdict = dataclasses.replace(judge(summary), enforcing=enforcing, notes=(note,))
+
+        page = Page(render_html(summary, verdict))
+
+        sentence = note_sentence(note, ENGLISH, enforcing == "reject")
+        assert sentence in page.texts
+        assert f"would be {words}." in sentence
 
 
 def test_there_is_no_notes_block_without_notes() -> None:
