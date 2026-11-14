@@ -540,8 +540,9 @@ Regras
   4  falhas reconhecidas      0                <= 0        passa
   5  falhas não reconhecidas  56 (0.8%)        <= 0.5%     FALHA
 
-Próximo: olhe as origens acima e acrescente os seletores das que forem suas a
-         [senders] na configuração.
+Próximo: olhe as origens acima e acrescente as que forem suas a [senders]
+         (seletor DKIM), [spf] (domínio SPF) ou [ips] (faixa de IP) na
+         configuração.
 
 Isto lê apenas os relatórios que você deu: email que nenhum receptor reporta, e
 remetentes que ficaram quietos neste período, não são cobertos.

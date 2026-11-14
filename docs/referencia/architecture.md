@@ -99,12 +99,13 @@ tests/               # pytest, one test file per module (test_reports_*.py, test
                      # test_senders.py, test_summary.py, test_verdict.py, test_render*.py, test_messages*.py,
                      # test_json_schema_doc.py, test_cli_*.py, test_htmlkit.py, test_html_*.py,
                      # test_fetch_*.py, test_smoke.py, test_gitignore.py, test_readme_*.py,
-                     # test_properties.py (Hypothesis: the readers only refuse and a parsed report
-                     # reaches every output; the `thorough` profile is for a long hunt) and
-                     # test_offline_isolation.py, which runs fresh interpreters to prove that
+                     # test_impersonality.py, test_properties.py (Hypothesis: the readers only refuse
+                     # and a parsed report reaches every output; the `thorough` profile is for a long
+                     # hunt) and test_offline_isolation.py, which runs fresh interpreters to prove that
                      # summary and verdict never load the network code); fixtures are synthetic,
                      # built in conftest.py and the *_helpers.py, schema_examples.py, imap_peer.py (a
-                     # scripted IMAP server), help_golden.py (the recorded --help texts) or tmp_path
+                     # scripted IMAP server), help_golden.py (the recorded --help texts),
+                     # render_verdict_golden.py (the recorded verdict texts) or tmp_path
 specs/               # spec-driven development: requirements → design → tasks per feature
 docs/stack.md        # each technology of the stack, why it was chosen, what to study first
 docs/json-schema.md  # every field of the three --json documents and the compatibility promise
