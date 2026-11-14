@@ -128,6 +128,40 @@ def test_the_same_run_twice_prints_the_same_bytes(
     assert outputs[1] == outputs[3]
 
 
+def keys(value: object) -> set[str]:
+    """
+    Collect every key of a JSON value, at any depth.
+
+    Args:
+        value (object): A value read by ``json.loads``.
+
+    Returns:
+        set[str]: The keys of every object inside it.
+    """
+    if isinstance(value, dict):
+        return set(value).union(*(keys(item) for item in value.values()))
+    if isinstance(value, list):
+        return set().union(*(keys(item) for item in value))
+    return set()
+
+
+def test_no_document_carries_the_measures_without_each_organization(
+    tmp_path: Path,
+    make_report_xml: ReportXml,
+    make_record_xml: RecordXml,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Spec 011, RNF-01: ``without_reporter`` stays inside the summary, at any depth."""
+    folder = write_window(tmp_path / "reports", make_report_xml, make_record_xml, days=LONG)
+    config = write_config(tmp_path / "config.toml")
+
+    for command in ("summary", "verdict"):
+        main([command, str(folder), "--config", str(config), "--json"])
+        document = json.loads(capsys.readouterr().out)
+
+        assert "without_reporter" not in keys(document)
+
+
 # ---------------------------------------------------------------------------
 # A verdict that is not yes still prints in full (RF-05)
 # ---------------------------------------------------------------------------
