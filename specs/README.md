@@ -49,8 +49,8 @@ file says where the spec is.
 ## Roadmap
 
 Delivery is the milestone of the build (`v0.x`), as recorded in this table. No milestone was published: the
-first release is `1.0.0` and contains `v0.1` to `v0.9`; `v0.10` came with `1.6.0`, and `v0.11` is
-unreleased. `v0.9` (hardening before the release) has no spec of its own: it amends 002, 004, 005,
+first release is `1.0.0` and contains `v0.1` to `v0.9`; `v0.10` came with `1.6.0`, and `v0.11` with
+`1.8.0`. `v0.9` (hardening before the release) has no spec of its own: it amends 002, 004, 005,
 006 and 009. A spec still to be built has no milestone yet (`—`).
 
 | Spec | Scope | Delivery | Status |

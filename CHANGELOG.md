@@ -8,9 +8,11 @@ All notable changes to MailVigil are written here. The format follows
 The `v0.1` to `v0.11` milestones are the steps the project was built in, each
 designed as a spec under [`specs/`](specs/). None of them was released on its own: `1.0.0` is the
 first release and contains `v0.1` to `v0.9`, `v0.10` (several domains) arrived in `1.6.0`, and
-`v0.11` (the note on one reporting organization) is under [Unreleased].
+`v0.11` (the note on one reporting organization) in `1.8.0`.
 
 ## [Unreleased]
+
+## [1.8.0] - 2026-11-14
 
 ### Added
 
@@ -271,7 +273,8 @@ The first release. It gathers the milestones `v0.1` to `v0.9` built as specs und
   certificate checked, read-only (it changes, moves and deletes nothing and does not mark mail as
   read), with the password asked on the terminal or read from a file.
 
-[Unreleased]: https://github.com/ryanvmorais/mailvigil/compare/v1.7.2...HEAD
+[Unreleased]: https://github.com/ryanvmorais/mailvigil/compare/v1.8.0...HEAD
+[1.8.0]: https://github.com/ryanvmorais/mailvigil/compare/v1.7.2...v1.8.0
 [1.7.2]: https://github.com/ryanvmorais/mailvigil/compare/v1.7.1...v1.7.2
 [1.7.1]: https://github.com/ryanvmorais/mailvigil/compare/v1.7.0...v1.7.1
 [1.7.0]: https://github.com/ryanvmorais/mailvigil/compare/v1.6.0...v1.7.0
