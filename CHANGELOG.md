@@ -11,6 +11,16 @@ first release and contains `v0.1` to `v0.9`, and `v0.10` (several domains) arriv
 
 ## [Unreleased]
 
+### Added
+
+- **`verdict` notes when a `ready` answer rests on one reporting organization** (#186). When
+  the five rules, applied to every report except that organization's, would not answer `ready`,
+  the notes name it, give its share of the messages and say what the answer would be without its
+  reports (or that every report came from it). Only the largest such organization is named. The
+  answer and the exit code do not change. In `--json` it is a note of the new `kind`
+  `reporter_reliance` (see [docs/json-schema.md](docs/json-schema.md)); a consumer must accept a
+  note `kind` it does not know.
+
 ## [1.7.2] - 2026-11-14
 
 ### Changed

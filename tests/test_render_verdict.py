@@ -21,7 +21,8 @@ import pytest
 from tests.render_verdict_golden import GOLDEN
 
 from mailvigil import verdict as verdict_module
-from mailvigil.messages import ENGLISH, PORTUGUESE_ASCII, Messages
+from mailvigil.messages import ENGLISH, PORTUGUESE, PORTUGUESE_ASCII, Messages
+from mailvigil.render import fit
 from mailvigil.render_verdict import (
     measured_text,
     missing_text,
@@ -545,11 +546,154 @@ def test_several_notes_come_in_the_order_of_their_kinds() -> None:
     assert sentences[-1].startswith("The policy is p=quarantine")
 
 
+def _reliance_note(
+    answer: Answer = Answer.TOO_EARLY,
+    *,
+    name: str = "big.example.net",
+    messages: int = 1500,
+    total: int = 2000,
+    organizations: int = 2,
+) -> Note:
+    """
+    Build a reporter-reliance note (spec 011).
+
+    Args:
+        answer (Answer, optional): The answer without the organization. Default: ``TOO_EARLY``.
+        name (str, optional): The organization. Default: ``big.example.net``.
+        messages (int, optional): Its messages. Default: 1500.
+        total (int, optional): All the messages. Default: 2000.
+        organizations (int, optional): The organizations that reported. Default: 2.
+
+    Returns:
+        Note: The note, with rule 1 as the one that decides without the organization.
+    """
+    return Note(
+        NoteKind.REPORTER_RELIANCE,
+        numbers=(messages, total, organizations, int(RuleId.PERIOD)),
+        texts=(name, answer.value),
+    )
+
+
+@pytest.mark.parametrize(
+    ("messages", "answer", "enforcing", "expected"),
+    [
+        (
+            ENGLISH,
+            Answer.TOO_EARLY,
+            False,
+            "The answer rests on big.example.net (75.0% of the messages): without its reports it "
+            "would be TOO EARLY to say. Check that you recognize this reporter.",
+        ),
+        (
+            ENGLISH,
+            Answer.NOT_READY,
+            False,
+            "The answer rests on big.example.net (75.0% of the messages): without its reports it "
+            "would be NOT READY for p=reject. Check that you recognize this reporter.",
+        ),
+        (
+            ENGLISH,
+            Answer.NOT_READY,
+            True,
+            "The answer rests on big.example.net (75.0% of the messages): without its reports it "
+            "would be BLOCKING REAL MAIL. Check that you recognize this reporter.",
+        ),
+        (
+            PORTUGUESE,
+            Answer.TOO_EARLY,
+            False,
+            "A resposta depende de big.example.net (75.0% das mensagens): sem os relatórios dessa "
+            "organização, seria CEDO DEMAIS para dizer. Confira se você a reconhece.",
+        ),
+        (
+            PORTUGUESE,
+            Answer.NOT_READY,
+            True,
+            "A resposta depende de big.example.net (75.0% das mensagens): sem os relatórios dessa "
+            "organização, seria BLOQUEANDO EMAIL REAL. Confira se você a reconhece.",
+        ),
+        (
+            PORTUGUESE_ASCII,
+            Answer.NOT_READY,
+            False,
+            "A resposta depende de big.example.net (75.0% das mensagens): sem os relatorios dessa "
+            "organizacao, seria NAO PRONTO para p=reject. Confira se voce a reconhece.",
+        ),
+    ],
+    ids=[
+        "en too early",
+        "en not ready",
+        "en at p=reject",
+        "pt too early",
+        "pt at p=reject",
+        "pt folded",
+    ],
+)
+def test_the_reliance_note_names_the_organization_its_share_and_the_answer_without_it(
+    messages: Messages, answer: Answer, enforcing: bool, expected: str
+) -> None:
+    """The answer without it is named with the words of the title (``words_enforcing`` too)."""
+    assert note_sentence(_reliance_note(answer), messages, enforcing=enforcing) == expected
+
+
+@pytest.mark.parametrize(
+    ("messages", "expected"),
+    [
+        (
+            ENGLISH,
+            "Every report came from only.example.net, so the answer rests on its numbers alone. "
+            "Check that you recognize this reporter.",
+        ),
+        (
+            PORTUGUESE,
+            "Todos os relatórios vieram de only.example.net, então a resposta depende só dos "
+            "números dessa organização. Confira se você a reconhece.",
+        ),
+        (
+            PORTUGUESE_ASCII,
+            "Todos os relatorios vieram de only.example.net, entao a resposta depende so dos "
+            "numeros dessa organizacao. Confira se voce a reconhece.",
+        ),
+    ],
+    ids=["en", "pt", "pt folded"],
+)
+def test_one_organization_alone_gets_the_sentence_without_a_share(
+    messages: Messages, expected: str
+) -> None:
+    note = _reliance_note(name="only.example.net", messages=280, total=280, organizations=1)
+
+    assert note_sentence(note, messages) == expected
+
+
+def test_a_long_organization_name_is_cut_in_the_reliance_note() -> None:
+    """The name is the report's, so it is cut as the silent-reporter note cuts it."""
+    name = "a-very-long-reporting-organization.example.net"
+
+    for organizations in (1, 2):
+        sentence = note_sentence(_reliance_note(name=name, organizations=organizations), ENGLISH)
+
+        assert fit(name, 30) in sentence
+        assert name not in sentence
+
+
+def test_the_verdict_names_the_answer_without_the_organization_as_its_title_does() -> None:
+    """Under ``p=reject`` the title says "BLOCKING REAL MAIL", and so does the note."""
+    for p, words in (
+        ("none", "NOT READY for p=reject"),
+        ("reject", "BLOCKING REAL MAIL"),
+    ):
+        verdict = dataclasses.replace(make_verdict(p=p), notes=(_reliance_note(Answer.NOT_READY),))
+
+        out = " ".join(render_verdict(verdict).split())
+
+        assert f"without its reports it would be {words}." in out
+
+
 def test_every_kind_of_note_has_a_text() -> None:
     """A kind added to ``NoteKind`` later cannot reach the output as a bare key or an error."""
     base = make_verdict()
     for kind in NoteKind:
-        note = Note(kind, numbers=(1, 2, 3), texts=("a", "b"))
+        note = Note(kind, numbers=(1, 2, 3), texts=("a", "too_early"))
         out = render_verdict(dataclasses.replace(base, notes=(note,)))
         assert len(re.findall(r"(?m)^  - ", out)) == 1
 
@@ -1079,7 +1223,7 @@ def test_measured_needed_and_missing_text_for_each_rule() -> None:
 def test_the_sentence_of_every_kind_of_note_is_filled(messages: Messages) -> None:
     """The test iterates ``NoteKind``: a kind added later cannot reach the page as a bare key."""
     for kind in NoteKind:
-        note = Note(kind, numbers=(1, 2, 3), texts=("a", "b"))
+        note = Note(kind, numbers=(1, 2, 3), texts=("a", "too_early"))
         sentence = note_sentence(note, messages)
 
         assert sentence

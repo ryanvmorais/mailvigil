@@ -13,6 +13,8 @@ the code, so this page cannot drift from it.
   A run of **two or more domains** prints the envelope of "Several domains in one run" instead: look
   for a `domains` key to tell the two shapes apart.
 - A field is only **added** inside a `schema_version`; a consumer must ignore keys it does not know.
+- A value of `kind` in a `note` is also **added** inside a `schema_version`; a consumer must accept a
+  note whose `kind` it does not know, and may skip it.
 - A field is **renamed, removed or given another type** only with a new `schema_version`.
 - Keys come in a fixed order, and lists come in the order stated below; the same reports give the
   same bytes, in any order of files, with no timestamp and no path of the machine.
@@ -210,9 +212,9 @@ A share is `measured` over `whole`, compared with integers: rule 2 passes when
 
 | Key | Type | Meaning |
 |---|---|---|
-| `kind` | string | `fragile`, `partial_policy`, `policy_changed`, `subdomain_policy`, `currently_quarantine`, `silent_reporter` or `stale` |
-| `numbers` | list of integers | The figures of the note: `fragile` has fragile messages, those that pass by SPF only and all messages; `partial_policy` has `pct`; `silent_reporter` has the whole days a large reporter has been silent, its messages and all messages; `stale` has the whole days since the latest report ended |
-| `texts` | list of strings or nulls | The words of the note: `policy_changed` has the earlier `p` values, oldest first; `subdomain_policy` has `sp` and `np`, with null for the one that is absent; `silent_reporter` has the reporter's name |
+| `kind` | string | `fragile`, `partial_policy`, `policy_changed`, `subdomain_policy`, `currently_quarantine`, `silent_reporter`, `reporter_reliance` or `stale` |
+| `numbers` | list of integers | The figures of the note: `fragile` has fragile messages, those that pass by SPF only and all messages; `partial_policy` has `pct`; `silent_reporter` has the whole days a large reporter has been silent, its messages and all messages; `reporter_reliance` has the messages of the organization a `ready` answer rests on, all messages, the organizations that reported and the `id` of the rule that decides the answer without its reports; `stale` has the whole days since the latest report ended |
+| `texts` | list of strings or nulls | The words of the note: `policy_changed` has the earlier `p` values, oldest first; `subdomain_policy` has `sp` and `np`, with null for the one that is absent; `silent_reporter` has the reporter's name; `reporter_reliance` has the organization's name and the answer without its reports (`too_early` or `not_ready`) |
 
 ### `left_out`
 
@@ -582,6 +584,20 @@ address ranges.
   }
 }
 ```
+
+### A reporter-reliance note
+
+```json
+{
+  "kind": "reporter_reliance",
+  "numbers": [6300, 7335, 3, 2],
+  "texts": ["Example Receiver", "too_early"]
+}
+```
+
+A `ready` verdict whose coverage rests on one of three receivers: without its reports, rule 2 would
+fail and the answer would be `too_early`. The note qualifies the answer and never changes it, nor
+the exit code.
 
 ### A fetch
 

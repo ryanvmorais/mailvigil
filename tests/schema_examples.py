@@ -16,7 +16,7 @@ from tests.test_render_json import make_summary
 from mailvigil.fetch.model import FetchOutcome
 from mailvigil.reports import Reason, SkippedFile
 from mailvigil.senders import Outcome
-from mailvigil.summary import Counts, FailingSource, SenderRow, Summary
+from mailvigil.summary import Counts, FailingSource, SenderRow, Summary, WithoutReporter
 from mailvigil.verdict import Verdict, judge
 
 #: The configuration file shown in the summary example.
@@ -86,6 +86,28 @@ def example_verdict() -> Verdict:
     return judge(
         make_summary(days=29, ok=6000, dkim_only=950, failing=failing, sp="reject", other_domain=2)
     )
+
+
+def example_reliance_verdict() -> Verdict:
+    """
+    Build a ready verdict whose coverage rests on one of three receivers (spec 011).
+
+    Without ``Example Receiver`` the other reports cover 20 of the 29 days, under the 80% rule 2
+    asks for, so the answer would be too early.
+
+    Returns:
+        Verdict: The verdict, with the reporter-reliance note.
+    """
+    summary = dataclasses.replace(
+        make_summary(days=29, ok=7335),
+        reporters=3,
+        without_reporter=(
+            WithoutReporter("Example Receiver", 6300, 29, 20, 1035, 0, 0),
+            WithoutReporter("Other Receiver", 700, 29, 29, 6635, 0, 0),
+            WithoutReporter("Third Receiver", 335, 29, 29, 7000, 0, 0),
+        ),
+    )
+    return judge(summary)
 
 
 def example_fetch() -> FetchOutcome:

@@ -113,6 +113,11 @@ class NoteKind(StrEnum):
         SILENT_REPORTER (str): A reporter with a large share of the messages stopped sending while
             others went on. Numbers: whole days it has been silent, its messages, all messages.
             Texts: its name.
+        REPORTER_RELIANCE (str): The answer is ``ready``, and the five rules without one
+            organization's reports would not answer so (spec 011); only the largest such
+            organization is named. Numbers: its messages, all messages, the organizations that
+            reported, the id of the rule that decides the answer without it. Texts: its name, the
+            answer without it (``too_early`` or ``not_ready``).
         STALE (str): The latest report ended long before the run. Numbers: whole days since.
     """
 
@@ -122,6 +127,7 @@ class NoteKind(StrEnum):
     SUBDOMAIN_POLICY = "subdomain_policy"
     CURRENTLY_QUARANTINE = "currently_quarantine"
     SILENT_REPORTER = "silent_reporter"
+    REPORTER_RELIANCE = "reporter_reliance"
     STALE = "stale"
 
 
@@ -302,7 +308,64 @@ def _rules(
     )
 
 
-def _notes(summary: Summary, enforcing: str, now: datetime | None) -> tuple[Note, ...]:
+def _answer(rules: tuple[Rule, ...]) -> tuple[Answer, RuleId | None]:
+    """
+    Add the five rules up to an answer (ADR-2).
+
+    A failed problem rule beats a failed data rule, so a recognized service that fails decides the
+    answer even when the window is short.
+
+    Args:
+        rules (tuple[Rule, ...]): The five rules, from ``_rules``.
+
+    Returns:
+        tuple[Answer, RuleId | None]: The answer, and the first failed rule of the kind that
+            decided it; ``None`` exactly when the answer is ``READY``.
+    """
+    for kind, outcome in ((RuleKind.PROBLEM, Answer.NOT_READY), (RuleKind.DATA, Answer.TOO_EARLY)):
+        failed = [r for r in rules if r.kind is kind and not r.passed]
+        if failed:
+            return outcome, failed[0].id
+    return Answer.READY, None
+
+
+def _reliance(summary: Summary) -> Note | None:
+    """
+    Find the largest organization a ``ready`` answer rests on (spec 011, RF-01, ADR-1, ADR-4).
+
+    The five rules are applied to the measures without each organization, by the same ``_rules``
+    and ``_answer`` as the run, so no threshold is read here (RNF-03).
+
+    Args:
+        summary (Summary): The summary of a run whose answer is ``READY``.
+
+    Returns:
+        Note | None: The note for the first organization, in the order of ``reporter_activity``,
+            without whose reports the answer would not be ``READY``; ``None`` when there is none.
+    """
+    for entry in summary.without_reporter:
+        answer, deciding = _answer(
+            _rules(
+                entry.days_spanned,
+                entry.days_with_reports,
+                entry.total,
+                entry.recognized_failing,
+                entry.unrecognized_failing,
+            )
+        )
+        # why: the list is sorted, most messages first, so the first match is the largest.
+        if deciding is not None:
+            return Note(
+                NoteKind.REPORTER_RELIANCE,
+                numbers=(entry.messages, summary.totals.total, summary.reporters, int(deciding)),
+                texts=(entry.name, answer.value),
+            )
+    return None
+
+
+def _notes(
+    summary: Summary, enforcing: str, now: datetime | None, answer: Answer
+) -> tuple[Note, ...]:
     """
     Collect the notes that apply, in the order of ``NoteKind`` (RF-04).
 
@@ -310,6 +373,8 @@ def _notes(summary: Summary, enforcing: str, now: datetime | None) -> tuple[Note
         summary (Summary): The summary.
         enforcing (str): The latest ``p``, normalized.
         now (datetime | None): The moment of the run, ``None`` when the caller gave no clock.
+        answer (Answer): The answer of the run, already decided; only ``READY`` is qualified by
+            the reporter-reliance note.
 
     Returns:
         tuple[Note, ...]: The notes; none changes the answer.
@@ -347,6 +412,10 @@ def _notes(summary: Summary, enforcing: str, now: datetime | None) -> tuple[Note
                     )
                 )
                 break
+    if answer is Answer.READY:
+        reliance = _reliance(summary)
+        if reliance is not None:
+            notes.append(reliance)
     if now is not None and summary.period is not None:
         age = now - summary.period.end
         if age > STALE_AFTER:
@@ -387,13 +456,7 @@ def judge(summary: Summary, now: datetime | None = None) -> Verdict:
     rules = _rules(days, with_reports, summary.totals.total, recognized, unrecognized)
 
     # 2. A failed problem rule beats a failed data rule; ``deciding`` is the first of that kind.
-    answer = Answer.READY
-    deciding: RuleId | None = None
-    for kind, outcome in ((RuleKind.PROBLEM, Answer.NOT_READY), (RuleKind.DATA, Answer.TOO_EARLY)):
-        failed = [r for r in rules if r.kind is kind and not r.passed]
-        if failed:
-            answer, deciding = outcome, failed[0].id
-            break
+    answer, deciding = _answer(rules)
 
     enforcing = summary.policy.p.strip().lower() if summary.policy else ""
     return Verdict(
@@ -404,7 +467,7 @@ def judge(summary: Summary, now: datetime | None = None) -> Verdict:
         deciding=deciding,
         recognized_failing=recognized_failing,
         unrecognized_failing=unrecognized_failing,
-        notes=_notes(summary, enforcing, now),
+        notes=_notes(summary, enforcing, now, answer),
         left_out=LeftOut(
             skipped=len(summary.skipped),
             duplicates=summary.duplicates,

@@ -208,11 +208,19 @@ _VERDICT = VerdictMessages(
                 "{name} enviou {share} das mensagens mas nada nos últimos {days} dias; os dias "
                 "que faltaram podem parecer cobertos por outros relatórios."
             ),
+            NoteKind.REPORTER_RELIANCE: (
+                "A resposta depende de {name} ({share} das mensagens): sem os relatórios dessa "
+                "organização, seria {words}. Confira se você a reconhece."
+            ),
             NoteKind.STALE: (
                 "O último relatório terminou há {days} dias; os números podem não descrever o "
                 "e-mail que você envia hoje."
             ),
         }
+    ),
+    reliance_alone=(
+        "Todos os relatórios vieram de {name}, então a resposta depende só dos números dessa "
+        "organização. Confira se você a reconhece."
     ),
     next_label="Próximo:",
     next_each_service="cada serviço listado acima",

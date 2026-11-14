@@ -207,11 +207,19 @@ _VERDICT = VerdictMessages(
                 "{name} sent {share} of the messages but nothing in the last {days} days; the "
                 "days it missed may look covered by other reporters."
             ),
+            NoteKind.REPORTER_RELIANCE: (
+                "The answer rests on {name} ({share} of the messages): without its reports it "
+                "would be {words}. Check that you recognize this reporter."
+            ),
             NoteKind.STALE: (
                 "The latest report ended {days} days ago, so the figures may not describe the "
                 "mail you send today."
             ),
         }
+    ),
+    reliance_alone=(
+        "Every report came from {name}, so the answer rests on its numbers alone. Check that "
+        "you recognize this reporter."
     ),
     next_label="Next:",
     next_each_service="each service listed above",

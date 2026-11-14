@@ -560,7 +560,8 @@ def _notes(verdict: Verdict, messages: Messages) -> Safe:
     """
     if not verdict.notes:
         return fragment()
-    items = [el("li", text(note_sentence(note, messages))) for note in verdict.notes]
+    enforcing = verdict.enforcing == "reject"
+    items = [el("li", text(note_sentence(note, messages, enforcing))) for note in verdict.notes]
     return _section(messages.verdict.notes_title, "h-notes", el("ul", *items, class_="notes"))
 
 

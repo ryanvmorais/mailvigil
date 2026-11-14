@@ -228,6 +228,8 @@ class VerdictMessages:
         result_too_early (str): The result of a data rule that fails.
         notes_title (str): The title of the notes.
         notes (Mapping[NoteKind, str]): One sentence per note; each kind has its own placeholders.
+        reliance_alone (str): The reporter-reliance note when one organization sent every report;
+            ``{name}`` (spec 011).
         next_label (str): The label that opens the next step, without the colon-space after it.
         next_each_service (str): What names the services when more than one fails.
         next_recognized (str): The next step when a recognized sender fails; ``{who}``.
@@ -274,6 +276,7 @@ class VerdictMessages:
     result_too_early: str
     notes_title: str
     notes: Mapping[NoteKind, str]
+    reliance_alone: str
     next_label: str
     next_each_service: str
     next_recognized: str

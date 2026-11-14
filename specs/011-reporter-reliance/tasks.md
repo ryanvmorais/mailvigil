@@ -10,8 +10,9 @@ origin: conception
 
 # 011 — Reporter reliance — tasks
 
-Each stage is one pull request (issue → branch → PR). Inside a stage, tests come first: write the
-test that feeds the input, watch it fail for the right reason, then write the code. Every report,
+Each stage is one pull request (issue → branch → PR), except stages 2 and 3, which went in one
+(see there). Inside a stage, tests come first: write the test that feeds the input, watch it fail
+for the right reason, then write the code. Every report,
 organization and domain in a test is invented, and every address is in a documentation range
 (RNF-06).
 
@@ -76,50 +77,84 @@ maintainer's act and is prepared apart.
   `test_every_collection_of_a_summary_is_a_tuple` each gained the new field or type; no other
   test changed.
 
+## Stages 2 and 3, one pull request
+
+Stages 2 and 3 went in one pull request (decided by the maintainer on 2026-11-14). With the new kind
+and no sentence for it, every `ready` run resting on one organization ended in exit 70 (the table of
+note texts had no entry), and about 45 tests of the CLI, the page and the catalogs failed, so stage
+2 alone would have left `main` broken.
+
 ## Stage 2 — The check and the note (RF-01, RF-02, RF-04, RNF-03, ADR-1, ADR-4, ADR-5)
 
-- [ ] `tests/test_verdict.py`, written first: a `ready` summary where the answer rests on one
+- [x] `tests/test_verdict.py`, written first: a `ready` summary where the answer rests on one
   organization through each rule that can turn it (period, coverage, volume, the unrecognized
   share), each giving the note with its numbers (its messages, all messages, organizations, the rule
   id) and texts (its name, `too_early` or `not_ready`); a test that rule 4 cannot turn a `ready`; the
   largest organization named when two qualify, and the name deciding a tie; one organization alone;
   no note when the answer rests on none; no note on `too_early` and `not_ready`. — RF-01, RF-02,
   ADR-4
-- [ ] `tests/test_verdict.py`: the answer, the deciding rule, the five rules, the failing sources
+- [x] `tests/test_verdict.py`: the answer, the deciding rule, the five rules, the failing sources
   and `left_out` are equal to a verdict built with `without_reporter` emptied; a threshold of
   `verdict.py` patched in the test (`monkeypatch`) makes the note appear or go. — RF-04, RNF-03
-- [ ] `src/mailvigil/verdict.py`: `_answer(rules)` taken out of `judge`, which calls it as before;
+- [x] `src/mailvigil/verdict.py`: `_answer(rules)` taken out of `judge`, which calls it as before;
   `NoteKind.REPORTER_RELIANCE` after `SILENT_REPORTER`, documented on the kind; `_notes` receives the
   answer of the run and, on `READY`, walks `summary.without_reporter` with `_rules` and `_answer` and
   stops at the first entry that is not `READY`. — RF-01, RF-02, ADR-1, ADR-4, ADR-5
-- [ ] Quality gate of the stage (as above), with the real result recorded. A test that now fails
-  because it builds a `ready` verdict resting on one organization is updated in this stage only if
-  it compares the notes of the verdict; every one is named here. — RF-04, RNF-01
+  Result: the walk is `_reliance(summary)`; the count of organizations in the note is
+  `Summary.reporters`.
 
 ## Stage 3 — The text and the outputs (RF-02, RF-03, RNF-01, RNF-05)
 
-- [ ] `tests/test_render_verdict.py` and `tests/test_messages.py`, written first: both sentences in
+- [x] `tests/test_render_verdict.py` and `tests/test_messages.py`, written first: both sentences in
   both languages, as in the table of the design; `{words}` from `words` and from `words_enforcing`
   (a domain already at `p=reject`); a long name cut by `fit`; the Portuguese folded to ASCII on a
   stream without accents (`tests/test_messages_fold.py`); every `NoteKind` has its sentence. — RF-02
-- [ ] `src/mailvigil/messages/model.py` (`reliance_alone`), `messages/en.py` and `messages/pt_br.py`
+  Result: the folded Portuguese is checked in `tests/test_render_verdict.py` with
+  `PORTUGUESE_ASCII`; `tests/test_messages_fold.py` folds every field of the catalog already, so it
+  did not change.
+- [x] `src/mailvigil/messages/model.py` (`reliance_alone`), `messages/en.py` and `messages/pt_br.py`
   (the two sentences), `src/mailvigil/render_verdict.py` (`_reliance` in the table of note texts).
   — RF-02
-- [ ] `tests/test_cli_verdict.py`, `tests/test_cli_json.py`, `tests/test_cli_html.py` and the files
+  Result: the note is the only one that names an answer, so `note_sentence` gained an `enforcing`
+  argument (default `False`), passed by the text and by the page, and sends this kind to
+  `_reliance` before the table; the other note functions keep their two arguments.
+- [x] `tests/test_cli_verdict.py`, `tests/test_cli_json.py`, `tests/test_cli_html.py` and the files
   for several domains (`tests/test_render_json_domains.py`, `tests/test_cli_html_domains.py`): the
   note in text, in `--json` (`kind` `reporter_reliance`) and in the notes card of `--html`, for one
   domain and for several, where each domain gets its own note or none; the exit codes are the same
   as without the note. — RF-03, RF-04
-- [ ] `tests/test_render_html_hostile.py`: an organization name with markup and control characters
+  Result: these tests are in one new file, `tests/test_cli_reporter_reliance.py`, with the text in
+  Portuguese too. `tests/test_render_html.py` checks the page words under `p=reject`.
+- [x] `tests/test_render_html_hostile.py`: an organization name with markup and control characters
   reaches the note cleaned in text and escaped on the page. — RNF-05
-- [ ] `docs/json-schema.md`: the kind in the `note` table with its numbers and texts, the rule that
+  Result: tested end to end in `tests/test_cli_reporter_reliance.py` instead, from the XML of a
+  report, because the name is cleaned by the ingestion (002): no right-to-left override or tab in
+  the text, and the page has the elements and attributes of a run with an innocent name.
+- [x] `docs/json-schema.md`: the kind in the `note` table with its numbers and texts, the rule that
   a consumer must accept a note `kind` it does not know, and an example built by the code;
   `tests/test_json_schema_doc.py` sees the new kind. — RNF-01, ADR-5
-- [ ] The goldens that carry a `ready` run resting on one organization
+  Result: the example is `example_reliance_verdict` in `tests/schema_examples.py`, and a test
+  reads every `NoteKind` from the `kind` row, in order.
+- [x] The goldens that carry a `ready` run resting on one organization
   (`tests/render_verdict_golden.py` and any other the gate names) are regenerated from the live
   output and the change is read line by line: only the note line is new. — RNF-01
-- [ ] Quality gate of the stage (as above), with the real result recorded and every changed
+  Result: none needed it. The goldens build their verdicts by hand, without `without_reporter`, and
+  the CLI tests of a `ready` run compare parts of the output, so the gate named no golden. The
+  README demo, which does rest on one organization, is stage 4.
+- [x] Quality gate of stages 2 and 3 (as above), with the real result recorded and every changed
   existing test named. — RNF-01, RNF-06
+  Result (2026-11-14): ruff, black and mypy clean; 3722 passed, 7 skipped (POSIX modes and
+  symbolic links on Windows); coverage 100%. The existing tests that changed only list the kinds of
+  note: in `tests/test_verdict.py`, `test_several_notes_come_in_the_order_of_note_kind` and
+  `test_the_answer_and_kind_words_are_the_stable_strings` gained the kind; in
+  `tests/test_render_verdict.py`, `test_every_kind_of_note_has_a_text` and
+  `test_the_sentence_of_every_kind_of_note_is_filled`, and in `tests/test_render_pt.py`,
+  `test_every_kind_of_note_has_a_portuguese_text`, give every kind `too_early` as its second text,
+  since this note names an answer there. The table of placeholders of `tests/test_messages.py`
+  gained the two sentences. Two helpers gained arguments whose defaults keep every earlier file:
+  `_report` in `tests/test_verdict.py` (`reporter`) and `write_window` in `tests/cli_helpers.py`
+  (`reporter`, `host`, `first_day`). No other test changed. The `CHANGELOG.md` entry went in this
+  pull request, as the repository asks of a change a user notices.
 
 ## Stage 4 — Documentation and close (RNF-01, RNF-04)
 
@@ -129,8 +164,8 @@ maintainer's act and is prepared apart.
 - [ ] The README demo: run `docs/demo/build_demo.py` and rebuild `docs/demo/verdict.cast` and its
   picture with the commands in its docstring, adjusting the height if the note adds a line; read the
   new frames; the alt text stays true. — RF-03
-- [ ] `docs/stability.md` (the JSON row: a new note kind is a minor change), `CHANGELOG.md` (under
-  `[Unreleased]`: Added), `specs/README.md` (011 `done`, the next milestone in the delivery column).
+- [ ] `docs/stability.md` (the JSON row: a new note kind is a minor change), `CHANGELOG.md` (the
+  entry of stages 2 and 3 read again), `specs/README.md` (011 `done`, the next milestone in the delivery column).
   `CLAUDE.md` and `docs/stack.md` change only if a line of theirs is no longer true. — RNF-01
 - [ ] A last compatibility pass: the full suite; the wheel declares no `Requires-Dist` (`uv build`
   and the `package` check); `status: done` in the three files. — RNF-01, RNF-04

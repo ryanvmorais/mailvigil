@@ -527,6 +527,30 @@ def _silent(note: Note, messages: Messages) -> str:
     )
 
 
+def _reliance(note: Note, messages: Messages, enforcing: bool) -> str:
+    """
+    Say which organization the answer rests on, and what it would be without its reports.
+
+    Args:
+        note (Note): The note, as ``NoteKind.REPORTER_RELIANCE`` documents it.
+        messages (Messages): The language.
+        enforcing (bool): Whether the domain is at ``p=reject`` already.
+
+    Returns:
+        str: One sentence; without a share when one organization sent every report.
+    """
+    sent, total, organizations = note.numbers[:3]
+    name = fit(note.texts[0], _NAME_MAX)
+    text = messages.verdict
+    if organizations <= 1:
+        return text.reliance_alone.format(name=name)
+    # why: the answer is named with the words of the title, so the two never call it differently.
+    words = text.words_enforcing if enforcing else text.words
+    return text.notes[NoteKind.REPORTER_RELIANCE].format(
+        name=name, share=format_share(sent, total), words=words[Answer(note.texts[1])]
+    )
+
+
 def _stale(note: Note, messages: Messages) -> str:
     """Say how long ago the latest report ended."""
     return messages.verdict.notes[NoteKind.STALE].format(days=note.numbers[0])
@@ -543,17 +567,22 @@ _NOTE_TEXT: dict[NoteKind, Callable[[Note, Messages], str]] = {
 }
 
 
-def note_sentence(note: Note, messages: Messages) -> str:
+def note_sentence(note: Note, messages: Messages, enforcing: bool = False) -> str:
     """
     Write one note as a sentence, whatever its kind.
 
     Args:
         note (Note): The note.
         messages (Messages): The language.
+        enforcing (bool, optional): Whether the domain is at ``p=reject`` already, so an answer
+            the note names takes the words the title uses under it. Default: ``False``.
 
     Returns:
         str: The template of the note's kind with its numbers and texts filled in.
     """
+    # why: the one note that names an answer, so the one that needs the policy in force.
+    if note.kind is NoteKind.REPORTER_RELIANCE:
+        return _reliance(note, messages, enforcing)
     return _NOTE_TEXT[note.kind](note, messages)
 
 
@@ -572,7 +601,8 @@ def _notes(verdict: Verdict, messages: Messages) -> list[str]:
         return []
     lines = [messages.verdict.notes_title]
     for note in verdict.notes:
-        lines.extend(_wrap(note_sentence(note, messages), "  - ", "    "))
+        sentence = note_sentence(note, messages, verdict.enforcing == "reject")
+        lines.extend(_wrap(sentence, "  - ", "    "))
     return lines
 
 
