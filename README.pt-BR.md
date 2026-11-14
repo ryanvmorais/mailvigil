@@ -322,7 +322,7 @@ outro domínio são contados no fim, para que nenhum número suma em silêncio.
 ### O veredito
 
 O `mailvigil verdict` responde uma de três coisas, cada uma com a regra que decidiu. Este é um
-`NAO PRONTO` (dados inventados):
+`NÃO PRONTO` (dados inventados):
 
 ```text
 Veredito do MailVigil para example.com: NÃO PRONTO para p=reject
@@ -348,7 +348,7 @@ remetentes que ficaram quietos neste período, não são cobertos.
 ```
 
 `PRONTO` significa que todas as regras passam. `CEDO DEMAIS` significa que as regras de dados (1 a
-3) falham e nada está falhando ainda: espere por mais relatórios. `NAO PRONTO` significa que uma
+3) falham e nada está falhando ainda: espere por mais relatórios. `NÃO PRONTO` significa que uma
 origem falha (regras 4 e 5), e o comando diz qual.
 
 Quando há arquivos recusados, duplicados ou de outro domínio, o veredito acrescenta uma linha
