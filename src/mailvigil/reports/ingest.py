@@ -20,7 +20,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from mailvigil.reports.discovery import Source, discover
-from mailvigil.reports.errors import Reason, ReportRefused
+from mailvigil.reports.errors import Reason, ReportRefused, RunTooLarge
 from mailvigil.reports.mail import iter_mailbox, read_message, read_message_file
 from mailvigil.reports.model import IngestionResult, Report, SkippedFile
 from mailvigil.reports.parser import parse_report
@@ -30,6 +30,12 @@ from mailvigil.text import normalize_domain
 #: How far past the clock a report may end before it is refused. A day absorbs a skewed clock or a
 #: reporter in a distant time zone.
 FUTURE_TOLERANCE = timedelta(days=1)
+
+#: The most records the reports kept in one run may hold, all domains together. Each document is
+#: capped, but a run reads any number of them and keeps every record until the end, so many small
+#: compressed reports could fill memory. A record kept costs under 1 KB; ten reporters sending
+#: 1,000 rows a day for 28 days make 280,000.
+MAX_RECORDS_PER_RUN = 1_000_000
 
 # ---------------------------------------------------------------------------
 # Documents
@@ -203,6 +209,8 @@ def ingest_many(
     Raises:
         ValueError: When ``domains`` is empty or holds an empty name. That is a mistake in the
             caller, not a bad input file.
+        RunTooLarge: When the reports kept hold more than ``MAX_RECORDS_PER_RUN`` records. The
+            run stops there rather than answer on the files read so far.
     """
     wanted = list(dict.fromkeys(normalize_domain(domain) for domain in domains))
     if not wanted:
@@ -217,6 +225,7 @@ def ingest_many(
     seen: dict[str, set[tuple[str, str]]] = {domain: set() for domain in wanted}
     duplicates = dict.fromkeys(wanted, 0)
     other_domain = 0
+    records = 0
 
     for source in sources:
         for item in _documents(source):
@@ -250,6 +259,9 @@ def ingest_many(
             if key in seen[domain]:
                 duplicates[domain] += 1
                 continue
+            records += len(report.records)
+            if records > MAX_RECORDS_PER_RUN:
+                raise RunTooLarge(MAX_RECORDS_PER_RUN)
             seen[domain].add(key)
             reports[domain].append(report)
 

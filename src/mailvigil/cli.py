@@ -65,6 +65,7 @@ from mailvigil.render_json import (
 )
 from mailvigil.render_verdict import render_tally, render_verdict
 from mailvigil.reports import IngestionResult, ingest_many
+from mailvigil.reports.errors import RunTooLarge
 from mailvigil.summary import summarize
 from mailvigil.verdict import Answer, judge, worst_answer
 
@@ -464,7 +465,11 @@ def _load(
             return None
 
     domains = [config.domain for config in configs]
-    results = ingest_many(args.paths, domains, _now(), args.recursive)
+    try:
+        results = ingest_many(args.paths, domains, _now(), args.recursive)
+    except RunTooLarge as error:
+        write(sys.stderr, f"mailvigil: {messages.refusals.run_too_large.format(limit=error.limit)}")
+        return None
     if not any(result.reports for result in results.values()):
         # What was refused or passed over is shared, so any one result tells it.
         write(sys.stderr, no_reports_message(results[domains[0]], domains, messages))

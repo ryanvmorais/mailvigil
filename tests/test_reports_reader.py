@@ -12,11 +12,13 @@ from __future__ import annotations
 
 import io
 import struct
+import zipfile
 from collections.abc import Callable, Mapping
 from pathlib import Path
 
 import pytest
 
+from mailvigil.reports import reader
 from mailvigil.reports.errors import Reason, ReportRefused
 from mailvigil.reports.reader import MAX_BYTES, Kind, _read_capped, read_xml, read_xml_bytes
 
@@ -243,6 +245,69 @@ def test_unsupported_zip_compression_is_refused(tmp_path: Path, make_zip: _MakeZ
 
     with pytest.raises(ReportRefused) as caught:
         read_xml(_write(tmp_path, "r.zip", archive))
+
+    assert caught.value.reason is Reason.NOT_AN_ARCHIVE
+
+
+def _zip_compressed_with(method: int) -> bytes:
+    """
+    Build a valid one-member zip whose member uses a given compression method.
+
+    Args:
+        method (int): A ``zipfile`` method constant.
+
+    Returns:
+        bytes: The archive.
+    """
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", compression=method) as archive:
+        archive.writestr("r.xml", _XML)
+    return buffer.getvalue()
+
+
+# Two methods the standard library can write and read, outside the two the reader opens: each one
+# must be refused before its decompressor starts.
+_OTHER_METHODS = pytest.mark.parametrize(
+    "method", [zipfile.ZIP_LZMA, zipfile.ZIP_BZIP2], ids=["lzma", "bzip2"]
+)
+
+
+@_OTHER_METHODS
+def test_zip_member_with_a_method_other_than_stored_or_deflate_is_refused(
+    tmp_path: Path, method: int
+) -> None:
+    """Some decompressors reserve memory before the cap counts a byte, so only two methods open."""
+    with pytest.raises(ReportRefused) as caught:
+        read_xml(_write(tmp_path, "r.zip", _zip_compressed_with(method)))
+
+    assert caught.value.reason is Reason.NOT_AN_ARCHIVE
+    assert caught.value.detail == f"compression method {method}"
+
+
+@_OTHER_METHODS
+def test_zip_member_with_another_method_is_refused_in_memory(method: int) -> None:
+    """The same rule for a zip attached to a mail, which is read from memory."""
+    with pytest.raises(ReportRefused) as caught:
+        read_xml_bytes(_zip_compressed_with(method), "zip")
+
+    assert caught.value.reason is Reason.NOT_AN_ARCHIVE
+
+
+@pytest.mark.parametrize("method", [zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED])
+def test_zip_member_stored_or_deflated_is_read(tmp_path: Path, method: int) -> None:
+    assert read_xml(_write(tmp_path, "r.zip", _zip_compressed_with(method))) == _XML
+
+
+def test_a_decompressor_error_in_memory_is_a_refusal(monkeypatch: pytest.MonkeyPatch) -> None:
+    """In memory there is no file to fail on, so an ``OSError`` is the data being refused."""
+
+    def fail(kind: Kind, source: object) -> bytes:
+        raise OSError("invalid data stream")
+
+    monkeypatch.setattr(reader, "_read_kind", fail)
+
+    with pytest.raises(ReportRefused) as caught:
+        read_xml_bytes(b"data", "zip")
 
     assert caught.value.reason is Reason.NOT_AN_ARCHIVE
 

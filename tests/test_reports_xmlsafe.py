@@ -129,6 +129,19 @@ def test_malformed_xml_is_refused_with_the_position(document: bytes) -> None:
     assert re.fullmatch(r"line \d+, column \d+", caught.value.detail)
 
 
+@pytest.mark.parametrize(
+    "encoding", ["x-mailvigil-no-such-codec", "shift_jis"], ids=["unknown", "multibyte"]
+)
+def test_an_encoding_the_parser_cannot_use_is_refused(encoding: str) -> None:
+    """Expat hands such an encoding to a hook that raises outside ``ExpatError``."""
+    document = f'<?xml version="1.0" encoding="{encoding}"?><feedback/>'.encode("ascii")
+
+    with pytest.raises(ReportRefused) as caught:
+        parse_xml(document)
+
+    assert caught.value.reason is Reason.MALFORMED_XML
+
+
 # ---------------------------------------------------------------------------
 # Namespace translation (ADR-5)
 # ---------------------------------------------------------------------------

@@ -88,3 +88,26 @@ class ReportRefused(Exception):
             str: The reason value, followed by the detail when there is one.
         """
         return f"{self.reason.value}: {self.detail}" if self.detail else self.reason.value
+
+
+class RunTooLarge(Exception):
+    """
+    Raised when the reports kept in one run hold more records than a run may.
+
+    Unlike ``ReportRefused`` it ends the run: the records of every file read so far stay in memory
+    until the end, so going on is what the limit is there to stop, and skipping the files left would
+    give an answer on part of the data. The caller refuses the run instead.
+
+    Attributes:
+        limit (int): The most records a run may keep.
+    """
+
+    def __init__(self, limit: int) -> None:
+        """
+        Build the refusal of a run.
+
+        Args:
+            limit (int): The most records a run may keep.
+        """
+        super().__init__(f"more than {limit} records in one run")
+        self.limit = limit

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import gzip
 import io
+import lzma
 import stat
 import zipfile
 import zlib
@@ -36,14 +37,21 @@ type Kind = Literal["xml", "gz", "zip"]
 # The suffix of each form; any other suffix is refused before the file opens.
 KIND_BY_SUFFIX: dict[str, Kind] = {".xml": "xml", ".gz": "gz", ".zip": "zip"}
 
+# The compression methods a zip member may use: the two every provider sends. Any other method is
+# refused before its decompressor starts, because some of them reserve the memory their own header
+# asks for before ``_read_capped`` counts a byte, and their errors are not all in the list below.
+_ZIP_METHODS = frozenset({zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED})
+
 # What the standard library raises for an archive it cannot read. ``BadGzipFile`` is an ``OSError``,
 # so this tuple must be caught before ``OSError``. ``NotImplementedError`` is a compression method
 # it lacks and ``RuntimeError`` is an encrypted member. ``ValueError`` is what ``zipfile`` raises
-# for a damaged archive read from memory, where a file would give ``BadZipFile``.
+# for a damaged archive read from memory, where a file would give ``BadZipFile``. ``LZMAError`` is
+# defense in depth: ``_ZIP_METHODS`` already keeps LZMA members closed.
 _ARCHIVE_ERRORS = (
     zipfile.BadZipFile,
     gzip.BadGzipFile,
     zlib.error,
+    lzma.LZMAError,
     EOFError,
     NotImplementedError,
     RuntimeError,
@@ -111,7 +119,8 @@ def _read_zip(source: Path | BinaryIO) -> bytes:
 
     Raises:
         ReportRefused: ``NO_XML_MEMBER`` or ``MULTIPLE_XML_MEMBERS`` when the zip does not hold
-            exactly one ``.xml`` file, and ``DECOMPRESSED_TOO_LARGE`` for a member over the cap.
+            exactly one ``.xml`` file, ``NOT_AN_ARCHIVE`` for a member compressed with a method
+            outside ``_ZIP_METHODS``, and ``DECOMPRESSED_TOO_LARGE`` for a member over the cap.
     """
     with zipfile.ZipFile(source) as archive:
         members = [
@@ -123,6 +132,9 @@ def _read_zip(source: Path | BinaryIO) -> bytes:
             raise ReportRefused(Reason.NO_XML_MEMBER, "the zip holds no .xml file")
         if len(members) > 1:
             raise ReportRefused(Reason.MULTIPLE_XML_MEMBERS, f"the zip holds {len(members)} files")
+        method = members[0].compress_type
+        if method not in _ZIP_METHODS:
+            raise ReportRefused(Reason.NOT_AN_ARCHIVE, f"compression method {method}")
         with archive.open(members[0]) as stream:
             return _read_capped(stream)
 
@@ -174,11 +186,17 @@ def read_xml_bytes(data: bytes, kind: Kind) -> bytes:
 
     Raises:
         ReportRefused: ``FILE_TOO_LARGE`` when ``data`` is over the cap before anything is opened,
-            then the same refusals as ``read_xml`` for the content.
+            then the same refusals as ``read_xml`` for the content, with ``NOT_AN_ARCHIVE`` for
+            any ``OSError``.
     """
     if len(data) > MAX_BYTES:
         raise ReportRefused(Reason.FILE_TOO_LARGE, f"{len(data)} bytes")
-    return _read_kind(kind, io.BytesIO(data))
+    try:
+        return _read_kind(kind, io.BytesIO(data))
+    except OSError as error:
+        # In memory there is no file to fail on, so an ``OSError`` is a decompressor refusing the
+        # data (bzip2 raises one); left alone it would escape the caller, which expects a refusal.
+        raise ReportRefused(Reason.NOT_AN_ARCHIVE, type(error).__name__) from None
 
 
 def read_xml(path: Path) -> bytes:

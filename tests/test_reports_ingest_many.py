@@ -19,6 +19,7 @@ import pytest
 
 import mailvigil.reports
 from mailvigil.reports import ingest, ingest_many
+from mailvigil.reports.errors import RunTooLarge
 
 # The package attribute ``ingest`` is the function, so the module is fetched by name.
 ingest_module = importlib.import_module("mailvigil.reports.ingest")
@@ -175,6 +176,44 @@ def test_the_same_reporter_and_id_under_two_domains_is_not_a_duplicate(
 
     assert [len(result.reports) for result in results.values()] == [1, 1]
     assert [result.duplicates for result in results.values()] == [0, 0]
+
+
+# ---------------------------------------------------------------------------
+# The records of a run are capped
+# ---------------------------------------------------------------------------
+
+
+def test_a_run_past_the_record_cap_stops_instead_of_answering_on_part_of_it(
+    tmp_path: Path, make_report_xml: _MakeReport, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Every record kept stays in memory, so the run ends once the total is past the cap."""
+    _attachment(tmp_path, "a", make_report_xml(domain=_COM, report_id="r1"))
+    _attachment(tmp_path, "b", make_report_xml(domain=_NET, report_id="r2"))
+    monkeypatch.setattr(ingest_module, "MAX_RECORDS_PER_RUN", 1)
+
+    with pytest.raises(RunTooLarge) as caught:
+        ingest_many([tmp_path], [_COM, _NET])
+
+    assert caught.value.limit == 1
+
+
+def test_a_run_at_the_record_cap_is_read(
+    tmp_path: Path, make_report_xml: _MakeReport, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The cap counts the records kept, across domains; reaching it exactly is allowed."""
+    _attachment(tmp_path, "a", make_report_xml(domain=_COM, report_id="r1"))
+    _attachment(tmp_path, "b", make_report_xml(domain=_NET, report_id="r2"))
+    _attachment(tmp_path, "c", make_report_xml(domain=_FOREIGN, report_id="r3"))
+    monkeypatch.setattr(ingest_module, "MAX_RECORDS_PER_RUN", 2)
+
+    results = ingest_many([tmp_path], [_COM, _NET])
+
+    assert [len(result.reports) for result in results.values()] == [1, 1]
+
+
+def test_the_record_cap_holds_a_large_legitimate_run() -> None:
+    """Ten reporters sending 1,000 rows a day for 28 days stay well under the cap."""
+    assert ingest_module.MAX_RECORDS_PER_RUN >= 10 * 1_000 * 28 * 3
 
 
 # ---------------------------------------------------------------------------

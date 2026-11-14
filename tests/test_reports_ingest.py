@@ -12,6 +12,8 @@ hostile files are the attack itself, so a failure in the refusal table means a d
 from __future__ import annotations
 
 import importlib
+import io
+import zipfile
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -471,6 +473,44 @@ def test_a_mailbox_refusal_names_the_message_and_the_attachment(
     assert [(entry.reason, entry.part) for entry in result.skipped] == [
         (Reason.NOT_AN_ARCHIVE, "#2 broken.gz"),
         (Reason.NOT_A_REPORT, "#3"),
+    ]
+
+
+def _damaged_bzip2_zip() -> bytes:
+    """
+    Build a one-member zip whose bzip2 stream does not start as one.
+
+    Returns:
+        bytes: The archive; reading the member makes the decompressor raise an ``OSError``.
+    """
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_BZIP2) as archive:
+        archive.writestr("r.xml", b"<feedback/>" * 50)
+    data = bytearray(buffer.getvalue())
+    # The member's data starts right after the 30-byte local header and the name.
+    start = 30 + len("r.xml")
+    data[start : start + 10] = bytes(10)
+    return bytes(data)
+
+
+def test_a_damaged_attachment_in_a_mailbox_does_not_hide_the_messages_after_it(
+    tmp_path: Path, make_report_xml: _MakeReport
+) -> None:
+    """One message's attachment is refused alone; the mailbox is still read to its end."""
+    path = tmp_path / "inbox.mbox"
+    path.write_bytes(
+        build_mbox(
+            build_eml(("a.xml", "xml", make_report_xml(report_id="a"))),
+            build_eml(("r.zip", "zip", _damaged_bzip2_zip())),
+            build_eml(("c.xml", "xml", make_report_xml(report_id="c"))),
+        )
+    )
+
+    result = ingest([path], "example.com")
+
+    assert [report.report_id for report in result.reports] == ["a", "c"]
+    assert [(entry.reason, entry.part) for entry in result.skipped] == [
+        (Reason.NOT_AN_ARCHIVE, "#2 r.zip"),
     ]
 
 

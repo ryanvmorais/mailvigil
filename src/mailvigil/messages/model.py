@@ -316,6 +316,8 @@ class RefusalMessages:
         html_needs_folder (str): ``--html`` of several domains without ``--output``; ``{count}``.
         output_not_folder (str): ``--output`` of several domains is not an existing folder;
             ``{path}``.
+        run_too_large (str): The reports of the run hold more records than a run may keep;
+            ``{limit}``.
     """
 
     no_domain: str
@@ -330,6 +332,7 @@ class RefusalMessages:
     no_reports_many: str
     html_needs_folder: str
     output_not_folder: str
+    run_too_large: str
 
 
 @dataclass(frozen=True, slots=True)

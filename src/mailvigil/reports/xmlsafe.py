@@ -94,7 +94,8 @@ def parse_xml(xml: bytes) -> Element:
     Raises:
         ReportRefused: ``FORBIDDEN_DECLARATION`` for a ``DOCTYPE`` or an ``ENTITY``,
             ``XML_TOO_COMPLEX`` past ``MAX_DEPTH`` levels or ``MAX_ELEMENTS`` elements, and
-            ``MALFORMED_XML`` (detail ``line L, column C``) for a document that is not well formed.
+            ``MALFORMED_XML`` (detail ``line L, column C``) for a document that is not well formed,
+            or with the error's name for one that declares an encoding the parser cannot use.
     """
     builder = TreeBuilder()
     parser = expat.ParserCreate(namespace_separator=_SEPARATOR)
@@ -136,4 +137,8 @@ def parse_xml(xml: bytes) -> Element:
         raise ReportRefused(
             Reason.MALFORMED_XML, f"line {error.lineno}, column {error.offset}"
         ) from None
+    except (LookupError, ValueError) as error:
+        # An encoding expat cannot use comes out of its unknown-encoding hook as one of these, not
+        # as an ``ExpatError``. A refusal of ours is neither, so it passes through unchanged.
+        raise ReportRefused(Reason.MALFORMED_XML, type(error).__name__) from None
     return builder.close()

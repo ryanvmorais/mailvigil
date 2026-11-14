@@ -19,6 +19,7 @@ import tracemalloc
 from collections.abc import Iterator
 from email.message import EmailMessage
 from email.parser import BytesFeedParser
+from email.policy import EmailPolicy
 from pathlib import Path
 
 import pytest
@@ -27,6 +28,7 @@ from mailvigil.reports import mail
 from mailvigil.reports.errors import Reason, ReportRefused
 from mailvigil.reports.mail import (
     MAX_DEPTH,
+    MAX_HEADER_CHARS,
     MAX_LINES,
     MAX_MESSAGE_BYTES,
     MAX_PARTS,
@@ -437,6 +439,66 @@ def test_nesting_past_the_depth_limit_is_refused() -> None:
 def test_nesting_of_two_thousand_levels_is_refused_not_a_crash() -> None:
     """Deep nesting is a refusal with a reason, never a ``RecursionError``."""
     assert _refusal(_nested(2000)) is Reason.MESSAGE_TOO_COMPLEX
+
+
+def _with_content_type(value: str) -> bytes:
+    """
+    Build a one-part message whose ``Content-Type`` is the given value.
+
+    Args:
+        value (str): The header value, on one line.
+
+    Returns:
+        bytes: The message.
+    """
+    return f"Content-Type: {value}\r\n\r\nbody\r\n".encode("ascii")
+
+
+def _content_type_of_length(length: int) -> str:
+    """
+    Build a plain-text content type exactly ``length`` characters long.
+
+    Args:
+        length (int): The length wanted.
+
+    Returns:
+        str: The value.
+    """
+    start = 'text/plain; x="'
+    return start + "a" * (length - len(start) - 1) + '"'
+
+
+def test_a_header_over_the_length_limit_is_refused() -> None:
+    """The header parser costs more than linear time, so a header past the limit is refused."""
+    raw = _with_content_type(_content_type_of_length(MAX_HEADER_CHARS + 1))
+    assert _refusal(raw) is Reason.MESSAGE_TOO_COMPLEX
+
+
+def test_a_header_at_the_length_limit_is_read() -> None:
+    assert read_message(_with_content_type(_content_type_of_length(MAX_HEADER_CHARS))) == ()
+
+
+def test_a_long_header_is_refused_before_the_header_parser_sees_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The length is checked first: the default policy is never asked to parse the value."""
+    parsed: list[int] = []
+    original = EmailPolicy.header_fetch_parse
+
+    def counted(self: EmailPolicy, name: str, value: str) -> object:
+        parsed.append(len(value))
+        return original(self, name, value)
+
+    monkeypatch.setattr(EmailPolicy, "header_fetch_parse", counted)
+    _refusal(_with_content_type(_content_type_of_length(MAX_HEADER_CHARS + 1)))
+    assert all(length <= MAX_HEADER_CHARS for length in parsed)
+
+
+def test_a_deeply_nested_header_is_a_refusal_not_a_crash() -> None:
+    """The header parser descends once per nested comment; running out of stack is a refusal."""
+    depth = MAX_HEADER_CHARS // 2 - 20
+    raw = _with_content_type("text/plain " + "(" * depth + ")" * depth)
+    assert _refusal(raw) is Reason.MALFORMED_MESSAGE
 
 
 def test_parser_failure_is_a_malformed_message(monkeypatch: pytest.MonkeyPatch) -> None:

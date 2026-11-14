@@ -258,6 +258,9 @@ _REFUSALS = RefusalMessages(
     no_reports_many="No DMARC report for any of the {count} domains was kept.",
     html_needs_folder="--html of {count} domains writes one page each: pass --output FOLDER",
     output_not_folder="--output {path} is not an existing folder",
+    run_too_large=(
+        "the reports hold more than {limit} records in one run: read fewer files at a time"
+    ),
 )
 
 # ---------------------------------------------------------------------------

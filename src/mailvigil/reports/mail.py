@@ -19,8 +19,9 @@ from dataclasses import dataclass
 from email import policy
 from email.message import EmailMessage, Message
 from email.parser import BytesFeedParser
+from email.policy import EmailPolicy
 from pathlib import Path
-from typing import BinaryIO, cast
+from typing import TYPE_CHECKING, Any, BinaryIO, cast
 
 from mailvigil.reports.errors import Reason, ReportRefused
 from mailvigil.reports.reader import KIND_BY_SUFFIX, Kind
@@ -30,7 +31,7 @@ from mailvigil.text import MAX_TEXT, clean_text
 # Constants
 # ---------------------------------------------------------------------------
 
-# The four bounds on a message. Changing one is a decision for a spec, not a silent edit (007).
+# The five bounds on a message. Changing one is a decision for a spec, not a silent edit (007).
 # 8 MiB: the 5 MiB attachment cap, plus a third for base64, plus headers and a body.
 MAX_MESSAGE_BYTES = 8 * 1024 * 1024
 # An 8 MiB message of base64 has about 110,000 lines; more is not a mail.
@@ -39,6 +40,10 @@ MAX_LINES = 150_000
 MAX_PARTS = 50
 # Mixed, related, alternative and a signature wrapper make 4. The message itself is depth 0.
 MAX_DEPTH = 10
+# One header, folded lines joined, in characters. A report's ``Content-Type`` or
+# ``Content-Disposition`` is under 200; a line may hold 998 (RFC 5322). The parser of the
+# standard library spends time that grows faster than the header, so the length is checked first.
+MAX_HEADER_CHARS = 4 * 1024
 
 # How much of the message the parser is given at a time, so a refusal in the middle stops the work.
 _FEED_SIZE = 64 * 1024
@@ -67,8 +72,15 @@ _KIND_BY_TYPE: dict[str, Kind] = {
 }
 
 # What the ``email`` package raises of its own on a message it cannot make sense of. A refusal of
-# ours (``ReportRefused``) is not in the list, so it passes through.
-_MESSAGE_ERRORS = (email.errors.MessageError, ValueError, LookupError, UnicodeError)
+# ours (``ReportRefused``) is not in the list, so it passes through. ``RecursionError`` is the
+# header parser, which descends once per nested comment or group.
+_MESSAGE_ERRORS = (
+    email.errors.MessageError,
+    ValueError,
+    LookupError,
+    UnicodeError,
+    RecursionError,
+)
 
 # ---------------------------------------------------------------------------
 # Model
@@ -130,9 +142,46 @@ class _PartCounter:
         return EmailMessage(policy=policy)
 
 
+# The standard library's stubs make the policy generic, the class itself is not.
+if TYPE_CHECKING:
+    _EmailPolicy = EmailPolicy[EmailMessage]
+else:
+    _EmailPolicy = EmailPolicy
+
+
+class _BoundedHeaders(_EmailPolicy):
+    """
+    The default policy, refusing a header too long to parse before the parser sees it.
+
+    ``email`` keeps a header as raw text and parses it each time it is read, through
+    ``header_fetch_parse``, during parsing (the content type of every part) as well as after. That
+    is the one place every read goes through, so the check cannot be skipped.
+    """
+
+    def header_fetch_parse(self, name: str, value: str) -> Any:
+        """
+        Parse a header the way the default policy does, after checking its length.
+
+        Args:
+            name (str): The header name.
+            value (str): The raw value, folded lines joined.
+
+        Returns:
+            Any: What the default policy returns, a header object.
+
+        Raises:
+            ReportRefused: ``MESSAGE_TOO_COMPLEX`` for a value over ``MAX_HEADER_CHARS``.
+        """
+        if len(value) > MAX_HEADER_CHARS:
+            raise ReportRefused(
+                Reason.MESSAGE_TOO_COMPLEX, f"a header over {MAX_HEADER_CHARS} characters"
+            )
+        return super().header_fetch_parse(name, value)
+
+
 def _parse(raw: bytes) -> Message[str, str]:
     """
-    Parse a message in chunks, with the part count in force.
+    Parse a message in chunks, with the part count and the header length in force.
 
     Args:
         raw (bytes): The message.
@@ -141,9 +190,9 @@ def _parse(raw: bytes) -> Message[str, str]:
         Message[str, str]: The root of the tree.
 
     Raises:
-        ReportRefused: ``MESSAGE_TOO_COMPLEX`` past ``MAX_PARTS``.
+        ReportRefused: ``MESSAGE_TOO_COMPLEX`` past ``MAX_PARTS`` or ``MAX_HEADER_CHARS``.
     """
-    parser = BytesFeedParser(policy=policy.default.clone(message_factory=_PartCounter()))
+    parser = BytesFeedParser(policy=_BoundedHeaders(message_factory=_PartCounter()))
     for start in range(0, len(raw), _FEED_SIZE):
         parser.feed(raw[start : start + _FEED_SIZE])
     return parser.close()
@@ -204,8 +253,8 @@ def read_message(raw: bytes) -> tuple[Attachment, ...]:
 
     Raises:
         ReportRefused: ``MESSAGE_TOO_LARGE`` over ``MAX_MESSAGE_BYTES``, ``MESSAGE_TOO_COMPLEX``
-            over ``MAX_LINES``, ``MAX_PARTS`` or ``MAX_DEPTH``, and ``MALFORMED_MESSAGE`` when the
-            ``email`` package fails in a way those do not name.
+            over ``MAX_LINES``, ``MAX_PARTS``, ``MAX_DEPTH`` or ``MAX_HEADER_CHARS``, and
+            ``MALFORMED_MESSAGE`` when the ``email`` package fails in a way those do not name.
     """
     if len(raw) > MAX_MESSAGE_BYTES:
         raise ReportRefused(Reason.MESSAGE_TOO_LARGE, f"{len(raw)} bytes")

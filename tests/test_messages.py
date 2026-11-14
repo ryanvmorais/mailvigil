@@ -89,6 +89,7 @@ _PLACEHOLDERS: dict[str, frozenset[str]] = {
     "refusals.no_reports_many": frozenset({"count"}),
     "refusals.html_needs_folder": frozenset({"count"}),
     "refusals.output_not_folder": frozenset({"path"}),
+    "refusals.run_too_large": frozenset({"limit"}),
     "refusals.output_failed": frozenset({"path", "reason"}),
 }
 

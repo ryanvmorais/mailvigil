@@ -297,6 +297,10 @@ _REFUSALS = RefusalMessages(
         "--html de {count} domínios grava uma página por domínio: informe --output PASTA"
     ),
     output_not_folder="--output {path} não é uma pasta existente",
+    run_too_large=(
+        "os relatórios somam mais de {limit} registros numa execução: "
+        "leia menos arquivos de cada vez"
+    ),
 )
 
 # ---------------------------------------------------------------------------

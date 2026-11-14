@@ -10,6 +10,7 @@ only file read from the repository.
 
 from __future__ import annotations
 
+import importlib
 import io
 import re
 from collections.abc import Callable
@@ -20,6 +21,9 @@ from tests.cli_helpers import LONG, RecordXml, ReportXml, write_config, write_wi
 
 from mailvigil import cli
 from mailvigil.cli import main
+
+# The package attribute ``ingest`` is the function, so the module is fetched by name.
+ingest_module = importlib.import_module("mailvigil.reports.ingest")
 
 _README = Path(__file__).resolve().parent.parent / "README.md"
 
@@ -379,3 +383,30 @@ def test_no_provisional_codes_are_left_in_the_help_or_the_readme(
 
     assert "provisional" not in capsys.readouterr().out.lower()
     assert "provisional" not in _README.read_text(encoding="utf-8").lower()
+
+
+@pytest.mark.parametrize("command", ["summary", "verdict"])
+@pytest.mark.parametrize("json_flag", [[], ["--json"]], ids=["text", "json"])
+def test_a_run_past_the_record_cap_is_refused_with_one_line(
+    command: str,
+    json_flag: list[str],
+    tmp_path: Path,
+    make_report_xml: ReportXml,
+    make_record_xml: RecordXml,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Past the cap the run is a refusal, never an answer on part of the reports."""
+    folder = write_window(tmp_path / "reports", make_report_xml, make_record_xml, days=LONG)
+    monkeypatch.setattr(ingest_module, "MAX_RECORDS_PER_RUN", 1)
+
+    code = main(
+        [command, str(folder), "--config", str(write_config(tmp_path / "c.toml")), *json_flag]
+    )
+
+    captured = capsys.readouterr()
+    assert code == cli.EXIT_REFUSED
+    assert captured.out == ""
+    assert captured.err == (
+        "mailvigil: the reports hold more than 1 records in one run: read fewer files at a time\n"
+    )
