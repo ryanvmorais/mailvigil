@@ -11,6 +11,19 @@ first release and contains `v0.1` to `v0.9`, and `v0.10` (several domains) arriv
 
 ## [Unreleased]
 
+## [1.7.1] - 2026-11-14
+
+### Fixed
+
+- **Report files that could not be read no longer stop the run.** A zip member compressed with a
+  method other than stored or deflate is refused as `not_an_archive`, an XML report that declares an
+  encoding the parser cannot use as `malformed_xml`, and a mail with a header over 4 KiB as
+  `message_too_complex`; each is listed with the other skipped files and the reports around it are
+  read as usual. A refused attachment in an `.mbox` no longer stops the reading of the messages
+  after it.
+- **A run whose reports hold more than 1,000,000 records stops** with one line and exit code `1`,
+  instead of taking more and more memory.
+
 ### Changed
 
 - The README (and `README.pt-BR.md`) opens "What it does" with the question the verdict answers and its five
@@ -216,7 +229,8 @@ The first release. It gathers the milestones `v0.1` to `v0.9` built as specs und
   certificate checked, read-only (it changes, moves and deletes nothing and does not mark mail as
   read), with the password asked on the terminal or read from a file.
 
-[Unreleased]: https://github.com/ryanvmorais/mailvigil/compare/v1.7.0...HEAD
+[Unreleased]: https://github.com/ryanvmorais/mailvigil/compare/v1.7.1...HEAD
+[1.7.1]: https://github.com/ryanvmorais/mailvigil/compare/v1.7.0...v1.7.1
 [1.7.0]: https://github.com/ryanvmorais/mailvigil/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/ryanvmorais/mailvigil/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/ryanvmorais/mailvigil/compare/v1.4.0...v1.5.0
