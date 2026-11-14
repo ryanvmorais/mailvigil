@@ -51,9 +51,9 @@ mailbox = "Example Mail (staff mailboxes)"
 #: Relative traffic by weekday (Monday first), so the day-by-day chart is not flat.
 WEEKDAY_WEIGHTS = (100, 110, 105, 115, 95, 40, 30)
 
-#: The first day of each period; the earlier one is NOT READY, the later one is READY.
-BEFORE_FIRST = date(2026, 8, 20)
-AFTER_FIRST = date(2026, 9, 18)
+#: How many days each period covers; the earlier one is NOT READY, the later one is READY.
+BEFORE_DAYS = 29
+AFTER_DAYS = 31
 
 #: Seconds between two typed characters, and the pause before the output of a command appears.
 TYPING_STEP = 0.035
@@ -161,6 +161,22 @@ def _weights(first: date, days: int) -> list[int]:
     return [WEEKDAY_WEIGHTS[(first + timedelta(days=i)).weekday()] for i in range(days)]
 
 
+def _first_day(days: int) -> date:
+    """
+    Give the first day of a period that ends the day before the script runs.
+
+    Args:
+        days (int): How many days the period covers.
+
+    Returns:
+        date: The first day covered.
+    """
+    # why: the verdict measures the age of the latest report against today's clock, so fixed dates
+    # would add the stale note to both answers as the recording ages. Each period ends yesterday,
+    # and each answer reads as it would on the day it was given; the totals do not depend on it.
+    return date.today() - timedelta(days=days)
+
+
 def build_reports(workdir: Path) -> None:
     """
     Write the two folders of invented reports and the configuration next to each.
@@ -169,12 +185,13 @@ def build_reports(workdir: Path) -> None:
         workdir (Path): The folder that receives ``before/`` and ``after/``.
     """
     # Before: 29 days, 7056 messages, an unrecognized source that fails 56 of them (0.8%).
-    days = 29
-    weights = _weights(BEFORE_FIRST, days)
+    days = BEFORE_DAYS
+    first = _first_day(days)
+    weights = _weights(first, days)
     fails = [1 if index % 3 == 0 else 0 for index in range(days)]  # about one day in three
     _write_period(
         workdir / "before" / "reports",
-        BEFORE_FIRST,
+        first,
         days,
         {
             "newsletter": _spread(6300, weights),
@@ -185,11 +202,12 @@ def build_reports(workdir: Path) -> None:
         },
     )
     # After: 31 days, the same sender now signs correctly, two stray failures remain (0.03%).
-    days = 31
-    weights = _weights(AFTER_FIRST, days)
+    days = AFTER_DAYS
+    first = _first_day(days)
+    weights = _weights(first, days)
     _write_period(
         workdir / "after" / "reports",
-        AFTER_FIRST,
+        first,
         days,
         {
             "newsletter": _spread(6700, weights),
