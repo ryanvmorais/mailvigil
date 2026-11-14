@@ -214,6 +214,19 @@ def test_the_domain_filter_is_exact_and_ignores_case_and_a_trailing_dot(
     assert result.other_domain == 0
 
 
+def test_a_look_alike_domain_is_another_domain(
+    tmp_path: Path, make_report_xml: _MakeReport
+) -> None:
+    """The Kelvin sign is not ``k``, whatever ``str.lower`` says."""
+    _attachment(tmp_path, "look", make_report_xml(domain="\u212aey.example.com", report_id="look"))
+    _attachment(tmp_path, "real", make_report_xml(domain="key.example.com", report_id="real"))
+
+    result = ingest([tmp_path], "key.example.com")
+
+    assert [report.report_id for report in result.reports] == ["real"]
+    assert result.other_domain == 1
+
+
 def test_a_subdomain_and_a_parent_are_another_domain(
     tmp_path: Path, make_report_xml: _MakeReport
 ) -> None:

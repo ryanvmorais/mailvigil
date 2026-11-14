@@ -145,6 +145,23 @@ def test_a_new_file_is_readable_by_others_as_the_file_of_a_redirect_is(
     assert target.stat().st_mode & 0o777 == 0o644
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows has no permission bits to read")
+def test_an_existing_file_keeps_its_mode(
+    tmp_path: Path, make_report_xml: ReportXml, make_record_xml: RecordXml
+) -> None:
+    """A private page stays private, as it would under a ``>`` redirect."""
+    folder = write_window(tmp_path / "reports", make_report_xml, make_record_xml, days=LONG)
+    config = write_config(tmp_path / "config.toml")
+    target = tmp_path / "report.html"
+    target.write_bytes(b"old")
+    target.chmod(0o600)
+
+    main(_argv(folder, config, "--output", str(target)))
+
+    assert target.read_bytes().startswith(b"<!doctype html>")
+    assert target.stat().st_mode & 0o777 == 0o600
+
+
 # ---------------------------------------------------------------------------
 # Usage errors (RF-01)
 # ---------------------------------------------------------------------------

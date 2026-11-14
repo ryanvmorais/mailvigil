@@ -154,6 +154,38 @@ def test_has_is_false_when_the_directory_does_not_exist(tmp_path: Path) -> None:
     assert _store(tmp_path).has(1, 1) is False
 
 
+def test_a_link_with_a_message_name_is_not_a_saved_message(tmp_path: Path) -> None:
+    """The message is fetched again, and the save replaces the link, not what it points at."""
+    store = _store(tmp_path)
+    store.directory.mkdir()
+    elsewhere = tmp_path / "elsewhere.txt"
+    elsewhere.write_bytes(b"not a report")
+    link = store.directory / store.name(1, 10)
+    try:
+        link.symlink_to(elsewhere)
+    except OSError:
+        pytest.skip("the system does not let this user create a symbolic link")
+
+    assert store.has(1, 10) is False
+    store.save(1, 10, b"mail")
+    assert not link.is_symlink()
+    assert link.read_bytes() == b"mail"
+    assert elsewhere.read_bytes() == b"not a report"
+
+
+def test_a_folder_with_a_message_name_is_not_a_saved_message(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    (store.directory / store.name(1, 10)).mkdir(parents=True)
+    assert store.has(1, 10) is False
+
+
+@pytest.mark.skipif(os.name != "posix", reason="file modes are a POSIX idea")
+def test_a_new_directory_is_private(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    store.save(1, 1, b"mail")
+    assert store.directory.stat().st_mode & 0o777 == 0o700
+
+
 def test_save_creates_a_missing_directory_of_several_levels(tmp_path: Path) -> None:
     store = Store(tmp_path / "a" / "b" / "c", "0badc0de")
     store.save(1, 1, b"mail")

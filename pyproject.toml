@@ -3,6 +3,7 @@
 #
 #   [project]                        metadata (no runtime dependencies, by design)
 #   [dependency-groups] dev          lint / type / test tooling (installed by default)
+#   [tool.uv]                        release cooldown for resolution
 #   [tool.*]                         config for ruff, black, mypy, coverage, pytest
 #
 # Exact versions of the whole graph are pinned in uv.lock (`uv lock`); the lines
@@ -87,6 +88,12 @@ include = [
     "/README.md",
     "/LICENSE",
 ]
+
+# --- Resolution (uv) ---------------------------------------------------------
+[tool.uv]
+# A release younger than a week is never resolved: hijacked uploads are usually caught and pulled
+# within hours, so the wait keeps them out of uv.lock (the same 7 days as Dependabot's cooldown).
+exclude-newer = "7 days"
 
 # --- Lint (ruff: replaces flake8 + isort, reads pyproject natively) ----------
 [tool.ruff]

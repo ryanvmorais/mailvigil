@@ -11,6 +11,30 @@ first release and contains `v0.1` to `v0.9`, and `v0.10` (several domains) arriv
 
 ## [Unreleased]
 
+### Changed
+
+- The README (and `README.pt-BR.md`) says that the figures trust the reports, which are not signed,
+  and that `[spf]` names everyone a shared provider sends for when the name's SPF record includes
+  it.
+
+### Fixed
+
+- **`fetch` reads at most a fixed amount per command.** Each answer of the server may hold the
+  message asked for plus 4 MB; past that the run ends as `protocol_error` instead of keeping what
+  the server sends until the deadline.
+- **A login that fails part way shows no text from the server or the library**, only its reason.
+- **`fetch --host` refuses an empty name, a space or a control character** as a usage error (exit
+  `2`), as the `host` of `[fetch]` already did; a host name the TLS library cannot use is
+  `host_unreachable` instead of an error that named `--user`.
+- **`fetch` no longer asks for the password where the terminal would show it.** It ends with the
+  usage error that points to `--password-file`.
+- **`fetch` downloads again a message whose name is taken by a link or a folder**, and a folder it
+  creates for `--to` is readable by its owner only.
+- **A domain or a selector in a report changes case only in its ASCII letters**, so a look-alike
+  name outside ASCII is never counted as a configured one.
+- **`verdict --html --output` keeps the mode of the file it replaces**, as a `>` redirect does; a
+  new file still gets the permission the umask allows.
+
 ## [1.7.1] - 2026-11-14
 
 ### Fixed

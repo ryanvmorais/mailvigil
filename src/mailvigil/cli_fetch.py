@@ -16,6 +16,7 @@ import getpass
 import os
 import sys
 import time
+import warnings
 from datetime import date
 from pathlib import Path
 
@@ -28,6 +29,7 @@ from mailvigil.fetch.store import Store, tag_of
 from mailvigil.messages import Messages
 from mailvigil.render_fetch import refusal_line, render_fetch
 from mailvigil.render_json import dumps, fetch_document
+from mailvigil.text import has_dropped_characters
 
 # The most a password file is read for: the first line of a file longer than this is not a password.
 _PASSWORD_FILE_MAX = 4096
@@ -298,7 +300,16 @@ def _password(args: argparse.Namespace, parser: argparse.ArgumentParser) -> str:
         return _password_from_file(args.password_file, args.lang)
     if not sys.stdin.isatty():
         parser.error("no terminal: give the password in a file with --password-file")
-    password = getpass.getpass()
+    # ``getpass`` that cannot turn the echo off warns and reads the password in plain sight; the
+    # warning is made an error so that read never happens.
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", getpass.GetPassWarning)
+        try:
+            password = getpass.getpass()
+        except getpass.GetPassWarning:
+            parser.error(
+                "the terminal cannot hide the password: give it in a file with --password-file"
+            )
     if not password:
         raise FetchRefused(FetchReason.PASSWORD_UNUSABLE)
     return password
@@ -334,6 +345,11 @@ def _connection(
     user = args.user if args.user is not None else settings.user
     if host is None:
         parser.error("--host is required (or give host in the [fetch] table of --config)")
+    # The rule of ``host`` in [fetch], for the flag: the file's value arrives already checked.
+    if not host or has_dropped_characters(host) or any(char.isspace() for char in host):
+        parser.error(
+            "argument --host: the server name is empty or has a space or control character"
+        )
     if user is None:
         parser.error("--user is required (or give user in the [fetch] table of --config)")
     port = args.port if args.port is not None else settings.port
