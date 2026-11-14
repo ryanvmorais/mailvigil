@@ -89,6 +89,14 @@ def test_normalize_domain_lowercases_and_drops_the_trailing_dot(raw: str, expect
     assert normalize_domain(raw) == expected
 
 
+def test_normalize_domain_lowers_ascii_letters_only() -> None:
+    """The Kelvin sign is not ``k``: ``str.lower`` would make the look-alike equal the real one."""
+    look_alike = "\u212aey.example.com"
+    assert normalize_domain(look_alike) == look_alike
+    assert normalize_domain(look_alike) != "key.example.com"
+    assert not is_within_domain(look_alike, "key.example.com")
+
+
 @pytest.mark.parametrize("candidate", ["example.com", "mail.example.com", "MAIL.Example.com."])
 def test_is_within_domain_accepts_the_domain_and_its_subdomains(candidate: str) -> None:
     """The domain itself and any name below it belong to the owner."""

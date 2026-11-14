@@ -31,7 +31,7 @@ from mailvigil.reports.model import (
     SpfResult,
 )
 from mailvigil.reports.xmlsafe import parse_xml
-from mailvigil.text import MAX_TEXT, clean_text
+from mailvigil.text import MAX_TEXT, ascii_lower, clean_text
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -163,7 +163,8 @@ def _text(node: Element, path: str, default: str = "", *, lower: bool = False) -
         node (Element): The element to search from.
         path (str): A path of local names, such as ``policy_evaluated/dkim``.
         default (str, optional): Returned when the element is absent or holds no text.
-        lower (bool, optional): Lower-case the result, for domains. The default is not changed.
+        lower (bool, optional): Lower-case the ASCII letters of the result, for domains. The
+            default is not changed.
 
     Returns:
         str: The cleaned text, or the default.
@@ -171,7 +172,7 @@ def _text(node: Element, path: str, default: str = "", *, lower: bool = False) -
     value = _find_text(node, path)
     if not value:
         return default
-    return value.lower() if lower else value
+    return ascii_lower(value) if lower else value
 
 
 # ---------------------------------------------------------------------------

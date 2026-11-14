@@ -18,7 +18,7 @@ from enum import StrEnum
 
 from mailvigil.config import Config
 from mailvigil.reports import Record
-from mailvigil.text import is_within_domain, normalize_domain
+from mailvigil.text import ascii_lower, is_within_domain, normalize_domain
 
 # ---------------------------------------------------------------------------
 # Vocabulary
@@ -151,7 +151,7 @@ def identify_sender(record: Record, config: Config) -> Identification:
     foreign: Identification | None = None
     failing: Identification | None = None
     for block in record.dkim:
-        selector = block.selector.strip().lower()
+        selector = ascii_lower(block.selector.strip())
         # An empty selector or signer is "not said", never a match, even against an odd map.
         if not selector or not block.domain or selector not in config.senders:
             continue

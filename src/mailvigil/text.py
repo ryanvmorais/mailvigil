@@ -9,6 +9,7 @@ rest of the package.
 
 from __future__ import annotations
 
+import string
 import unicodedata
 
 # ---------------------------------------------------------------------------
@@ -26,6 +27,10 @@ DROPPED_CATEGORIES = frozenset({"Cc", "Cf", "Zl", "Zp"})
 # The longest text a field may hold once cleaned (RF-05 of 002): a report field or the name of a
 # mail attachment (RF-07 of 007). One constant, so raising it is one edit.
 MAX_TEXT = 255
+
+# Only A to Z: ``str.lower`` maps some letters outside ASCII onto ASCII ones (the Kelvin sign
+# becomes ``k``), which would let a look-alike name from a report equal a configured one.
+_ASCII_LOWER = str.maketrans(string.ascii_uppercase, string.ascii_lowercase)
 
 # ---------------------------------------------------------------------------
 # Text
@@ -77,6 +82,22 @@ def has_dropped_characters(value: str) -> bool:
 # ---------------------------------------------------------------------------
 
 
+def ascii_lower(value: str) -> str:
+    """
+    Lower-case the ASCII letters of a name and leave every other character as it is.
+
+    Domains and selectors are compared in ASCII (the configuration turns a name outside ASCII into
+    its ``xn--`` form first), so a letter outside ASCII never has to fold onto one inside it.
+
+    Args:
+        value (str): A name from a report or a file.
+
+    Returns:
+        str: The name with ``A`` to ``Z`` lower-cased.
+    """
+    return value.translate(_ASCII_LOWER)
+
+
 def normalize_domain(value: str) -> str:
     """
     Reduce a domain to the form reports use: lower case, no spaces, no trailing dot.
@@ -85,9 +106,9 @@ def normalize_domain(value: str) -> str:
         value (str): A domain as a person or a file wrote it.
 
     Returns:
-        str: The normalized domain, empty when ``value`` was blank.
+        str: The normalized domain, empty when ``value`` was blank; only ASCII letters change case.
     """
-    return value.strip().lower().rstrip(".")
+    return ascii_lower(value.strip()).rstrip(".")
 
 
 def is_within_domain(candidate: str, parent: str) -> bool:

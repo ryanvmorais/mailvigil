@@ -131,6 +131,14 @@ def test_selector_is_compared_case_insensitively() -> None:
     assert answer == Identification(Outcome.KNOWN, "Example Mailer", "newsletter")
 
 
+def test_a_look_alike_selector_is_not_the_configured_one() -> None:
+    """A Kelvin sign in the report's selector does not fold onto the ``k`` of the file."""
+    record = Record(dkim=(block(selector="\u212aey"),))
+    answer = identify_sender(record, config({"key": "Example Mailer"}))
+    assert answer.outcome is not Outcome.KNOWN
+    assert answer.service == ""
+
+
 def test_result_is_compared_case_insensitively() -> None:
     """``PASS`` counts as a pass."""
     assert identify(block(result=" PASS ")).outcome is Outcome.KNOWN
