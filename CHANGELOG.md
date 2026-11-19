@@ -12,6 +12,13 @@ first release and contains `v0.1` to `v0.9`, `v0.10` (several domains) arrived i
 
 ## [Unreleased]
 
+### Changed
+
+- The README (and `README.pt-BR.md`) puts the quick start before the comparison with other tools,
+  corrects the parsedmarc and hosted-service cells against their official documentation, with
+  the date of that check, and no longer shows the development-tool badges (deps, lint, style,
+  types) at the top.
+
 ## [1.8.0] - 2026-11-14
 
 ### Added
