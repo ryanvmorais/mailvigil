@@ -3,21 +3,17 @@
 **English** · [Português (Brasil)](https://github.com/ryanvmorais/mailvigil/blob/main/README.pt-BR.md)
 
 ![Python](https://img.shields.io/badge/Python-3.12+-3776AB?logo=python&logoColor=white)
-![deps](https://img.shields.io/badge/deps-uv-DE5FE9?logo=uv&logoColor=white)
 ![runtime deps](https://img.shields.io/badge/runtime%20deps-0-brightgreen)
 [![CI](https://img.shields.io/github/actions/workflow/status/ryanvmorais/mailvigil/ci.yml?label=CI&logo=githubactions&logoColor=white)](https://github.com/ryanvmorais/mailvigil/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/mailvigil?logo=pypi&logoColor=white)](https://pypi.org/project/mailvigil/)
 [![Release](https://img.shields.io/github/v/release/ryanvmorais/mailvigil?logo=github&logoColor=white)](https://github.com/ryanvmorais/mailvigil/releases)
-![lint](https://img.shields.io/badge/lint-ruff-261230?logo=ruff&logoColor=white)
-![style](https://img.shields.io/badge/style-black-000000?logo=black&logoColor=white)
-![types](https://img.shields.io/badge/types-mypy%20strict-2A6DB2)
 ![license](https://img.shields.io/badge/license-Apache%202.0-blue?logo=apache&logoColor=white)
 
 **MailVigil is an offline, zero-dependency DMARC report analyzer: a command-line tool that reads
 the aggregate reports (RUA) your mail providers send you and tells you, in plain language, who is
 sending mail as your domain and whether it is safe to move your policy to `p=reject`.**
 
-Everyone who deploys DMARC receives a daily XML file (usually inside a `.zip` or `.gz`) from each
+Everyone who deploys DMARC receives daily XML files (usually inside a `.zip` or `.gz`) from each
 provider, and nobody reads them. The result is people who stay on `p=none` forever, afraid of
 blocking legitimate mail. MailVigil reads them for you, groups the traffic by sender, and gives a
 verdict with an explicit, documented criterion instead of a wall of numbers.
@@ -179,42 +175,6 @@ that is what is printed. The conversion is the standard library's `idna` codec (
 name it would change (`faß.example` becomes `fass.example`), that is not valid or that uses a
 character newer than Unicode 3.2 is refused with the advice to write its `xn--` form, which is
 always accepted.
-
-## MailVigil vs. other tools
-
-| | MailVigil | [parsedmarc](https://github.com/domainaware/parsedmarc) | Hosted services (dmarcian, EasyDMARC, Postmark) |
-|---|---|---|---|
-| Shape | One small CLI, standard library only | Parser and pipeline for Elasticsearch, Splunk and Kibana | Web dashboards |
-| Where your reports go | Nowhere: offline | Your own stack | To a third party |
-| Answer | A verdict on `p=reject` with a stated criterion | Parsed data (JSON, CSV, dashboards) | Dashboards and recommendations |
-| Best for | Deciding if you can enforce DMARC, from the terminal | Continuous monitoring at scale | Teams that want a managed product |
-
-MailVigil is not a replacement for a monitoring pipeline: if you already run parsedmarc, keep it.
-It answers one question, and answers it without a stack to install.
-
-Before there are reports to read, [DMARC Fácil](https://dmarc-facil.ryanmorais.com.br) checks the
-DMARC, SPF and DKIM records of a domain in your browser (the interface is in Portuguese).
-
-## Scope and limitations
-
-MailVigil is deliberately small. For each limit below, what to reach for instead.
-
-- **It reads only the reports you give it.** Mail that no receiver reports on, and senders that
-  were quiet in the period, are not covered, and the verdict says so under every answer. *Instead:*
-  collect a full cycle first; the verdict asks for 28 days.
-- **It trusts the numbers in the reports.** Aggregate reports are not signed, so a file that did
-  not come from a real receiver counts the same as one that did, in the figures and in the
-  verdict. When a `READY` rests on the reports of one organization alone, the verdict says so in a
-  note. *Instead:* read only reports from receivers you recognize (the summary counts the
-  reporting organizations), and keep the reports folder writable by you alone.
-- **`fetch` has no OAuth.** It logs in with a name and a password, so Microsoft 365 and Google
-  accounts without an app password are not supported (see [Fetch](#fetch)). *Instead:* save the
-  report messages from your mail client into a folder as `.eml` files and point `summary` at it.
-  The same goes for a provider with no IMAP.
-- **It is not a monitoring pipeline.** There are no dashboards, no history and no alerts, and a
-  web dashboard is not planned (see [Permanent non-goals][non-goals]).
-  *Instead:*
-  [parsedmarc](https://github.com/domainaware/parsedmarc) with Elasticsearch or Kibana.
 
 ## Quick start
 
@@ -552,6 +512,44 @@ remetentes que ficaram quietos neste período, não são cobertos.
 
 Numbers keep the decimal point in both languages, `--json` has no language (its identifiers do not
 change), `--help` stays in English, and neither the language nor `--json` changes an exit code.
+
+## MailVigil vs. other tools
+
+| | MailVigil | [parsedmarc](https://github.com/domainaware/parsedmarc) | Hosted services (dmarcian, EasyDMARC, Postmark) |
+|---|---|---|---|
+| Shape | One small CLI, standard library only | Parser with JSON/CSV output that ships to Elasticsearch, OpenSearch, Splunk, Kafka or S3 | Web dashboards and email digests |
+| Where your reports go | Nowhere: offline | Your own stack | To a third party |
+| Answer | A verdict on `p=reject` with a stated criterion | Parsed data (JSON, CSV, dashboards) | Dashboards and recommendations |
+| Best for | Deciding if you can enforce DMARC, from the terminal | Continuous monitoring at scale | Teams that want a managed product |
+
+_Comparison checked against the official documentation in November 2026._
+
+MailVigil is not a replacement for a monitoring pipeline: if you already run parsedmarc, keep it.
+It answers one question, and answers it without a stack to install.
+
+Before there are reports to read, [DMARC Fácil](https://dmarc-facil.ryanmorais.com.br) checks the
+DMARC, SPF and DKIM records of a domain in your browser (the interface is in Portuguese).
+
+## Scope and limitations
+
+MailVigil is deliberately small. For each limit below, what to reach for instead.
+
+- **It reads only the reports you give it.** Mail that no receiver reports on, and senders that
+  were quiet in the period, are not covered, and the verdict says so under every answer. *Instead:*
+  collect a full cycle first; the verdict asks for 28 days.
+- **It trusts the numbers in the reports.** Aggregate reports are not signed, so a file that did
+  not come from a real receiver counts the same as one that did, in the figures and in the
+  verdict. When a `READY` rests on the reports of one organization alone, the verdict says so in a
+  note. *Instead:* read only reports from receivers you recognize (the summary counts the
+  reporting organizations), and keep the reports folder writable by you alone.
+- **`fetch` has no OAuth.** It logs in with a name and a password, so Microsoft 365 and Google
+  accounts without an app password are not supported (see [Fetch](#fetch)). *Instead:* save the
+  report messages from your mail client into a folder as `.eml` files and point `summary` at it.
+  The same goes for a provider with no IMAP.
+- **It is not a monitoring pipeline.** There are no dashboards, no history and no alerts, and a
+  web dashboard is not planned (see [Permanent non-goals][non-goals]).
+  *Instead:*
+  [parsedmarc](https://github.com/domainaware/parsedmarc) with Elasticsearch or Kibana.
 
 ## Development
 

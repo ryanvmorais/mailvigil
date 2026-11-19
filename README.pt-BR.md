@@ -3,14 +3,10 @@
 [English](README.md) · **Português (Brasil)**
 
 ![Python](https://img.shields.io/badge/Python-3.12+-3776AB?logo=python&logoColor=white)
-![deps](https://img.shields.io/badge/deps-uv-DE5FE9?logo=uv&logoColor=white)
 ![runtime deps](https://img.shields.io/badge/runtime%20deps-0-brightgreen)
 [![CI](https://img.shields.io/github/actions/workflow/status/ryanvmorais/mailvigil/ci.yml?label=CI&logo=githubactions&logoColor=white)](https://github.com/ryanvmorais/mailvigil/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/mailvigil?logo=pypi&logoColor=white)](https://pypi.org/project/mailvigil/)
 [![Release](https://img.shields.io/github/v/release/ryanvmorais/mailvigil?logo=github&logoColor=white)](https://github.com/ryanvmorais/mailvigil/releases)
-![lint](https://img.shields.io/badge/lint-ruff-261230?logo=ruff&logoColor=white)
-![style](https://img.shields.io/badge/style-black-000000?logo=black&logoColor=white)
-![types](https://img.shields.io/badge/types-mypy%20strict-2A6DB2)
 ![license](https://img.shields.io/badge/license-Apache%202.0-blue?logo=apache&logoColor=white)
 
 **O MailVigil é um analisador de relatórios DMARC offline e sem dependências: uma ferramenta de
@@ -43,7 +39,7 @@ DKIM, um mês de relatórios mais novos dá `READY` e `0`. A gravação está em
 padrão da ferramenta; com `--lang pt-BR` o texto sai como nos exemplos mais abaixo. Os comandos são
 digitados para a gravação e a espera entre as duas execuções foi cortada. A gravação é o arquivo
 [`docs/demo/verdict.cast`](docs/demo/verdict.cast), feito por
-[`docs/demo/build_demo.py`](docs/demo/build_demo.py); toque com `asciinema play`.*
+[`docs/demo/build_demo.py`](docs/demo/build_demo.py); reproduza com `asciinema play`.*
 
 ## O que ele faz
 
@@ -189,41 +185,6 @@ Um domínio internacionalizado pode ser escrito como se lê: `bücher.example` e
 que ele mudaria (`faß.example` viraria `fass.example`), que não é válido ou que usa um caractere mais
 novo que o Unicode 3.2 é recusado, com o conselho de escrever a forma `xn--`, que é sempre aceita.
 
-## MailVigil e outras ferramentas
-
-| | MailVigil | [parsedmarc](https://github.com/domainaware/parsedmarc) | Serviços hospedados (dmarcian, EasyDMARC, Postmark) |
-|---|---|---|---|
-| Formato | Uma CLI pequena, só biblioteca padrão | Parser e pipeline para Elasticsearch, Splunk e Kibana | Painéis web |
-| Para onde vão seus relatórios | Para lugar nenhum: offline | Para a sua própria stack | Para um terceiro |
-| Resposta | Um veredito sobre `p=reject` com critério declarado | Dados já interpretados (JSON, CSV, painéis) | Painéis e recomendações |
-| Ideal para | Decidir se dá para impor o DMARC, pelo terminal | Monitoramento contínuo em escala | Times que querem um produto gerenciado |
-
-O MailVigil não substitui um pipeline de monitoramento: se você já roda o parsedmarc, continue com
-ele. O MailVigil responde a uma pergunta só, e responde sem uma stack para instalar.
-
-Antes de haver relatórios para ler, o [DMARC Fácil](https://dmarc-facil.ryanmorais.com.br) confere no
-navegador os registros DMARC, SPF e DKIM de um domínio.
-
-## Escopo e limitações
-
-O MailVigil é pequeno de propósito. Para cada limite abaixo, o que usar no lugar.
-
-- **Ele lê só os relatórios que você der.** E-mail que nenhum receptor reporta, e remetentes que
-  ficaram quietos no período, não são cobertos, e o veredito diz isso sob toda resposta. *No
-  lugar:* colete um ciclo completo primeiro; o veredito pede 28 dias.
-- **Ele confia nos números dos relatórios.** Relatórios agregados não são assinados, então um
-  arquivo que não veio de um receptor real conta igual a um que veio, nos números e no
-  veredito. Quando um `READY` depende só dos relatórios de uma organização, o veredito diz isso
-  numa nota. *No lugar:* leia só relatórios de receptores que você reconhece (o resumo conta as
-  organizações que reportaram) e deixe a pasta de relatórios gravável só por você.
-- **O `fetch` não tem OAuth.** Ele entra com nome e senha, então contas do Microsoft 365 e do
-  Google sem senha de app não são suportadas (veja [Fetch](#fetch)). *No lugar:* salve as
-  mensagens de relatório do seu cliente de e-mail numa pasta como arquivos `.eml` e aponte o
-  `summary` para ela. Vale o mesmo para um provedor sem IMAP.
-- **Não é um pipeline de monitoramento.** Não há painéis, histórico nem alertas, e um painel web
-  não está nos planos (veja [Não-objetivos permanentes][non-goals]). *No lugar:*
-  [parsedmarc](https://github.com/domainaware/parsedmarc) com Elasticsearch ou Kibana.
-
 ## Começando
 
 Instale como um comando, com o [pipx](https://pipx.pypa.io/) ou o [uv](https://docs.astral.sh/uv/).
@@ -263,7 +224,7 @@ mailvigil fetch --host imap.example.com --user me@example.com --to reports/
 
 O `summary` e o `verdict` imprimem o texto e mais nada; só leem os seus arquivos e não tocam na
 rede. Só o `fetch` se conecta a um servidor (veja [Fetch](#fetch)).
-Uma pasta é vasculhada, um nível de profundidade, apenas atrás dos nomes que os provedores usam nos
+Uma pasta é vasculhada a um nível de profundidade, só em busca dos nomes que os provedores usam nos
 anexos (`provedor!dominio!inicio!fim.zip`, também `.gz` e `.xml`) e dos arquivos `.eml` e `.mbox`,
 cujos anexos de relatório são extraídos das mensagens em memória. Um arquivo nomeado na linha de
 comando é lido seja qual for o nome. Acrescente `--recursive` para vasculhar também as subpastas
@@ -543,6 +504,43 @@ Se você quer os acentos num pipe, grave a página.
 
 Os números mantêm o ponto decimal nos dois idiomas, o `--json` não tem idioma (seus identificadores
 não mudam), o `--help` continua em inglês, e nem o idioma nem o `--json` alteram um código de saída.
+
+## MailVigil e outras ferramentas
+
+| | MailVigil | [parsedmarc](https://github.com/domainaware/parsedmarc) | Serviços hospedados (dmarcian, EasyDMARC, Postmark) |
+|---|---|---|---|
+| Formato | Uma CLI pequena, só biblioteca padrão | Parser com saída JSON/CSV e envio a Elasticsearch, OpenSearch, Splunk, Kafka ou S3 | Painéis web e resumos por e-mail |
+| Para onde vão seus relatórios | Para lugar nenhum: offline | Para a sua própria stack | Para um terceiro |
+| Resposta | Um veredito sobre `p=reject` com critério declarado | Dados já interpretados (JSON, CSV, painéis) | Painéis e recomendações |
+| Ideal para | Decidir se dá para impor o DMARC, pelo terminal | Monitoramento contínuo em escala | Times que querem um produto gerenciado |
+
+_Comparação conferida nas documentações oficiais em novembro de 2026._
+
+O MailVigil não substitui um pipeline de monitoramento: se você já roda o parsedmarc, continue com
+ele. O MailVigil responde a uma pergunta só, e responde sem uma stack para instalar.
+
+Antes de haver relatórios para ler, o [DMARC Fácil](https://dmarc-facil.ryanmorais.com.br) confere no
+navegador os registros DMARC, SPF e DKIM de um domínio.
+
+## Escopo e limitações
+
+O MailVigil é pequeno de propósito. Para cada limite abaixo, o que usar no lugar.
+
+- **Ele lê só os relatórios que você der.** E-mail que nenhum receptor reporta, e remetentes que
+  ficaram quietos no período, não são cobertos, e o veredito diz isso sob toda resposta. *No
+  lugar:* colete um ciclo completo primeiro; o veredito pede 28 dias.
+- **Ele confia nos números dos relatórios.** Relatórios agregados não são assinados, então um
+  arquivo que não veio de um receptor real conta igual a um que veio, nos números e no
+  veredito. Quando um `READY` depende só dos relatórios de uma organização, o veredito diz isso
+  numa nota. *No lugar:* leia só relatórios de receptores que você reconhece (o resumo conta as
+  organizações que reportaram) e deixe a pasta de relatórios gravável só por você.
+- **O `fetch` não tem OAuth.** Ele entra com nome e senha, então contas do Microsoft 365 e do
+  Google sem senha de app não são suportadas (veja [Fetch](#fetch)). *No lugar:* salve as
+  mensagens de relatório do seu cliente de e-mail numa pasta como arquivos `.eml` e aponte o
+  `summary` para ela. Vale o mesmo para um provedor sem IMAP.
+- **Não é um pipeline de monitoramento.** Não há painéis, histórico nem alertas, e um painel web
+  não está nos planos (veja [Não-objetivos permanentes][non-goals]). *No lugar:*
+  [parsedmarc](https://github.com/domainaware/parsedmarc) com Elasticsearch ou Kibana.
 
 ## Desenvolvimento
 
