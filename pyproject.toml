@@ -64,11 +64,11 @@ Issues = "https://github.com/ryanvmorais/mailvigil/issues"
 [dependency-groups]
 dev = [
     "black>=26.10.1",
-    "hypothesis>=6.170.9",
-    "mypy>=2.4.0",
+    "hypothesis>=6.170.15",
+    "mypy>=2.4.1",
     "pytest>=9.2.0",
     "pytest-cov>=7.1.0",
-    "ruff>=0.17.3",
+    "ruff>=0.17.5",
 ]
 
 # --- Packaging (Hatchling) ---------------------------------------------------
