@@ -12,6 +12,7 @@ output (RNF-06, RNF-02).
 from __future__ import annotations
 
 import base64
+import binascii
 import imaplib
 import locale
 import re
@@ -556,6 +557,25 @@ def test_a_timeout_during_the_login_is_a_timeout(fake_ssl: _Recorder) -> None:
     assert _refused(_connect).reason is FetchReason.TIMEOUT
 
 
+@pytest.mark.parametrize(
+    "raised",
+    [
+        ValueError(f"Exceeds the limit for integer string conversion {CANARY}"),
+        # ``binascii.Error`` on a challenge that is not base64, in ``AUTHENTICATE PLAIN``.
+        binascii.Error(f"Incorrect padding {CANARY}"),
+    ],
+)
+def test_an_answer_the_library_cannot_read_during_the_login_is_a_protocol_error(
+    fake_ssl: _Recorder, raised: ValueError
+) -> None:
+    """Not a usage error about ``--user``: the server's answer is what failed."""
+    fake_ssl.login_raises = raised
+    refused = _refused(_connect)
+    assert refused.reason is FetchReason.PROTOCOL_ERROR
+    assert refused.detail == ""
+    assert fake_ssl.shutdowns == 1
+
+
 def test_the_user_is_quoted_in_the_login(fake_ssl: _Recorder) -> None:
     _connect(user='odd "name"')
     assert fake_ssl.logins == [('"odd \\"name\\""', CANARY)]
@@ -650,6 +670,21 @@ def test_the_password_is_scrubbed_from_every_form_the_library_may_echo() -> None
     forms = [secret, 'pa\\"ss\\\\w', 'pa"ss\\\\w']
     assert imap._scrub(" | ".join(forms), secret) == "*** | *** | ***"
     assert imap._scrub("nothing to hide", secret) == "nothing to hide"
+
+
+@pytest.mark.parametrize("inside", ["\x00", "\x1b", "\u200b", "\u2028"])
+def test_an_echo_broken_by_a_character_the_cleaning_drops_is_still_scrubbed(inside: str) -> None:
+    """The cleaning would join the two halves; it runs before the scrub, so they never meet."""
+    echo = f"no such folder {CANARY[:5]}{inside}{CANARY[5:]}"
+    refused = FetchRefused(FetchReason.FOLDER_NOT_FOUND, imap._scrub(echo, CANARY))
+    assert CANARY not in refused.detail
+    assert refused.detail == "no such folder ***"
+
+
+def test_a_password_with_a_character_the_cleaning_drops_is_scrubbed_once_cleaned() -> None:
+    secret = "zero\u200bwidth-pw"
+    for echo in (f"echo {secret}", "echo zerowidth-pw"):
+        assert imap._scrub(echo, secret) == "echo ***"
 
 
 def test_a_hostile_error_text_is_cleaned_and_cut(fake_ssl: _Recorder) -> None:
@@ -957,10 +992,10 @@ def test_a_literal_over_the_limit_is_refused_before_any_of_it_is_read(
     peer = peers()
     connection = PairedImap(peer.client, clock=ManualClock(), deadline=_FAR)
 
-    def never(self: object, size: int) -> bytes:
-        raise AssertionError("the library read a literal the bounds should have refused")
+    def never(self: object) -> bool:
+        raise AssertionError("the socket was read for a literal the bounds should have refused")
 
-    monkeypatch.setattr(imaplib.IMAP4, "read", never)
+    monkeypatch.setattr(_Bounds, "_receive", never)
     connection.max_literal = 10
     with pytest.raises(imaplib.IMAP4.abort, match="announced a literal of 11 bytes"):
         connection.read(11)
@@ -1066,6 +1101,19 @@ def test_untagged_answers_do_not_pile_up_across_commands(
     mailbox.close()
 
 
+def test_an_announced_size_the_library_cannot_read_is_a_protocol_error(
+    peers: Callable[..., ScriptedPeer],
+) -> None:
+    """Too many digits for ``int``: the library raises ``ValueError``, not one of its own errors."""
+    announce = b"* 1 FETCH (UID 3 BODY[]<0> {" + b"9" * 5000 + b"}\r\n"
+    peer = peers(_script((b"RFC822.SIZE", lambda tag, p: p.send(announce) or None)))
+    mailbox = open_mailbox(peer, selected=True)
+    assert _refused(lambda: mailbox.sizes([3])).reason is FetchReason.PROTOCOL_ERROR
+    mailbox.close()
+    peer.close()
+    assert not any(line.startswith(b"LOGOUT") for line in peer.commands())  # the stream is lost
+
+
 def test_a_silent_server_ends_in_timeout(
     peers: Callable[..., ScriptedPeer], monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1085,6 +1133,68 @@ def test_a_literal_that_never_ends_ends_in_timeout(
     mailbox = open_mailbox(peer, selected=True)
     assert _refused(lambda: mailbox.message(3, 100)).reason is FetchReason.TIMEOUT
     mailbox.close()
+
+
+class _Ticking:
+    """A clock that moves by ``step`` each time it is read, so every receive sees a later time."""
+
+    def __init__(self) -> None:
+        """Start at zero and still."""
+        self.now = 0.0
+        self.step = 0.0
+
+    def __call__(self) -> float:
+        """
+        Read the time, then move it.
+
+        Returns:
+            float: The time before the step.
+        """
+        value = self.now
+        self.now += self.step
+        return value
+
+
+def test_a_line_that_arrives_slowly_stops_at_the_deadline(
+    peers: Callable[..., ScriptedPeer], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The deadline passes between two receives of one line; the rest of it is not waited for."""
+    monkeypatch.setattr(imap, "SOCKET_TIMEOUT", 0.3)
+    clock = _Ticking()
+    peer = peers()
+    connection = PairedImap(peer.client, clock=clock, deadline=50.0)
+    clock.step = 60.0
+    peer.send(b"* OK the first part of a line")
+    with pytest.raises(FetchRefused) as refused:
+        connection.readline()
+    assert refused.value.reason is FetchReason.DEADLINE_EXCEEDED
+
+
+def test_a_literal_that_arrives_slowly_stops_at_the_deadline(
+    peers: Callable[..., ScriptedPeer], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Within one slice too: the deadline is looked at before every receive."""
+    monkeypatch.setattr(imap, "SOCKET_TIMEOUT", 0.3)
+    clock = _Ticking()
+    peer = peers()
+    connection = PairedImap(peer.client, clock=clock, deadline=50.0)
+    connection.max_literal = 1000
+    clock.step = 60.0
+    peer.send(b"m" * 10)
+    with pytest.raises(FetchRefused) as refused:
+        connection.read(1000)
+    assert refused.value.reason is FetchReason.DEADLINE_EXCEEDED
+
+
+def test_lines_split_over_many_receives_are_read_whole(
+    peers: Callable[..., ScriptedPeer],
+) -> None:
+    peer = peers()
+    connection = PairedImap(peer.client, clock=ManualClock(), deadline=_FAR)
+    for part in (b"* 1 EXISTS", b" and more", b"\r\n* 2 EXISTS\r\n"):
+        peer.send(part)
+    assert connection.readline() == b"* 1 EXISTS and more\r\n"
+    assert connection.readline() == b"* 2 EXISTS\r\n"
 
 
 def test_an_endless_line_is_a_protocol_error(peers: Callable[..., ScriptedPeer]) -> None:
@@ -1118,23 +1228,35 @@ def test_a_search_answer_just_under_the_limit_is_read(peers: Callable[..., Scrip
     mailbox.close()
 
 
+def _send_in_background(peer: ScriptedPeer, data: bytes) -> None:
+    """
+    Write more than a socket buffer holds while the test reads it.
+
+    Args:
+        peer (ScriptedPeer): The scripted server.
+        data (bytes): What to write.
+    """
+    threading.Thread(target=peer.send, args=(data,), daemon=True).start()
+
+
 def test_a_line_of_exactly_the_limit_with_no_line_break_is_too_long(
-    peers: Callable[..., ScriptedPeer], monkeypatch: pytest.MonkeyPatch
+    peers: Callable[..., ScriptedPeer],
 ) -> None:
     peer = peers()
     connection = PairedImap(peer.client, clock=ManualClock(), deadline=_FAR)
-    monkeypatch.setattr(imaplib.IMAP4, "readline", lambda self: b"x" * LINE_LIMIT)
+    _send_in_background(peer, b"x" * LINE_LIMIT)
     with pytest.raises(_LineTooLong):
         connection.readline()
+    assert connection.overlong
 
 
 def test_a_line_of_exactly_the_limit_with_its_line_break_is_fine(
-    peers: Callable[..., ScriptedPeer], monkeypatch: pytest.MonkeyPatch
+    peers: Callable[..., ScriptedPeer],
 ) -> None:
     peer = peers()
     connection = PairedImap(peer.client, clock=ManualClock(), deadline=_FAR)
     line = b"x" * (LINE_LIMIT - 2) + b"\r\n"
-    monkeypatch.setattr(imaplib.IMAP4, "readline", lambda self: line)
+    _send_in_background(peer, line)
     assert connection.readline() == line
 
 

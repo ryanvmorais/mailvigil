@@ -393,6 +393,51 @@ def test_a_clock_past_the_deadline_moves_what_is_not_tried_to_left(tmp_path: Pat
     _adds_up(outcome)
 
 
+def test_the_bytes_of_one_run_move_what_does_not_fit_to_left(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    mailbox, store = _mailbox(1, 2, 3, 4), _store(tmp_path)
+    size = len(mailbox.bodies[4] or b"")
+    monkeypatch.setattr(run_module, "MAX_RUN_BYTES", 2 * size + size // 2)
+
+    outcome = _run(mailbox, store)
+
+    # 4 and 3 fit; 2 would pass the bytes of the run, so 2 and 1 wait for the next run.
+    assert _requested(mailbox) == [4, 3]
+    assert outcome == FetchOutcome(matched=4, saved=2, already=0, too_large=0, skipped=0, left=2)
+    _adds_up(outcome)
+
+    following = _run(mailbox, store)  # the bytes are per run: the next one goes on backwards
+    assert following == FetchOutcome(matched=4, saved=2, already=2, too_large=0, skipped=0, left=0)
+
+
+def test_the_bytes_of_one_run_count_what_arrived_not_what_was_announced(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    mailbox, store = _mailbox(1, 2, 3), _store(tmp_path)
+    size = len(mailbox.bodies[3] or b"")
+    for uid in (1, 2, 3):
+        mailbox.announced[uid] = 1  # a server that says less than it sends
+    monkeypatch.setattr(run_module, "MAX_RUN_BYTES", 2 * size)
+
+    outcome = _run(mailbox, store)
+
+    assert _requested(mailbox) == [3, 2]
+    assert outcome.left == 1
+    _adds_up(outcome)
+
+
+def test_a_message_that_fits_exactly_in_the_bytes_of_the_run_is_downloaded(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    mailbox, store = _mailbox(1, 2), _store(tmp_path)
+    monkeypatch.setattr(
+        run_module, "MAX_RUN_BYTES", sum(len(body or b"") for body in mailbox.bodies.values())
+    )
+
+    assert _run(mailbox, store).saved == 2
+
+
 def test_a_clock_already_past_the_deadline_tries_nothing(tmp_path: Path) -> None:
     mailbox = _mailbox(1, 2)
 
