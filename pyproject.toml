@@ -12,7 +12,7 @@
 
 [project]
 name = "mailvigil"
-version = "1.8.0"
+version = "1.8.1"
 description = "Reads DMARC aggregate reports and tells you, in plain language, if it is safe to move to p=reject."
 readme = "README.md"
 # 3.12 is the floor so that anyone still on it can install the tool; 3.12 reaches end of life on
