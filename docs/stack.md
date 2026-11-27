@@ -5,7 +5,7 @@ and the handful of concepts worth learning first if it is new to you.
 
 This is not exhaustive: the full version graph is pinned in `uv.lock`, and per-feature decisions
 live in the `### ADR-N` blocks of `specs/*/design.md`. This page is the map: the *shape* of the
-project and the reasoning behind each piece. The project is released (1.8.1, on PyPI): the
+project and the reasoning behind each piece. The project is released (1.8.2, on PyPI): the
 report-ingestion layer (`mailvigil.reports`), the configuration loader, the sender identification, the summary, the verdict and their texts are built
 and tested (it reads `.eml` and `.mbox` too, spec 007), and `mailvigil summary` and `mailvigil
 verdict` run them end to end, in English or Portuguese (`--lang`), as text or as one JSON document
@@ -89,6 +89,10 @@ run `uv build`. Configured in `[build-system]` and `[tool.hatch.*]` of `pyprojec
 **Why this:** against setuptools and Flit, Hatchling needs almost no configuration for a `src/`
 layout, has no legacy `setup.py` baggage. The wheel
 contains only `src/mailvigil`; the sdist adds the README and the license.
+
+The build environment is pinned by `[tool.uv] build-constraint-dependencies` (Hatchling and its
+dependencies, exact versions), because `uv build` does not resolve it in the lock. Dependabot does
+not raise those pins: they are updated by hand, with the same 7-day wait as the lock.
 
 **Learn:** the `src/` layout and why it stops you from importing the source tree by accident,
 `[tool.hatch.build.targets.wheel] packages`, and how to read a wheel (`unzip -l dist/*.whl`).
