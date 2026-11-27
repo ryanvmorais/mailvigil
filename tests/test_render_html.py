@@ -498,5 +498,5 @@ def test_the_spf_domains_of_one_source_are_named_up_to_the_limit_and_the_rest_co
     page = Page(render_html(summary, judge(summary)))
     names = ", ".join(domains[:10]) + " " + ENGLISH.summary.skipped_more.format(n=5)
     named = ENGLISH.common.spf_domains_named.of(15, names=names)
-    assert any(named in found for found in page.texts)
-    assert not any("d10.example.com" in found for found in page.texts)
+    (detail,) = [found for found in page.texts if named in found]
+    assert detail.count(".example.com") == 10
