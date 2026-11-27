@@ -216,6 +216,15 @@ def test_malformed_toml_is_refused_with_the_line(tmp_path: Path) -> None:
     assert "line 2" in error.detail
 
 
+def test_the_detail_of_a_refusal_is_cleaned_and_cut() -> None:
+    """The detail can quote the TOML parser on the file's own text, so it is kept as the key is."""
+    error = ConfigError(ConfigReason.MALFORMED_TOML, detail="bad \x1b[2J value " + "x" * 500)
+
+    assert error.detail.startswith("bad [2J value x")
+    assert "\x1b" not in error.detail and "\x1b" not in str(error)
+    assert len(error.detail) <= 200
+
+
 def test_a_deeply_nested_array_is_refused_not_a_crash(tmp_path: Path) -> None:
     """Within the size cap, 30,000 nested brackets still exhaust the parser's recursion."""
     depth = 30_000

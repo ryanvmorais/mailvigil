@@ -99,7 +99,7 @@ class Period:
     first_day: date                    # the UTC day `begin` falls on
     last_day: date                     # the last UTC day any report touches (see ADR-3)
     days_spanned: int                  # first_day to last_day, inclusive
-    days_with_reports: int             # days in that span touched by at least one report
+    days_with_reports: int             # days in that span covered enough (ADR-3, ADR-8)
 
 class Summary:
     domain: str
@@ -108,7 +108,7 @@ class Summary:
     reporters: int                     # distinct reporting organizations, as given
     period: Period | None              # None only when there are no reports
     policy: PolicyPublished | None     # the latest report's, None only when there are no reports
-    earlier_p: tuple[str, ...]         # other `p` values seen in the period, oldest first
+    earlier_p: tuple[str, ...]         # other `p` values seen in the period, oldest first (ADR-8)
     totals: Counts
     recognized_messages: int           # messages of KNOWN records
     senders: tuple[SenderRow, ...]     # every row, ordered: total desc, label asc
@@ -167,7 +167,8 @@ After the loop, the accumulators become tuples and are sorted (RNF-05):
 midnight to the next midnight touches one day, as one that ends at 23:59:59 does. Both datetimes are
 already UTC and timezone-aware (002). `days_spanned` is `(max last - min first).days + 1`, from the
 day the earliest report begins. A day is covered when the periods of the reports, merged in time,
-cover at least `MIN_COVERED_SECONDS` (twelve hours) of it; only the first and the last day of a
+cover more than `MIN_COVERED_SECONDS` (twelve hours) of it, or at least that much on the first and
+the last day of the period (ADR-8); only the first and the last day of a
 merged period can be partial, so the days between are one range. `covered` holds the merged
 intervals of those days and `days_with_reports` is the sum of their lengths. `reporter_activity`
 holds, per organization, the sum of its messages and its latest `end`, most messages first.
@@ -382,6 +383,30 @@ errors name the wrong thing. `text.py` is about characters and equality, and the
 is the configuration's rule.
 **Trade-off.** One more public name in `config.py`, behind a refactor that the existing tests
 cover. (RF-08)
+
+### ADR-8 — The text of the reports does not size or set the policy line, and half a day is a hole (amendment of 2026-11-27)
+
+**Decision.** `_policy` reads only the reports that counted a message, unless none did: the latest
+of them gives the policy, and the others give `earlier_p`, distinct values in the order they first
+appear, kept in a set while they are read and cut to the latest `MAX_EARLIER_P = 5`. A day inside
+the period counts as covered with more than `MIN_COVERED_SECONDS`; the first and the last day of
+the period still count with that much (`_enough`). The measures without one organization (011,
+ADR-3) use the same rule, each edge day weighed by the period it is an edge of: the run's, or the
+one without the organization.
+**Alternatives.** (a) Keep the latest report whatever it holds. (b) Keep only the values the
+standard defines (`none`, `quarantine`, `reject`) in `earlier_p`, with no cap. (c) More than half
+on every day, the edges included. (d) Keep at least half on every day.
+**Why.** A report is not authenticated and can be empty: a late empty one decided the policy line
+without a message behind it. The `p` values are free text of the reports, so the list and the cost
+of building it grew with them, quadratically. With reports from noon to noon, one that never
+arrived leaves exactly half of each day it touches, so (d) hid the hole RF-03 is there to show. (c)
+made every complete run of such reports lose its first and last day, which are partial whatever
+arrived. (b) would change what an odd but real value shows.
+**Trade-off.** A run of empty reports still takes its policy from them. A report missing in the
+middle of a noon-to-noon run shows as two days without reports, one more than went missing: the
+error is on the side that waits longer. The edge days make the measure without an organization
+weigh up to four days apart, and the random runs against summarizing again (011) keep the two in
+step. (RF-03)
 
 ## Impact on existing code
 

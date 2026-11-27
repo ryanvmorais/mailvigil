@@ -543,6 +543,13 @@ def test_an_empty_address_in_a_failing_source_reads_as_no_address() -> None:
     assert lines[-2:] == ["  ! no address", "      12 messages  dkim: fail, spf: fail"]
 
 
+def test_a_long_address_is_cut_so_the_messages_of_its_source_stay_in_view() -> None:
+    """A report writes the address; one wider than the line must not push the figures out."""
+    source = failing_source("x" * 200, 12, Outcome.FOREIGN_DOMAIN)
+    lines = section(render(make_summary(failing=(source,))), "! FAILING")
+    assert lines[-1].startswith("      " + "x" * 42 + "...  12 messages  dkim: fail")
+
+
 def test_an_empty_group_is_not_printed() -> None:
     only_unrecognized = render(make_summary(failing=(failing_source(),)))
     assert "Recognized senders that fail" not in only_unrecognized

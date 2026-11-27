@@ -20,7 +20,7 @@ import warnings
 from datetime import date
 from pathlib import Path
 
-from mailvigil.cli_common import EXIT_OK, EXIT_REFUSED, config_line, echo, write
+from mailvigil.cli_common import EXIT_OK, EXIT_REFUSED, UsageParser, config_line, echo, write
 from mailvigil.config import ConfigError, FetchSettings, load_configs
 from mailvigil.fetch.errors import FetchReason, FetchRefused
 from mailvigil.fetch.model import DEADLINE_SECONDS, DEFAULT_LIMIT, MAX_LIMIT
@@ -140,16 +140,15 @@ def _folder(text: str) -> str:
 
 
 def add_fetch_parser(
-    commands: argparse._SubParsersAction[argparse.ArgumentParser],
-    language: argparse.ArgumentParser,
+    commands: argparse._SubParsersAction[UsageParser],
+    language: UsageParser,
 ) -> None:
     """
     Add the ``fetch`` subcommand to the parser of the ``mailvigil`` command.
 
     Args:
-        commands (argparse._SubParsersAction[argparse.ArgumentParser]): The subcommands of the main
-            parser.
-        language (argparse.ArgumentParser): The parent parser that holds ``--lang``; ``fetch``
+        commands (argparse._SubParsersAction[UsageParser]): The subcommands of the main parser.
+        language (UsageParser): The parent parser that holds ``--lang``; ``fetch``
             shares no other option with the reading commands (spec 009, ADR-7).
     """
     fetch_parser = commands.add_parser(

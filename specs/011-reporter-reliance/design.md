@@ -112,16 +112,17 @@ that is not itself. A zero-length report counts for the period and not for the c
 
 ### The coverage without an organization (ADR-3)
 
-`_covered` merges the periods of every report and counts a day when the merged periods cover at least
-`MIN_COVERED_SECONDS` of it. Without an organization, a day can only lose the time that **only that
+`_covered` merges the periods of every report and counts a day when the merged periods cover enough
+of it (004, ADR-8: more than `MIN_COVERED_SECONDS`, or that much on the first and the last day). Without an organization, a day can only lose the time that **only that
 organization** covered. One sweep over the start and end of every period, with a count of the
 reports each organization has open, finds the stretches of time where exactly one organization has
 a report open: its exclusive time. For each organization:
 
 - a whole UTC day inside its exclusive time is covered now and would not be (0 seconds left);
 - a day where its exclusive time starts or ends keeps the seconds the merged periods give it today,
-  minus that organization's exclusive seconds on that day, and is lost when the rest falls below
-  `MIN_COVERED_SECONDS`.
+  minus that organization's exclusive seconds on that day, and is lost when the rest is no longer
+  enough; the first and the last day of the period with and without it are weighed by their own
+  period, so one can also be gained (amendment of 2026-11-27, 004 ADR-8).
 
 `days_with_reports` without it is today's count minus the days it would lose. `_covered` is split so
 that the sweep reads the same per-day seconds that decide today's coverage, and the two cannot

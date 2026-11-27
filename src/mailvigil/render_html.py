@@ -48,7 +48,8 @@ _NAME_MAX = 60
 _VALUE_MAX = 30
 
 # Failing sources shown in a group before the line that still counts the others (the summary's
-# limit); the senders table shows every row (RF-05).
+# limit), and SPF domains named for one source before "and N more"; the senders table shows every
+# row (RF-05).
 _LIMIT = 10
 
 # Senders rows the table shows when ``--top`` does not say (spec 008, ADR-12): the rest is counted
@@ -479,7 +480,7 @@ def _source(source: FailingSource, messages: Messages) -> Safe:
     )
     if source.override_reasons:
         detail += "; " + fit(", ".join(source.override_reasons), _NAME_MAX)
-    detail += spf_domains_part(messages, source.spf_domains, _NAME_MAX)
+    detail += spf_domains_part(messages, source.spf_domains, _NAME_MAX, _LIMIT)
     if source.outcome is Outcome.KNOWN:
         head = [el("strong", _clean(source.service, _NAME_MAX))]
         detail = f"{fit(where, _ADDRESS_MAX)} \u00b7 {detail}"

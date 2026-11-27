@@ -1,6 +1,8 @@
-# Changes to automation, hooks and the dependency graph ask for the maintainer's review.
+# Changes to automation, hooks, agent instructions and the dependency graph ask for the maintainer's
+# review.
 .github/        @ryanvmorais
 .claude/        @ryanvmorais
 .githooks/      @ryanvmorais
 pyproject.toml  @ryanvmorais
 uv.lock         @ryanvmorais
+CLAUDE.md       @ryanvmorais

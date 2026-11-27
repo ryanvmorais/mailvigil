@@ -94,6 +94,18 @@ include = [
 # A release younger than a week is never resolved: hijacked uploads are usually caught and pulled
 # within hours, so the wait keeps them out of uv.lock (the same 7 days as Dependabot's cooldown).
 exclude-newer = "7 days"
+# The build environment of `uv build` is not in uv.lock, so it is pinned here: the published wheel is
+# built by the same backend every time, not by whatever Hatchling is newest. `requires` above stays a
+# floor for whoever builds the sdist. Dependabot does not raise these pins; update them by hand with
+# the same 7-day wait (`uv pip compile` of `hatchling` with `--exclude-newer "7 days"`).
+build-constraint-dependencies = [
+    "hatchling==1.33.0",
+    "packaging==26.3",
+    "pathspec==1.1.1",
+    "pluggy==1.7.0",
+    "tomlkit==0.15.2",
+    "trove-classifiers==2026.9.21.13",
+]
 
 # --- Lint (ruff: replaces flake8 + isort, reads pyproject natively) ----------
 [tool.ruff]

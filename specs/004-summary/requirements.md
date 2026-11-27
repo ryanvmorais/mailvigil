@@ -187,8 +187,9 @@ Left out of these numbers
   **When** the period is built
   **Then** it runs from the earliest `begin` to the latest `end`, in UTC dates, and it states how
   many of the calendar days in that span are covered: a day counts when the periods of the reports,
-  merged, cover at least half of it (twelve hours), so a report that never arrived leaves a hole
-  even when the reports do not start at midnight. Missing days are a fact the verdict will need.
+  merged, cover more than half of it (twelve hours), so a report that never arrived leaves a hole
+  even when the reports do not start at midnight; the first and the last day of the span, partial
+  whatever arrived, count with half (amendment of 2026-11-27, ADR-8). Missing days are a fact the verdict will need.
 - **Given** the reports
   **When** the summary is built
   **Then** it also holds, per reporting organization, its messages and the end of its latest report,
@@ -198,11 +199,12 @@ Left out of these numbers
   **Then** it is the messages of `KNOWN` records over all messages, with both numbers shown.
 - **Given** reports whose published policy is the same
   **When** the policy line is built
-  **Then** it shows `p`, and `sp`, `np` and `pct` when present, from the most recent report.
+  **Then** it shows `p`, and `sp`, `np` and `pct` when present, from the most recent report that
+  counted a message, or the most recent of all when none did (amendment of 2026-11-27, ADR-8).
 - **Given** reports whose `p` differs between them (the owner changed the policy in the period)
   **When** the policy line is built
   **Then** it shows the latest and says that the policy changed during the period, with the
-  earlier values.
+  earlier values (at most five, the latest ones).
 - **Given** a `Summary`
   **When** another spec reads it
   **Then** every figure above is a field of the dataclass, not text to be parsed.

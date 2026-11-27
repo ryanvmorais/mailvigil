@@ -33,6 +33,10 @@ _WIDTH = 80
 # (Resolved decision 12).
 _LIMIT = 10
 
+# The longest IPv6 address in text. An address comes from a report, so it is cut to this before it
+# opens a line, and the figures after it stay in view.
+_ADDRESS_MAX = 45
+
 # The label column of the senders table takes what the numbers leave, but not less than the first
 # bound, which keeps a short IP readable, nor more than the second, which keeps the numbers close.
 # The second is the longest IPv4 address with the longest kind, so a long service name never makes
@@ -425,7 +429,9 @@ def _senders(summary: Summary, messages: Messages) -> list[str]:
     return lines
 
 
-def spf_domains_part(messages: Messages, domains: Sequence[str], width: int = 0) -> str:
+def spf_domains_part(
+    messages: Messages, domains: Sequence[str], width: int = 0, limit: int = 0
+) -> str:
     """
     Write the SPF domains an unrecognized source passed SPF on, ready to append to a line.
 
@@ -433,13 +439,18 @@ def spf_domains_part(messages: Messages, domains: Sequence[str], width: int = 0)
         messages (Messages): The language.
         domains (Sequence[str]): The domains, sorted.
         width (int, optional): The most characters of each domain; 0 means no cut. Default: 0.
+        limit (int, optional): The most domains named; the others are counted with ``... and N
+            more``. 0 means every domain. Default: 0.
 
     Returns:
         str: ``"; SPF domain a, b"``, or nothing when there are none.
     """
     if not domains:
         return ""
-    names = ", ".join(fit(d, width) if width else d for d in domains)
+    shown = domains[:limit] if limit else domains
+    names = ", ".join(fit(d, width) if width else d for d in shown)
+    if len(shown) < len(domains):
+        names += " " + messages.summary.skipped_more.format(n=len(domains) - len(shown))
     return "; " + messages.common.spf_domains_named.of(len(domains), names=names)
 
 
@@ -494,7 +505,7 @@ def _source_lines(source: FailingSource, messages: Messages) -> list[str]:
         who = where
     else:
         who = _who(source, messages)
-        detail = f"{where}  {detail}"
+        detail = f"{fit(where, _ADDRESS_MAX)}  {detail}"
     return ["  ! " + fit(who, _WIDTH - 4), "      " + fit(detail, _WIDTH - 6)]
 
 

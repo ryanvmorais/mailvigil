@@ -41,6 +41,7 @@ from mailvigil.cli_common import (
     EXIT_REFUSED,
     EXIT_TOO_EARLY,
     EXIT_USAGE,
+    UsageParser,
     config_line,
     echo,
     write,
@@ -226,10 +227,11 @@ def _write_page(path: Path, page: str) -> None:
         with os.fdopen(fd, "wb") as handle:
             handle.write(page.encode("ascii"))
         # ``mkstemp`` makes the file private (0600); the page gets what a ``>`` redirect would give:
-        # the mode of the file it replaces, else the permission the umask allows. ``umask`` can
+        # the permission bits of the file it replaces, else what the umask allows. The setuid,
+        # setgid and sticky bits are never carried over: a page is not a program. ``umask`` can
         # only be read by setting it, so it is put back at once.
         try:
-            mode = stat.S_IMODE(os.stat(path).st_mode)
+            mode = stat.S_IMODE(os.stat(path).st_mode) & 0o777
         except OSError:
             umask = os.umask(0)
             os.umask(umask)
@@ -239,6 +241,10 @@ def _write_page(path: Path, page: str) -> None:
         temporary = None
     finally:
         if temporary is not None:
+            # On Windows a read-only mode copied from ``path`` makes the temporary file read-only,
+            # and a read-only file cannot be removed; it is made writable first.
+            with contextlib.suppress(OSError):
+                os.chmod(temporary, stat.S_IREAD | stat.S_IWRITE)
             with contextlib.suppress(OSError):
                 os.unlink(temporary)
 
@@ -348,13 +354,13 @@ def build_parser() -> argparse.ArgumentParser:
         argparse.ArgumentParser: The parser, with ``--version`` and the ``summary``, ``verdict``
             and ``fetch`` subcommands.
     """
-    parser = argparse.ArgumentParser(
+    parser = UsageParser(
         prog="mailvigil",
         description="Reads DMARC aggregate reports and says if it is safe to move to p=reject.",
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
 
-    reading = argparse.ArgumentParser(add_help=False)
+    reading = UsageParser(add_help=False)
     reading.add_argument(
         "paths",
         nargs="+",
@@ -393,7 +399,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="with --json, keep only the N worst entries of each list and say what was left "
         "out; with --html, show N rows of the senders table instead of 50; needs one of them",
     )
-    language = argparse.ArgumentParser(add_help=False)
+    language = UsageParser(add_help=False)
     language.add_argument(
         "--lang",
         type=_language,

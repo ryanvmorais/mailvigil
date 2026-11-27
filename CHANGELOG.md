@@ -25,6 +25,21 @@ first release and contains `v0.1` to `v0.9`, `v0.10` (several domains) arrived i
   ended the run as an internal error, or, during the login, as a usage error about `--user`.
 - **`fetch` scrubs the password after taking the control characters out of a server's text**, not
   before, so an echo with such a character inside the password is scrubbed as well.
+- **A report that never arrived leaves a hole even when the reports run from noon to noon.** A day
+  inside the period now needs more than half of it covered; exactly half made both days a missing
+  report touches count as covered. The first and the last day of the period still count with half,
+  so a complete run loses no day.
+- **The policy line comes from the latest report that counted a message.** A late report without
+  messages decided it; it still does when no report has any. The earlier `p` values are at most
+  five, the latest ones, and building the list no longer slows down with many distinct values.
+- **The page names at most ten SPF domains per failing source** and counts the rest, so a report
+  that lists thousands cannot make the page long.
+- **The text summary cuts a long source address in the detail line**, so the count of failing
+  messages after it stays in view.
+- **`--output` does not carry the setuid, setgid or sticky bit of the file it replaces**, and on
+  Windows a read-only file that cannot be replaced no longer leaves a temporary file behind.
+- **A usage error and the detail of a refused configuration are cleaned of control characters and
+  cut** before they reach standard error, as every other echo of the command line is.
 
 ## [1.8.1] - 2026-11-27
 

@@ -162,6 +162,47 @@ def test_an_existing_file_keeps_its_mode(
     assert target.stat().st_mode & 0o777 == 0o600
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows has no permission bits to read")
+def test_an_existing_file_passes_on_its_permission_bits_only(
+    tmp_path: Path, make_report_xml: ReportXml, make_record_xml: RecordXml
+) -> None:
+    """The setuid bit of the file replaced is not carried over to the page."""
+    folder = write_window(tmp_path / "reports", make_report_xml, make_record_xml, days=LONG)
+    config = write_config(tmp_path / "config.toml")
+    target = tmp_path / "report.html"
+    target.write_bytes(b"old")
+    target.chmod(0o4755)
+    assert target.stat().st_mode & 0o7777 == 0o4755  # the system kept the bit to be dropped
+
+    main(_argv(folder, config, "--output", str(target)))
+
+    assert target.read_bytes().startswith(b"<!doctype html>")
+    assert target.stat().st_mode & 0o7777 == 0o755
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="only Windows keeps a read-only file in place")
+def test_a_read_only_file_that_cannot_be_replaced_leaves_no_temporary_file(
+    tmp_path: Path, make_report_xml: ReportXml, make_record_xml: RecordXml
+) -> None:
+    """The read-only mode copied to the temporary file does not keep it from being removed."""
+    folder = write_window(tmp_path / "reports", make_report_xml, make_record_xml, days=LONG)
+    config = write_config(tmp_path / "config.toml")
+    out = tmp_path / "out"
+    out.mkdir()
+    target = out / "report.html"
+    target.write_bytes(b"old")
+    target.chmod(0o444)
+    try:
+        result = main(_argv(folder, config, "--output", str(target)))
+        left = sorted(path.name for path in out.iterdir())
+    finally:
+        target.chmod(0o644)
+
+    assert result == EXIT_REFUSED  # the replace failed, so the cleanup ran
+    assert left == ["report.html"]
+    assert target.read_bytes() == b"old"
+
+
 # ---------------------------------------------------------------------------
 # Usage errors (RF-01)
 # ---------------------------------------------------------------------------
