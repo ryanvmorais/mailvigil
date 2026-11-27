@@ -228,3 +228,17 @@ command, then the close. The computation (`summary.py`) never imports `render` (
   nothing. — RF-03
 - [x] Quality gate. — result recorded when run: ruff, black and mypy clean; pytest passed with
   coverage 100% (Python 3.12, 2026-10-29).
+
+## Stage 4 — The policy line and the half day (amendment of 2026-11-27)
+
+- [x] `summary.py`: `_policy` reads the reports that counted a message (all of them when none did),
+  keeps `earlier_p` in a set while it is read and cuts it to the latest `MAX_EARLIER_P`; `_enough`
+  counts a day inside the period with more than `MIN_COVERED_SECONDS` and its first and last day
+  with that much; `_lost_days` weighs the edge days of the run and of the run without the
+  organization by their own period. Tests: a late empty report does not set the policy, seven
+  earlier values keep the latest five, a missing report from noon to noon leaves a hole while a
+  complete run keeps every day, and the random runs still agree with summarizing again. — ADR-8
+- [x] `docs/json-schema.md`: `earlier_p` and `days_with_reports` say what they hold. — ADR-8
+- [x] Quality gate. — result recorded when run: ruff, black and mypy clean; pytest passed on
+  Windows (Python 3.12) and on Linux in a container, coverage 100% on the changed modules
+  (2026-11-27).

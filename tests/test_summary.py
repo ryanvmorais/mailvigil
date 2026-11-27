@@ -35,6 +35,7 @@ from mailvigil.reports import (
 )
 from mailvigil.senders import Outcome
 from mailvigil.summary import (
+    MAX_EARLIER_P,
     Counts,
     DayCounts,
     FailingSource,
@@ -675,6 +676,19 @@ def test_a_report_that_crosses_midnight_touches_two_days() -> None:
     assert (period.days_spanned, period.days_with_reports) == (2, 2)
 
 
+def test_a_missing_report_from_noon_to_noon_leaves_a_hole_and_the_edges_still_count() -> None:
+    """The two days it touches keep half each, which is not enough inside the period (ADR-8)."""
+    complete = [dated(at(day, 12), at(day + 1, 12), str(day)) for day in range(1, 5)]
+    missing_one = [report for report in complete if report.report_id != "3"]
+
+    whole = summary_of_reports(*complete).period
+    holed = summary_of_reports(*missing_one).period
+
+    assert whole is not None and holed is not None
+    assert (whole.days_spanned, whole.days_with_reports) == (5, 5)
+    assert (holed.days_spanned, holed.days_with_reports) == (5, 3)
+
+
 def test_a_gap_day_lowers_the_days_with_reports() -> None:
     """The verdict needs to know that a day is missing."""
     period = summary_of_reports(
@@ -994,6 +1008,28 @@ def test_a_changed_policy_lists_the_earlier_values_oldest_first_without_repeats(
         assert summary.policy is not None
         assert summary.policy.p == "reject"
         assert summary.earlier_p == ("none", "quarantine")
+
+
+def test_a_late_report_without_messages_does_not_set_the_policy() -> None:
+    """It says nothing about the mail, so the latest report that counted a message decides."""
+    counted = dataclasses.replace(dated(at(1), at(2), "1", p="none"), records=(record(),))
+    empty = dated(at(4), at(5), "2", p="reject")
+
+    for order in itertools.permutations((counted, empty)):
+        summary = summary_of_reports(*order)
+        assert summary.policy is not None
+        assert (summary.policy.p, summary.earlier_p) == ("none", ())
+
+
+def test_the_earlier_values_keep_the_latest_ones_up_to_the_cap() -> None:
+    """The values are text of the reports, so how many are kept does not depend on them."""
+    values = [f"value-{i}" for i in range(MAX_EARLIER_P + 2)]
+    reports = [dated(at(i + 1), at(i + 2), str(i), p=value) for i, value in enumerate(values)]
+    reports.append(dated(at(20), at(21), "latest", p="reject"))
+
+    summary = summary_of_reports(*reports)
+
+    assert summary.earlier_p == tuple(values[-MAX_EARLIER_P:])
 
 
 def test_a_policy_that_never_changed_has_no_earlier_values() -> None:
@@ -1388,11 +1424,11 @@ def test_hours_alone_at_each_end_of_a_day_are_taken_from_what_the_day_keeps() ->
 
 
 def test_hours_alone_inside_a_day_the_others_cover_enough_lose_nothing() -> None:
-    """Day 5: A alone from 06:00 to 18:00, B from midnight to 06:00 and C from 18:00 on."""
+    """Day 5: A alone from 06:00 to 17:00, B from midnight to 06:00 and C from 17:00 on."""
     reports = (
         by(_B, at(1), at(5, 6), "1"),
         by(_A, at(5), at(6), "2"),
-        by(_C, at(5, 18), at(8), "3"),
+        by(_C, at(5, 17), at(8), "3"),
     )
 
     assert days_without(*reports) == {_A: (7, 7), _B: (3, 3), _C: (5, 5)}

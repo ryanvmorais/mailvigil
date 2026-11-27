@@ -58,7 +58,7 @@ The keys, in order.
 | `reports` | object | See `summary.reports` |
 | `period` | object or null | See `period`; null without reports |
 | `policy` | object or null | See `policy`; null without reports |
-| `earlier_p` | list of strings | Other `p` values seen in the period, oldest first |
+| `earlier_p` | list of strings | Other `p` values seen in the period, oldest first; at most five, the latest |
 | `totals` | object | See `counts`: all the messages |
 | `recognized_messages` | integer | Messages of recognized senders |
 | `senders` | list of `sender` | Every row, the biggest first, with no display limit unless `--top` is given |
@@ -92,7 +92,7 @@ The keys, in order.
 | `first_day` | string | The first UTC day covered, `YYYY-MM-DD` |
 | `last_day` | string | The last UTC day any report touches, `YYYY-MM-DD` |
 | `days_spanned` | integer | `first_day` to `last_day`, inclusive |
-| `days_with_reports` | integer | The days in that span that at least one report touches |
+| `days_with_reports` | integer | The days in that span the reports cover for more than half of the day (at least half on the first and the last day) |
 
 ### `policy`
 
