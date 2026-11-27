@@ -3,8 +3,9 @@ The one adapter to IMAP: ``imaplib`` and ``ssl`` are imported here and nowhere e
 
 ``ImapMailbox`` implements the five-method ``Mailbox`` protocol over a connection whose reads are
 bounded (spec 009, ADR-1, ADR-3): a literal the server announces over the current limit is refused
-before one byte of it is read, every read waits at most ``SOCKET_TIMEOUT`` or the time left to the
-run, a line over ``LINE_LIMIT`` ends the run, and so does a command whose answer passes
+before one byte of it is read, every receive from the socket waits at most ``SOCKET_TIMEOUT`` or
+the time left to the run, so a server that trickles bytes cannot stretch one read past the deadline,
+a line over ``LINE_LIMIT`` ends the run, and so does a command whose answer passes
 ``_COMMAND_BYTES`` on top of its literal. The TLS context is built here and always verifies
 the certificate and the host name (ADR-2). The only commands the module can send are ``CAPABILITY``,
 ``LOGIN`` (or ``AUTHENTICATE PLAIN`` for a login outside ASCII, ADR-9), ``EXAMINE``,
@@ -34,6 +35,7 @@ from mailvigil.fetch.model import (
     UID_MAX,
     SearchResult,
 )
+from mailvigil.text import clean_text
 
 __all__ = [
     "ImapMailbox",
@@ -58,7 +60,7 @@ _MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct",
 # question 3).
 _SUBJECT = '"Report Domain:"'
 
-# A literal is read in slices of this size, so the deadline is looked at between slices.
+# The most one receive asks the socket for; the deadline is looked at before each receive.
 _CHUNK = 64 * 1024
 
 # What one command may read in all, on top of the literal it asked for: a search answer of
@@ -83,7 +85,10 @@ _UID_ATTRIBUTE = re.compile(rb"UID (\d{1,10})")
 _SIZE_ATTRIBUTE = re.compile(rb"RFC822\.SIZE (\d{1,10})")
 
 # What a refusal of the library may be; anything else is a bug and is left to crash.
-_LIBRARY_ERRORS = (OSError, UnicodeError, imaplib.IMAP4.error, FetchRefused)
+# ``ValueError`` (``UnicodeError`` is one) comes from ``ssl`` on a server name it cannot use and
+# from the library on an answer it cannot read, such as a number too long for ``int``: the
+# server's doing, either way. The guarded blocks call the library only, so no bug hides behind it.
+_LIBRARY_ERRORS = (OSError, ValueError, imaplib.IMAP4.error, FetchRefused)
 
 # ---------------------------------------------------------------------------
 # Pure helpers
@@ -269,9 +274,32 @@ def _scrub(text: str, secret: str) -> str:
     """
     Take the password out of a text, in the forms a server or the library may echo it.
 
+    The text is cleaned first, the way ``FetchRefused`` cleans its detail: scrubbing before the
+    cleaning would let an echo with a control character inside the password pass the scrub, and the
+    cleaning would then join the two halves. The password is looked for as typed and as the
+    cleaning leaves it, for one that holds a character the cleaning drops.
+
     Args:
         text (str): Text from the library or the server.
         secret (str): The password.
+
+    Returns:
+        str: The text, cleaned, with every occurrence replaced by ``***``.
+    """
+    text = clean_text(text, len(text))
+    for typed in dict.fromkeys((secret, clean_text(secret, len(secret)))):
+        if typed:
+            text = _scrub_forms(text, typed)
+    return text
+
+
+def _scrub_forms(text: str, secret: str) -> str:
+    """
+    Replace every form of one password a server or the library may echo.
+
+    Args:
+        text (str): The cleaned text.
+        secret (str): The password, as typed or as the cleaning leaves it.
 
     Returns:
         str: The text with every occurrence replaced by ``***``.
@@ -329,7 +357,12 @@ def _server_text(data: Sequence[object] | None) -> str:
 
 
 def _refusal_for(
-    exc: BaseException, secret: str, *, expired: bool, overlong: bool = False
+    exc: BaseException,
+    secret: str,
+    *,
+    expired: bool,
+    overlong: bool = False,
+    opening: bool = False,
 ) -> FetchRefused:
     """
     Turn what the library raised into the refusal the command reports.
@@ -341,6 +374,9 @@ def _refusal_for(
             deadline's.
         overlong (bool, optional): Whether a line passed ``LINE_LIMIT`` during ``UID SEARCH``,
             which means too many matches. Default: ``False``.
+        opening (bool, optional): Whether the connection was being opened, when a ``ValueError``
+            is the server name's; later it is an answer the library could not read.
+            Default: ``False``.
 
     Returns:
         FetchRefused: The refusal; ``exc`` itself when it already is one.
@@ -353,7 +389,7 @@ def _refusal_for(
         reason = FetchReason.TLS_FAILED
     elif isinstance(exc, TimeoutError):
         reason = FetchReason.DEADLINE_EXCEEDED if expired else FetchReason.TIMEOUT
-    elif isinstance(exc, (OSError, ValueError)):
+    elif isinstance(exc, OSError) or (opening and isinstance(exc, ValueError)):
         # ``UnicodeError`` (a host name IDNA cannot encode) is a ``ValueError`` too.
         reason = FetchReason.HOST_UNREACHABLE
     elif overlong:
@@ -372,10 +408,11 @@ class _Bounds(imaplib.IMAP4):
     """
     An ``IMAP4`` whose reads are bounded in size and in time (spec 009, ADR-3).
 
-    It overrides ``read`` and ``readline``, which ``imaplib`` documents as replaceable, and goes on
-    through the library's own reading, so it works on every version whose I/O sits behind those two
-    methods. Combined with ``IMAP4_SSL`` it is the product's connection; the tests combine it with
-    a plain ``IMAP4`` over a local socket pair.
+    It overrides ``read`` and ``readline``, which ``imaplib`` documents as replaceable, and reads
+    the socket itself with ``recv``, so it works the same on every version (3.12 reads through a
+    file object, 3.14 through the socket) and the deadline is looked at before every receive.
+    Combined with ``IMAP4_SSL`` it is the product's connection; the tests combine it with a plain
+    ``IMAP4`` over a local socket pair.
 
     Attributes:
         clock (Callable[[], float]): Reads the time, in the unit of ``deadline``.
@@ -384,6 +421,8 @@ class _Bounds(imaplib.IMAP4):
         overlong (bool): Whether a line passed ``LINE_LIMIT``; the caller reads it after a failure.
         budget (int): The bytes the current command may still read; ``begin`` sets it, and the
             greeting and the login share the one the constructor sets.
+        pending (bytearray): Bytes received and not yet handed to the library, at most
+            ``LINE_LIMIT`` plus one receive outside a literal.
     """
 
     def __init__(
@@ -411,6 +450,7 @@ class _Bounds(imaplib.IMAP4):
         self.max_literal = LITERAL_OTHER
         self.overlong = False
         self.budget = self.max_literal + _COMMAND_BYTES
+        self.pending = bytearray()
         super().__init__(host, port, **options)
 
     def begin(self) -> None:
@@ -449,6 +489,26 @@ class _Bounds(imaplib.IMAP4):
             raise FetchRefused(FetchReason.DEADLINE_EXCEEDED)
         self.sock.settimeout(min(SOCKET_TIMEOUT, left))
 
+    def _receive(self) -> bool:
+        """
+        Take one receive's worth of bytes from the socket into ``pending``.
+
+        Every receive is armed on its own: a timeout set once per line would let a server that
+        sends a byte at a time hold one line, or one literal, open far past the deadline.
+
+        Returns:
+            bool: ``False`` when the server closed the connection.
+
+        Raises:
+            FetchRefused: ``deadline_exceeded``, when no time is left.
+        """
+        self._arm()
+        data = self.sock.recv(_CHUNK)
+        if not data:
+            return False
+        self.pending += data
+        return True
+
     def read(self, size: int) -> bytes:
         """
         Read a literal, refusing one the server announces over the limit.
@@ -462,47 +522,47 @@ class _Bounds(imaplib.IMAP4):
         Raises:
             IMAP4.abort: Before reading anything, when ``size`` is over ``max_literal`` or over
                 what is left of the command's budget.
-            FetchRefused: ``deadline_exceeded``, between two slices.
+            FetchRefused: ``deadline_exceeded``, before a receive.
         """
         if size > self.max_literal:
             raise self.abort(f"the server announced a literal of {size} bytes, over the limit")
         self._spend(size)
-        parts: list[bytes] = []
-        remaining = size
-        while remaining > 0:
-            self._arm()
-            want = min(remaining, _CHUNK)
-            part = super().read(want)
-            parts.append(part)
-            remaining -= len(part)
-            if len(part) < want:
-                break
-        return b"".join(parts)
+        while len(self.pending) < size and self._receive():
+            pass
+        data = bytes(self.pending[:size])
+        del self.pending[:size]
+        return data
 
     def readline(self) -> bytes:
         """
         Read a line of at most ``LINE_LIMIT`` bytes.
 
         Returns:
-            bytes: The line, with its line break.
+            bytes: The line, with its line break; what was left without one when the connection
+                ended, which the library refuses.
 
         Raises:
             _LineTooLong: When the line passes the limit.
             IMAP4.abort: When the line passes what is left of the command's budget.
-            FetchRefused: ``deadline_exceeded``, when no time is left.
+            FetchRefused: ``deadline_exceeded``, before a receive.
         """
-        self._arm()
-        try:
-            line = super().readline()
-        except imaplib.IMAP4.error:
-            # The library raises its plain error only for a line over its own limit.
-            self.overlong = True
-            raise _LineTooLong(f"a line of more than {LINE_LIMIT} bytes") from None
-        # Newer releases read in blocks and can stop at exactly the limit with no line break yet;
-        # a line that long and still open is too long as well.
-        if len(line) >= LINE_LIMIT and not line.endswith(b"\n"):
-            self.overlong = True
-            raise _LineTooLong(f"a line of more than {LINE_LIMIT} bytes")
+        # Where the search for the line break goes on, so a line that arrives in many small
+        # receives is scanned once, not once per receive.
+        start = 0
+        while True:
+            end = self.pending.find(b"\n", start, LINE_LIMIT)
+            if end >= 0:
+                line = bytes(self.pending[: end + 1])
+                del self.pending[: end + 1]
+                break
+            if len(self.pending) >= LINE_LIMIT:
+                self.overlong = True
+                raise _LineTooLong(f"a line of more than {LINE_LIMIT} bytes")
+            start = len(self.pending)
+            if not self._receive():
+                line = bytes(self.pending)
+                self.pending.clear()
+                break
         self._spend(len(line))
         return line
 
@@ -816,10 +876,10 @@ def connect(
             ssl_context=context,
             timeout=SOCKET_TIMEOUT,
         )
-    except (*_LIBRARY_ERRORS, ValueError) as exc:
+    except _LIBRARY_ERRORS as exc:
         # ``ssl`` raises ``ValueError`` for a server name it cannot use: the host's problem, not
         # the user's, so it never reaches the command's ``ValueError`` for ``--user``.
-        raise _refusal_for(exc, password, expired=clock() >= deadline) from None
+        raise _refusal_for(exc, password, expired=clock() >= deadline, opening=True) from None
     try:
         _sign_in(connection, user, password)
     except _LIBRARY_ERRORS as exc:

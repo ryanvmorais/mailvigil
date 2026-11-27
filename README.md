@@ -387,7 +387,8 @@ What it does:
 - Looks in `INBOX` (or `--folder`) for the messages whose subject has `Report Domain:`, the
   subject providers use for their reports, and saves each one as `<tag>-<validity>-<uid>.eml`.
 - Is incremental: run it again and only the new messages are saved, so it can run from `cron`.
-  `--limit` (default 500, at most 10000) caps one run and takes the newest first.
+  `--limit` (default 500, at most 10000) caps one run and takes the newest first, and one run
+  downloads at most 256 MiB; what does not fit is left for the next run.
 - Prints six numbers (matched, saved, already saved, too large, skipped, left for the next run)
   and the folder, never a subject, sender or address. With `--json` the six numbers come as one
   JSON document instead (no folder in it), for a script that runs `fetch` from `cron`.

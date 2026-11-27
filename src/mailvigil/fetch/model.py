@@ -22,6 +22,7 @@ __all__ = [
     "LITERAL_OTHER",
     "MAX_LIMIT",
     "MAX_MESSAGE_BYTES",
+    "MAX_RUN_BYTES",
     "SIZE_BATCH",
     "SOCKET_TIMEOUT",
     "UID_MAX",
@@ -43,6 +44,11 @@ DEADLINE_SECONDS = 1800
 # The newest 500 messages decide a verdict; 10,000 is a bounded disk.
 DEFAULT_LIMIT = 500
 MAX_LIMIT = 10_000
+
+# What one run downloads in all. The report address is public in DNS, so anyone can fill the
+# mailbox with large mail under the report subject; a report is tens of KB, so thousands fit, and
+# at the cap per message 32 do. What does not fit is left for the next run.
+MAX_RUN_BYTES = 256 * 1024 * 1024
 
 # UIDs per size query: one short command line per batch, and 500 messages cost 5 queries.
 SIZE_BATCH = 100

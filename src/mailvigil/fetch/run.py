@@ -13,7 +13,7 @@ from collections.abc import Callable
 from datetime import date
 
 from mailvigil.fetch.errors import FetchRefused
-from mailvigil.fetch.model import MAX_MESSAGE_BYTES, FetchOutcome, Mailbox
+from mailvigil.fetch.model import MAX_MESSAGE_BYTES, MAX_RUN_BYTES, FetchOutcome, Mailbox
 from mailvigil.fetch.store import Store
 
 __all__ = ["fetch_reports"]
@@ -42,7 +42,8 @@ def fetch_reports(
         store (Store): Where the messages are kept.
         limit (int): The most new messages to download in this run.
         clock (Callable[[], float]): Reads the time, in the same unit as ``deadline``.
-        deadline (float): The reading of ``clock`` past which no new download starts.
+        deadline (float): The reading of ``clock`` past which no new download starts; nor does
+            one whose announced size would take the run past ``MAX_RUN_BYTES``.
 
     Returns:
         FetchOutcome: What the run did, in numbers that add up to ``matched``.
@@ -69,6 +70,8 @@ def fetch_reports(
     left = len(new) - len(todo)
 
     saved = too_large = 0
+    # Bytes downloaded so far, counted as they arrive: a server may announce less than it sends.
+    received = 0
     queue: list[int] = []
     # What the run has not tried yet, so a refusal can say how many messages are still to fetch.
     untried = len(todo)
@@ -84,14 +87,15 @@ def fetch_reports(
             else:
                 queue.append(uid)
 
-        # 5. One message at a time, stopping at the deadline.
+        # 5. One message at a time, stopping at the deadline or at the bytes of one run.
         for position, uid in enumerate(queue):
             untried = len(queue) - position
-            if clock() > deadline:
+            if clock() > deadline or received + announced[uid] > MAX_RUN_BYTES:
                 left += untried
                 break
             # The adapter hands back at most one byte over the cap, which is enough to tell.
             data = mailbox.message(uid, MAX_MESSAGE_BYTES)
+            received += len(data or b"")
             if data is None:
                 skipped += 1
             elif len(data) > MAX_MESSAGE_BYTES:

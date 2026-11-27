@@ -12,6 +12,20 @@ first release and contains `v0.1` to `v0.9`, `v0.10` (several domains) arrived i
 
 ## [Unreleased]
 
+### Fixed
+
+- **`fetch` downloads at most 256 MiB in one run.** The report address is published in DNS, so
+  anyone can fill the mailbox with large mail under the report subject; a run stops downloading
+  where the next message would pass 256 MiB and counts the rest in "left for the next run", as it
+  does at `--limit`.
+- **`fetch` keeps its deadline while a server sends slowly.** The time left was looked at once per
+  line, so a server that sent a few bytes at a time could hold one read open well past it; it is
+  now looked at before every receive from the socket.
+- **`fetch` refuses an answer the IMAP library cannot read as a protocol error.** Such an answer
+  ended the run as an internal error, or, during the login, as a usage error about `--user`.
+- **`fetch` scrubs the password after taking the control characters out of a server's text**, not
+  before, so an echo with such a character inside the password is scrubbed as well.
+
 ## [1.8.1] - 2026-11-27
 
 ### Changed
