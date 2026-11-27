@@ -12,6 +12,8 @@ first release and contains `v0.1` to `v0.9`, `v0.10` (several domains) arrived i
 
 ## [Unreleased]
 
+## [1.8.2] - 2026-11-27
+
 ### Fixed
 
 - **`fetch` downloads at most 256 MiB in one run.** The report address is published in DNS, so
@@ -328,7 +330,8 @@ The first release. It gathers the milestones `v0.1` to `v0.9` built as specs und
   certificate checked, read-only (it changes, moves and deletes nothing and does not mark mail as
   read), with the password asked on the terminal or read from a file.
 
-[Unreleased]: https://github.com/ryanvmorais/mailvigil/compare/v1.8.1...HEAD
+[Unreleased]: https://github.com/ryanvmorais/mailvigil/compare/v1.8.2...HEAD
+[1.8.2]: https://github.com/ryanvmorais/mailvigil/compare/v1.8.1...v1.8.2
 [1.8.1]: https://github.com/ryanvmorais/mailvigil/compare/v1.8.0...v1.8.1
 [1.8.0]: https://github.com/ryanvmorais/mailvigil/compare/v1.7.2...v1.8.0
 [1.7.2]: https://github.com/ryanvmorais/mailvigil/compare/v1.7.1...v1.7.2
