@@ -20,8 +20,9 @@ src/mailvigil/
                      # `cli_fetch.run_fetch`
   cli_common.py      # the eight EXIT_* codes (the one table), `echo` (a command-line value made safe to
                      # print), `write` (a line to a stream, whatever it can encode) and `config_line`
-                     # (the line of a refused configuration); shared by cli and cli_fetch, which may
-                     # not import each other
+                     # (the line of a refused configuration) and `UsageParser` (the argument parser
+                     # whose usage errors pass through `echo`); shared by cli and cli_fetch, which
+                     # may not import each other
   cli_fetch.py       # the `fetch` command (spec 009): option types (`--port`, `--limit`, `--since`,
                      # `--folder`), the subparser (takes only `--lang` from the parents and has its own
                      # `--json`, the six numbers of a run), the password
