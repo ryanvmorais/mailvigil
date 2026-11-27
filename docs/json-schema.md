@@ -298,7 +298,7 @@ skipped + left`.
 | `already` | integer | Messages found on disk by name and so not downloaded |
 | `too_large` | integer | Messages over the size cap, announced or cut while arriving |
 | `skipped` | integer | A UID that could not be used, or a message the server would not give |
-| `left` | integer | New messages beyond `--limit` or the deadline, for a later run |
+| `left` | integer | New messages beyond `--limit`, the deadline or the bytes of one run, for a later run |
 
 ## Examples
 

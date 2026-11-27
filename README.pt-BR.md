@@ -403,7 +403,8 @@ O que ele faz:
 - Procura em `INBOX` (ou em `--folder`) as mensagens cujo assunto tem `Report Domain:`, o assunto que
   os provedores usam nos relatórios, e salva cada uma como `<tag>-<validade>-<uid>.eml`.
 - É incremental: rode de novo e só as mensagens novas são salvas, então ele pode rodar pelo `cron`.
-  O `--limit` (padrão 500, no máximo 10000) limita uma execução e pega as mais novas primeiro.
+  O `--limit` (padrão 500, no máximo 10000) limita uma execução e pega as mais novas primeiro, e
+  uma execução baixa no máximo 256 MiB; o que não cabe fica para a próxima execução.
 - Imprime seis números (encontradas, salvas, já salvas, grandes demais, ignoradas, deixadas para a
   próxima execução) e a pasta, nunca um assunto, remetente ou endereço. Com `--json` os seis
   números saem como um documento JSON (sem a pasta), para um script que roda o `fetch` pelo `cron`.

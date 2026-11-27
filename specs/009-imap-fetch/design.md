@@ -93,7 +93,7 @@ class FetchOutcome:                            # model.py
     already: int      # found on disk by name, not downloaded
     too_large: int    # announced over the cap, or cut at the cap while arriving
     skipped: int      # an unusable UID, or a message the server would not give
-    left: int         # new messages beyond --limit (or beyond the deadline), for a later run
+    left: int         # new messages beyond --limit, the deadline or MAX_RUN_BYTES, for a later run
 ```
 
 `matched == saved + already + too_large + skipped + left` always holds; a test asserts it for every
@@ -107,6 +107,7 @@ Constants, in `model.py` (changing one is a spec decision):
 | `SOCKET_TIMEOUT` | 30 s | One silent read ends the run; a slow link still moves 8 MiB in chunks |
 | `DEADLINE_SECONDS` | 1800 | 500 messages of a few hundred KB fit on any usable link; more is a stuck run |
 | `DEFAULT_LIMIT` / `MAX_LIMIT` | 500 / 10,000 | The newest 500 decide a verdict; 10,000 is a bounded disk |
+| `MAX_RUN_BYTES` | 256 MiB | The report address is public, so anyone can fill the mailbox; thousands of reports fit, 32 messages at the cap |
 | `SIZE_BATCH` | 100 UIDs | One short command line per batch; 500 messages cost 5 size queries |
 | `LINE_LIMIT` | 1,000,000 bytes | The library's own `_MAXLINE`; a SEARCH answer over it is `too_many_matches` |
 | `LITERAL_OTHER` | 64 KiB | The biggest literal any command but the message fetch may announce |
@@ -137,14 +138,18 @@ saves is always one `007` would accept.
   plain `IMAP4` and a local socket pair) overrides two methods the library documents as replaceable
   (`read`, `readline`):
   - `read(size)`: `size > self.max_literal` raises `imaplib.IMAP4.abort` before one byte is read
-    (a server that announces a huge literal is refused, not obeyed), then reads in 64 KiB slices
-    through the library's own `read`, checking the deadline between slices and setting the socket
-    timeout to the time left. (Not `read1` on `self.file`: Python 3.15 reads from the socket
-    itself and has no `self.file`.) `max_literal` is `LITERAL_OTHER` by default and `limit + 1` only while `message()` runs.
-  - `readline()`: sets the socket timeout to `min(SOCKET_TIMEOUT, time left)`, then the library's
-    own bounded line read (1,000,000 bytes). An `abort` or an oversized line is `protocol_error`
-    (`too_many_matches` when it happens during the SEARCH). `imaplib` re-wraps every `abort`, so the
-    connection keeps an `overlong` flag the mailbox reads.
+    (a server that announces a huge literal is refused, not obeyed), then receives until `size`
+    bytes arrived or the connection ended. `max_literal` is `LITERAL_OTHER` by default and
+    `limit + 1` only while `message()` runs.
+  - `readline()`: receives until a line break within 1,000,000 bytes. An `abort` or an oversized
+    line is `protocol_error` (`too_many_matches` when it happens during the SEARCH). `imaplib`
+    re-wraps every `abort`, so the connection keeps an `overlong` flag the mailbox reads.
+  Both read the socket themselves with `recv` (at most 64 KiB at a time) instead of the library's
+  own reading, which is a file object up to 3.13 and the socket from 3.14. Before every receive
+  the socket timeout is set to `min(SOCKET_TIMEOUT, time left)` and a deadline already passed is
+  `deadline_exceeded`, so a server that trickles bytes cannot hold one line or one literal open
+  past the deadline. A `ValueError` from the library (an answer it cannot read, such as a number
+  too long for `int`) is `protocol_error`, like its own errors.
   After an `abort` the connection is shut down at the socket and no `LOGOUT` is attempted; in every
   other end `close()` sends `LOGOUT` and ignores its failure (RF-03).
 - **`select(folder)`**: rejects a folder with a control character (< 0x20, 0x7f) before it is sent
@@ -198,7 +203,8 @@ saves is always one `007` would accept.
 3. Split `found` into `already` (`store.has`) and `new`. `new[limit:]` is `left`; the rest is `todo`.
 4. `sizes = mailbox.sizes(todo)`; a UID with no size is `skipped`; a size over `MAX_MESSAGE_BYTES` is
    `too_large` and is never requested.
-5. For each remaining UID, in order: past `deadline` → everything not yet tried joins `left`; stop.
+5. For each remaining UID, in order: past `deadline`, or the bytes received so far plus its
+   announced size over `MAX_RUN_BYTES` → everything not yet tried joins `left`; stop.
    `data = mailbox.message(uid, MAX_MESSAGE_BYTES)`; `None` → `skipped`; `len(data) >
    MAX_MESSAGE_BYTES` → `too_large`; else `store.save`. A `write_failed` ends the run: it raises
    `FetchRefused` carrying the outcome so far; any refusal raised after the search (sizes,
