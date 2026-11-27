@@ -92,14 +92,14 @@ class ReportRefused(Exception):
 
 class RunTooLarge(Exception):
     """
-    Raised when the reports kept in one run hold more records than a run may.
+    Raised when the reports kept in one run would take more memory than a run may.
 
-    Unlike ``ReportRefused`` it ends the run: the records of every file read so far stay in memory
+    Unlike ``ReportRefused`` it ends the run: the reports of every file read so far stay in memory
     until the end, so going on is what the limit is there to stop, and skipping the files left would
     give an answer on part of the data. The caller refuses the run instead.
 
     Attributes:
-        limit (int): The most records a run may keep.
+        limit (int): The most memory a run may keep, in megabytes.
     """
 
     def __init__(self, limit: int) -> None:
@@ -107,7 +107,7 @@ class RunTooLarge(Exception):
         Build the refusal of a run.
 
         Args:
-            limit (int): The most records a run may keep.
+            limit (int): The most memory a run may keep, in megabytes.
         """
-        super().__init__(f"more than {limit} records in one run")
+        super().__init__(f"more than {limit} MB kept in one run")
         self.limit = limit

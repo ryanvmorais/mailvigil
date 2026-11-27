@@ -47,10 +47,13 @@ has tests that feed the attack or check the promise; keep it so when touching th
 > library raises while it opens an archive, decodes an encoding or parses a mail is mapped to a
 > `Reason` where it happens (spec 002 ADR-10, spec 007 ADR-10). A zip member opens only when it is
 > stored or deflated (`_ZIP_METHODS`), because other decompressors reserve memory before the cap
-> counts a byte; a mail header is refused past `MAX_HEADER_CHARS` (4 KiB) before the `email`
-> parser sees it; and a run stops past `MAX_RECORDS_PER_RUN` (1,000,000) kept records with
-> `RunTooLarge`, because the caps per document do not bound a run. A new decompressor, parser or
-> library call on report data gets the same treatment, with a test that it ends as a refusal.
+> counts a byte; a `.gz` holds at most `MAX_GZIP_MEMBERS` (8) members; a mail header is refused
+> past `MAX_HEADER_CHARS` (4 KiB) before the `email` package reads it, and mail is read with the
+> `compat32` policy, whose cost grows with the header (spec 007 ADR-11); and a run stops past
+> `MAX_KEPT_BYTES_PER_RUN` (1 GB, as `_kept_bytes` estimates the reports kept) with `RunTooLarge`,
+> because the caps per document do not bound a run (spec 002 ADR-12). Below a cap in bytes, cost
+> still depends on the shape: a new decompressor, parser or library call on report data gets the
+> same treatment, with a test that it ends as a refusal and a measure of its worst case.
 
 ## Never use a real DMARC report
 

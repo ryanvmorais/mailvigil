@@ -387,7 +387,7 @@ def test_no_provisional_codes_are_left_in_the_help_or_the_readme(
 
 @pytest.mark.parametrize("command", ["summary", "verdict"])
 @pytest.mark.parametrize("json_flag", [[], ["--json"]], ids=["text", "json"])
-def test_a_run_past_the_record_cap_is_refused_with_one_line(
+def test_a_run_past_the_memory_cap_is_refused_with_one_line(
     command: str,
     json_flag: list[str],
     tmp_path: Path,
@@ -398,7 +398,7 @@ def test_a_run_past_the_record_cap_is_refused_with_one_line(
 ) -> None:
     """Past the cap the run is a refusal, never an answer on part of the reports."""
     folder = write_window(tmp_path / "reports", make_report_xml, make_record_xml, days=LONG)
-    monkeypatch.setattr(ingest_module, "MAX_RECORDS_PER_RUN", 1)
+    monkeypatch.setattr(ingest_module, "MAX_KEPT_BYTES_PER_RUN", 1)
 
     code = main(
         [command, str(folder), "--config", str(write_config(tmp_path / "c.toml")), *json_flag]
@@ -408,5 +408,6 @@ def test_a_run_past_the_record_cap_is_refused_with_one_line(
     assert code == cli.EXIT_REFUSED
     assert captured.out == ""
     assert captured.err == (
-        "mailvigil: the reports hold more than 1 records in one run: read fewer files at a time\n"
+        "mailvigil: the reports of one run would keep more than 0 MB in memory: "
+        "read fewer files at a time\n"
     )

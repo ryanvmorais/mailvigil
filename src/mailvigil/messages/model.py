@@ -319,8 +319,8 @@ class RefusalMessages:
         html_needs_folder (str): ``--html`` of several domains without ``--output``; ``{count}``.
         output_not_folder (str): ``--output`` of several domains is not an existing folder;
             ``{path}``.
-        run_too_large (str): The reports of the run hold more records than a run may keep;
-            ``{limit}``.
+        run_too_large (str): The reports of the run would keep more memory than a run may;
+            ``{limit}``, in megabytes.
     """
 
     no_domain: str

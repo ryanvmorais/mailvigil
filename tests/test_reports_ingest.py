@@ -264,20 +264,65 @@ def test_an_empty_domain_is_a_programming_error(domain: str, tmp_path: Path) -> 
 # ---------------------------------------------------------------------------
 
 
-def test_the_same_reporter_and_id_twice_counts_one_duplicate_and_does_not_sum_records(
+def test_the_same_report_twice_counts_one_duplicate_and_does_not_sum_records(
     tmp_path: Path, make_report_xml: _MakeReport, make_record_xml: _MakeRecord
 ) -> None:
-    first = make_report_xml(report_id="r1", records=[make_record_xml(count=3)])
-    # Same report downloaded again, here with different records to prove which one was kept.
-    second = make_report_xml(report_id="r1", records=[make_record_xml(count=40)])
+    """The same report downloaded again, under another file name, is kept once."""
+    report = make_report_xml(report_id="r1", records=[make_record_xml(count=3)])
+    _attachment(tmp_path, "a", report)
+    _attachment(tmp_path, "b", report)
+
+    result = ingest([tmp_path], "example.com")
+
+    assert [[record.count for record in kept.records] for kept in result.reports] == [[3]]
+    assert result.duplicates == 1
+
+
+@pytest.mark.parametrize("report_id", ["r1", ""])
+def test_a_report_that_reuses_the_reporter_and_id_of_another_is_kept_beside_it(
+    tmp_path: Path, make_report_xml: _MakeReport, make_record_xml: _MakeRecord, report_id: str
+) -> None:
+    """
+    Both values come from the report, so they alone cannot make it the same report (ADR-12).
+
+    The one read first used to win, so a forged report under a genuine name and id took the
+    genuine one's place. An empty id is the case of a reporter that omits it.
+    """
+    first = make_report_xml(report_id=report_id, records=[make_record_xml(count=3)])
+    second = make_report_xml(report_id=report_id, records=[make_record_xml(count=40)])
     _attachment(tmp_path, "a", first)
     _attachment(tmp_path, "b", second)
 
     result = ingest([tmp_path], "example.com")
 
-    assert len(result.reports) == 1
-    assert [record.count for record in result.reports[0].records] == [3]
-    assert result.duplicates == 1
+    assert [[record.count for record in kept.records] for kept in result.reports] == [[3], [40]]
+    assert result.duplicates == 0
+
+
+def test_a_report_with_another_period_under_the_same_id_is_kept_beside_it(
+    tmp_path: Path, make_report_xml: _MakeReport
+) -> None:
+    """The period is part of what the report says, so a change in it alone is another report."""
+    _attachment(tmp_path, "a", make_report_xml(report_id="r1", begin=1790000000))
+    _attachment(tmp_path, "b", make_report_xml(report_id="r1", begin=1790000001))
+
+    result = ingest([tmp_path], "example.com")
+
+    assert len(result.reports) == 2
+    assert result.duplicates == 0
+
+
+def test_a_report_with_another_policy_under_the_same_id_is_kept_beside_it(
+    tmp_path: Path, make_report_xml: _MakeReport
+) -> None:
+    """The published policy is part of what the report says too."""
+    _attachment(tmp_path, "a", make_report_xml(report_id="r1", p="none"))
+    _attachment(tmp_path, "b", make_report_xml(report_id="r1", p="reject"))
+
+    result = ingest([tmp_path], "example.com")
+
+    assert [kept.policy.p for kept in result.reports] == ["none", "reject"]
+    assert result.duplicates == 0
 
 
 def test_the_same_id_from_two_reporters_is_kept(

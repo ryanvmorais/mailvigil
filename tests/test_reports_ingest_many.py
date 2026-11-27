@@ -12,6 +12,7 @@ does and not how long it takes.
 from __future__ import annotations
 
 import importlib
+import tracemalloc
 from collections.abc import Callable
 from pathlib import Path
 
@@ -20,12 +21,14 @@ import pytest
 import mailvigil.reports
 from mailvigil.reports import ingest, ingest_many
 from mailvigil.reports.errors import RunTooLarge
+from mailvigil.reports.parser import parse_report
 
 # The package attribute ``ingest`` is the function, so the module is fetched by name.
 ingest_module = importlib.import_module("mailvigil.reports.ingest")
 
 # The shape of the ``conftest.py`` report factory, named once so each test signature stays short.
 type _MakeReport = Callable[..., bytes]
+type _MakeRecord = Callable[..., str]
 
 # Invented names (RNF-06): ``example.*`` is reserved for documentation, ``.invalid`` never resolves.
 _COM = "example.com"
@@ -179,41 +182,154 @@ def test_the_same_reporter_and_id_under_two_domains_is_not_a_duplicate(
 
 
 # ---------------------------------------------------------------------------
-# The records of a run are capped
+# The memory a run keeps is capped
 # ---------------------------------------------------------------------------
 
 
-def test_a_run_past_the_record_cap_stops_instead_of_answering_on_part_of_it(
+def _kept(xml: bytes) -> int:
+    """
+    Estimate what one report keeps, the way the run counts it, before it knows its file name.
+
+    Args:
+        xml (bytes): The report.
+
+    Returns:
+        int: ``_kept_bytes`` of the parsed report.
+    """
+    return int(ingest_module._kept_bytes(parse_report(xml)))
+
+
+def _kept_by_run(directory: Path, domains: list[str]) -> list[int]:
+    """
+    Estimate what each report a run keeps takes, file name included, with no cap in force.
+
+    Args:
+        directory (Path): The folder of the run.
+        domains (list[str]): The domains of the run.
+
+    Returns:
+        list[int]: ``_kept_bytes`` of every report kept, domain by domain, in order.
+    """
+    results = ingest_many([directory], domains)
+    return [
+        ingest_module._kept_bytes(report)
+        for result in results.values()
+        for report in result.reports
+    ]
+
+
+def test_a_run_past_the_memory_cap_stops_instead_of_answering_on_part_of_it(
     tmp_path: Path, make_report_xml: _MakeReport, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Every record kept stays in memory, so the run ends once the total is past the cap."""
+    """Every report kept stays in memory, so the run ends once the total is past the cap."""
     _attachment(tmp_path, "a", make_report_xml(domain=_COM, report_id="r1"))
     _attachment(tmp_path, "b", make_report_xml(domain=_NET, report_id="r2"))
-    monkeypatch.setattr(ingest_module, "MAX_RECORDS_PER_RUN", 1)
+    first, _ = _kept_by_run(tmp_path, [_COM, _NET])
+    monkeypatch.setattr(ingest_module, "MAX_KEPT_BYTES_PER_RUN", first)
 
     with pytest.raises(RunTooLarge) as caught:
         ingest_many([tmp_path], [_COM, _NET])
 
-    assert caught.value.limit == 1
+    assert caught.value.limit == first // 1_000_000
 
 
-def test_a_run_at_the_record_cap_is_read(
+def test_a_run_at_the_memory_cap_is_read(
     tmp_path: Path, make_report_xml: _MakeReport, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The cap counts the records kept, across domains; reaching it exactly is allowed."""
+    """The cap counts the reports kept, across domains; reaching it exactly is allowed."""
     _attachment(tmp_path, "a", make_report_xml(domain=_COM, report_id="r1"))
     _attachment(tmp_path, "b", make_report_xml(domain=_NET, report_id="r2"))
+    # A report of no domain of the run is not kept, so it does not count.
     _attachment(tmp_path, "c", make_report_xml(domain=_FOREIGN, report_id="r3"))
-    monkeypatch.setattr(ingest_module, "MAX_RECORDS_PER_RUN", 2)
+    monkeypatch.setattr(
+        ingest_module, "MAX_KEPT_BYTES_PER_RUN", sum(_kept_by_run(tmp_path, [_COM, _NET]))
+    )
 
     results = ingest_many([tmp_path], [_COM, _NET])
 
     assert [len(result.reports) for result in results.values()] == [1, 1]
 
 
-def test_the_record_cap_holds_a_large_legitimate_run() -> None:
-    """Ten reporters sending 1,000 rows a day for 28 days stay well under the cap."""
-    assert ingest_module.MAX_RECORDS_PER_RUN >= 10 * 1_000 * 28 * 3
+def test_a_record_full_of_results_counts_what_it_keeps_not_one_record(
+    tmp_path: Path,
+    make_report_xml: _MakeReport,
+    make_record_xml: _MakeRecord,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    One record listing many authentication results costs what it keeps.
+
+    Counting records let one small compressed file keep tens of megabytes as "one record"; here a
+    cap ten times a plain one-record report stops the run at a report of the same single record.
+    """
+    plain = make_report_xml(domain=_COM, report_id="r1", records=[make_record_xml()])
+    blocks = [("example.com", "s1", "pass")] * 500
+    full = make_report_xml(domain=_COM, report_id="r2", records=[make_record_xml(dkim=blocks)])
+    monkeypatch.setattr(ingest_module, "MAX_KEPT_BYTES_PER_RUN", 10 * _kept(plain))
+    _attachment(tmp_path, "a", plain)
+    assert len(ingest_many([tmp_path], [_COM])[_COM].reports) == 1
+    _attachment(tmp_path, "b", full)
+
+    with pytest.raises(RunTooLarge):
+        ingest_many([tmp_path], [_COM])
+
+
+@pytest.mark.parametrize("shape", ["dkim", "spf", "reasons", "texts", "policy"])
+def test_the_estimate_is_not_below_what_a_report_really_keeps(
+    shape: str, make_report_xml: _MakeReport, make_record_xml: _MakeRecord
+) -> None:
+    """
+    The estimate follows the memory a parsed report holds, for the shapes that keep the most.
+
+    Each shape puts the weight in one place, so a place the estimate forgot leaves it far under.
+    Measured with ``tracemalloc`` around the parse, which frees the tree and keeps the report; a
+    tenth of slack absorbs the allocator.
+    """
+    wide = "€" * 255
+    many = 2_000
+    records: list[str] = []
+    policy = ""
+    if shape == "dkim":
+        records = [make_record_xml(dkim=[("", "", "")] * many, spf=[])]
+    elif shape == "spf":
+        records = [make_record_xml(dkim=[], spf=[("", "")] * many)]
+    elif shape == "reasons":
+        records = [make_record_xml(dkim=[], spf=[], reasons=[("", "")] * many)]
+    elif shape == "texts":
+        records = [
+            make_record_xml(
+                ip=wide,
+                disposition=wide,
+                dkim_evaluated=wide,
+                spf_evaluated=wide,
+                header_from=wide,
+                dkim=[(wide, wide, wide)],
+                spf=[(wide, wide)],
+            )
+        ] * 200
+    else:
+        tags = ("sp", "np", "adkim", "aspf", "testing", "discovery_method")
+        policy = "".join(f"<{tag}>{wide}</{tag}>" for tag in tags)
+    xml = make_report_xml(
+        domain=_COM, report_id=wide, reporter=wide, p=wide, policy_extra=policy, records=records
+    )
+
+    tracemalloc.start()
+    report = parse_report(xml)
+    kept, _ = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+
+    assert ingest_module._kept_bytes(report) >= 0.9 * kept
+
+
+def test_the_memory_cap_holds_a_large_legitimate_run(
+    make_report_xml: _MakeReport, make_record_xml: _MakeRecord
+) -> None:
+    """Ten reporters sending 1,000 rows a day for 28 days, three times over, stay under the cap."""
+    records = [make_record_xml(ip=f"192.0.2.{number}") for number in range(100)]
+    per_record = _kept(make_report_xml(domain=_COM, records=records)) / len(records)
+
+    assert 10 * 1_000 * 28 * 3 * per_record <= ingest_module.MAX_KEPT_BYTES_PER_RUN
 
 
 # ---------------------------------------------------------------------------

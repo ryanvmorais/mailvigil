@@ -18,11 +18,12 @@ from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
+from sys import getsizeof
 
 from mailvigil.reports.discovery import Source, discover
 from mailvigil.reports.errors import Reason, ReportRefused, RunTooLarge
 from mailvigil.reports.mail import iter_mailbox, read_message, read_message_file
-from mailvigil.reports.model import IngestionResult, Report, SkippedFile
+from mailvigil.reports.model import IngestionResult, PolicyPublished, Record, Report, SkippedFile
 from mailvigil.reports.parser import parse_report
 from mailvigil.reports.reader import read_xml, read_xml_bytes
 from mailvigil.text import normalize_domain
@@ -31,11 +32,106 @@ from mailvigil.text import normalize_domain
 #: reporter in a distant time zone.
 FUTURE_TOLERANCE = timedelta(days=1)
 
-#: The most records the reports kept in one run may hold, all domains together. Each document is
-#: capped, but a run reads any number of them and keeps every record until the end, so many small
-#: compressed reports could fill memory. A record kept costs under 1 KB; ten reporters sending
-#: 1,000 rows a day for 28 days make 280,000.
-MAX_RECORDS_PER_RUN = 1_000_000
+#: The most memory, in bytes, the reports kept in one run may take, all domains together, as
+#: ``_kept_bytes`` estimates it. Each document is capped, but a run reads any number of them and
+#: keeps every report until the end, so many small compressed reports could fill memory. What a
+#: report keeps depends on its shape, not only on its records: a record may list any number of
+#: authentication results and hold texts of up to 255 characters outside ASCII, so a count of
+#: records alone let one small file keep tens of megabytes. A real record is estimated at about 840
+#: bytes (the synthetic reports of ``scripts/benchmark_ingest.py``), so this holds over a million of
+#: them; ten reporters sending 1,000 rows a day for 28 days keep 280,000.
+MAX_KEPT_BYTES_PER_RUN = 1_000_000_000
+
+# ---------------------------------------------------------------------------
+# Memory kept
+# ---------------------------------------------------------------------------
+
+
+def _policy_bytes(policy: PolicyPublished) -> int:
+    """
+    Estimate the memory a published policy keeps.
+
+    Args:
+        policy (PolicyPublished): The policy of a report.
+
+    Returns:
+        int: The size of the object and of each of its texts, in bytes.
+    """
+    return (
+        getsizeof(policy)
+        + getsizeof(policy.domain)
+        + getsizeof(policy.p)
+        + getsizeof(policy.sp)
+        + getsizeof(policy.np)
+        + getsizeof(policy.adkim)
+        + getsizeof(policy.aspf)
+        + getsizeof(policy.testing)
+        + getsizeof(policy.discovery_method)
+    )
+
+
+def _record_bytes(record: Record) -> int:
+    """
+    Estimate the memory a record keeps, with every block it lists.
+
+    Args:
+        record (Record): One row of a report.
+
+    Returns:
+        int: The size of the record, its texts, its tuples and each block in them, in bytes.
+    """
+    size = (
+        getsizeof(record)
+        + getsizeof(record.source_ip)
+        + getsizeof(record.disposition)
+        + getsizeof(record.dkim_evaluated)
+        + getsizeof(record.spf_evaluated)
+        + getsizeof(record.header_from)
+        + getsizeof(record.override_reasons)
+        + getsizeof(record.dkim)
+        + getsizeof(record.spf)
+    )
+    for reason in record.override_reasons:
+        size += getsizeof(reason) + getsizeof(reason.type) + getsizeof(reason.comment)
+    for dkim in record.dkim:
+        size += (
+            getsizeof(dkim)
+            + getsizeof(dkim.domain)
+            + getsizeof(dkim.selector)
+            + getsizeof(dkim.result)
+        )
+    for spf in record.spf:
+        size += getsizeof(spf) + getsizeof(spf.domain) + getsizeof(spf.result)
+    return size
+
+
+def _kept_bytes(report: Report) -> int:
+    """
+    Estimate the memory a report keeps until the end of the run.
+
+    ``sys.getsizeof`` of every object and text the report holds, named field by field: walking the
+    dataclasses generically cost three times as much, and this runs once per record of the run. A
+    text shared between reports (``pass``, the empty string) is counted each time, so the estimate
+    errs high, never low.
+
+    Args:
+        report (Report): A report about to be kept.
+
+    Returns:
+        int: The estimate, in bytes.
+    """
+    size = (
+        getsizeof(report)
+        + getsizeof(report.reporter)
+        + getsizeof(report.report_id)
+        + getsizeof(report.begin)
+        + getsizeof(report.end)
+        + getsizeof(report.source_file)
+        + getsizeof(report.records)
+        + _policy_bytes(report.policy)
+    )
+    return size + sum(_record_bytes(record) for record in report.records)
+
 
 # ---------------------------------------------------------------------------
 # Documents
@@ -172,6 +268,36 @@ def _documents(source: Source) -> Iterator[_Document | SkippedFile]:
 # ---------------------------------------------------------------------------
 
 
+#: What makes two reports the same one: the reporting organization and the report id, as RF-08
+#: has it, and also the period, the policy and the records, so only a copy is a duplicate.
+type _Identity = tuple[str, str, datetime, datetime, PolicyPublished, tuple[Record, ...]]
+
+
+def _identity(report: Report) -> _Identity:
+    """
+    Name a report for the duplicate rule.
+
+    The organization and the id come from the report itself, so they alone let any sender claim
+    them: a forged report read first would have made the genuine one a duplicate, removing its
+    records from the answer. With the content in the key, the same report downloaded twice is still
+    one report, and two different reports under one name are both kept (ADR-12).
+
+    Args:
+        report (Report): A report of a wanted domain.
+
+    Returns:
+        _Identity: Every field but ``source_file``, which only says where the copy was found.
+    """
+    return (
+        report.reporter,
+        report.report_id,
+        report.begin,
+        report.end,
+        report.policy,
+        report.records,
+    )
+
+
 def ingest_many(
     paths: Sequence[Path],
     domains: Sequence[str],
@@ -209,8 +335,8 @@ def ingest_many(
     Raises:
         ValueError: When ``domains`` is empty or holds an empty name. That is a mistake in the
             caller, not a bad input file.
-        RunTooLarge: When the reports kept hold more than ``MAX_RECORDS_PER_RUN`` records. The
-            run stops there rather than answer on the files read so far.
+        RunTooLarge: When the reports kept would take more than ``MAX_KEPT_BYTES_PER_RUN`` bytes
+            of memory. The run stops there rather than answer on the files read so far.
     """
     wanted = list(dict.fromkeys(normalize_domain(domain) for domain in domains))
     if not wanted:
@@ -222,10 +348,12 @@ def ingest_many(
     skipped = list(discovery_skipped)
     reports: dict[str, list[Report]] = {domain: [] for domain in wanted}
     # A report id is only unique per reporting organization (RF-08), and per domain (ADR-4 of 010).
-    seen: dict[str, set[tuple[str, str]]] = {domain: set() for domain in wanted}
+    # Both come from the report itself, so the key also holds what the report says: a forged report
+    # that reuses the name and id of a genuine one is kept beside it, never in its place (ADR-12).
+    seen: dict[str, set[_Identity]] = {domain: set() for domain in wanted}
     duplicates = dict.fromkeys(wanted, 0)
     other_domain = 0
-    records = 0
+    kept_bytes = 0
 
     for source in sources:
         for item in _documents(source):
@@ -255,13 +383,13 @@ def ingest_many(
             if domain not in reports:
                 other_domain += 1
                 continue
-            key = (report.reporter, report.report_id)
+            key = _identity(report)
             if key in seen[domain]:
                 duplicates[domain] += 1
                 continue
-            records += len(report.records)
-            if records > MAX_RECORDS_PER_RUN:
-                raise RunTooLarge(MAX_RECORDS_PER_RUN)
+            kept_bytes += _kept_bytes(report)
+            if kept_bytes > MAX_KEPT_BYTES_PER_RUN:
+                raise RunTooLarge(MAX_KEPT_BYTES_PER_RUN // 1_000_000)
             seen[domain].add(key)
             reports[domain].append(report)
 

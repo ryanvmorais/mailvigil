@@ -19,9 +19,10 @@ import io
 import sys
 import tracemalloc
 from collections.abc import Iterator
+from email.headerregistry import HeaderRegistry
 from email.message import EmailMessage
 from email.parser import BytesFeedParser
-from email.policy import EmailPolicy
+from email.policy import Compat32
 from pathlib import Path
 
 import pytest
@@ -471,7 +472,7 @@ def _content_type_of_length(length: int) -> str:
 
 
 def test_a_header_over_the_length_limit_is_refused() -> None:
-    """The header parser costs more than linear time, so a header past the limit is refused."""
+    """A header past the limit is refused before any part of the ``email`` package reads it."""
     raw = _with_content_type(_content_type_of_length(MAX_HEADER_CHARS + 1))
     assert _refusal(raw) is Reason.MESSAGE_TOO_COMPLEX
 
@@ -480,32 +481,88 @@ def test_a_header_at_the_length_limit_is_read() -> None:
     assert read_message(_with_content_type(_content_type_of_length(MAX_HEADER_CHARS))) == ()
 
 
-def test_a_long_header_is_refused_before_the_header_parser_sees_it(
+def test_a_long_header_is_refused_before_the_policy_hands_it_out(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The length is checked first: the default policy is never asked to parse the value."""
-    parsed: list[int] = []
-    original = EmailPolicy.header_fetch_parse
+    """
+    The length is checked first: ``compat32`` is never asked for a value over the limit.
 
-    def counted(self: EmailPolicy, name: str, value: str) -> object:
-        parsed.append(len(value))
+    The header at the limit goes through the same spy, so an empty list cannot pass for a check.
+    """
+    handed: list[int] = []
+    original = Compat32.header_fetch_parse
+
+    def counted(self: Compat32, name: str, value: str) -> object:
+        handed.append(len(value))
         return original(self, name, value)
 
-    monkeypatch.setattr(EmailPolicy, "header_fetch_parse", counted)
+    monkeypatch.setattr(Compat32, "header_fetch_parse", counted)
+    read_message(_with_content_type(_content_type_of_length(MAX_HEADER_CHARS)))
     _refusal(_with_content_type(_content_type_of_length(MAX_HEADER_CHARS + 1)))
-    assert all(length <= MAX_HEADER_CHARS for length in parsed)
+    assert max(handed) == MAX_HEADER_CHARS
 
 
-def test_a_deeply_nested_header_is_a_refusal_not_a_crash() -> None:
-    """The header parser descends once per nested comment; running out of stack is a refusal."""
+def test_no_header_is_parsed_into_a_structured_object(monkeypatch: pytest.MonkeyPatch) -> None:
+    """
+    The structured parser of the default policy never runs, on any header of the message.
+
+    That parser takes time that grows much faster than the header and ran again on every read, so a
+    message under every cap could take tens of seconds. Every structured header is built by a
+    ``HeaderRegistry``; the attachment found shows the headers were read.
+    """
+    # The builder of the test uses the default policy itself, so the message exists before the spy.
+    raw = _mail((_BINARY, "application", "zip", "report.zip"))
+    built: list[str] = []
+    original = HeaderRegistry.__call__
+
+    def counted(self: HeaderRegistry, name: str, value: str) -> object:
+        built.append(name)
+        return original(self, name, value)
+
+    monkeypatch.setattr(HeaderRegistry, "__call__", counted)
+    found = read_message(raw)
+    assert [(a.name, a.kind) for a in found] == [("report.zip", "zip")]
+    assert built == []
+
+
+@pytest.mark.parametrize(
+    "word",
+    [
+        "=?x-unknown-charset?q?report.zip?=",
+        "=?utf-8?q?report=FF.zip?=",
+    ],
+)
+def test_an_encoded_name_that_does_not_decode_falls_back_to_the_content_type(word: str) -> None:
+    """
+    A name with a charset Python lacks, or bytes its charset refuses, is kept as written.
+
+    The part is still a report by its content type, and the message is not refused for one name.
+    """
+    part = (
+        b"Content-Type: application/zip\n"
+        + f'Content-Disposition: attachment; filename="{word}"\n'.encode()
+        + b"Content-Transfer-Encoding: base64\n\nUEsFBg==\n"
+    )
+    found = read_message(_multipart([part]))
+    assert [(a.name, a.kind) for a in found] == [(word, "zip")]
+
+
+def test_a_deeply_nested_header_is_read_without_descending_into_it() -> None:
+    """
+    A header of nested comments costs no recursion: the policy never parses it into a tree.
+
+    The structured parser of the default policy descended once per comment and ran out of stack
+    under this limit; ``compat32`` reads the content type by splitting the value, so the message is
+    read and its one part, plain text, is no candidate.
+    """
     depth = MAX_HEADER_CHARS // 2 - 20
     raw = _with_content_type("text/plain " + "(" * depth + ")" * depth)
-    # The limit of the process may have been raised by the runner, and a nesting under it parses
-    # fine; a limit set here, a little above the current depth, makes the descent run out of it.
+    # The limit of the process may have been raised by the runner; a limit set here, a little above
+    # the current depth, is one a parser that descends per comment would run out of.
     previous = sys.getrecursionlimit()
     sys.setrecursionlimit(len(inspect.stack(0)) + 300)
     try:
-        assert _refusal(raw) is Reason.MALFORMED_MESSAGE
+        assert read_message(raw) == ()
     finally:
         sys.setrecursionlimit(previous)
 

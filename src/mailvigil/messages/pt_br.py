@@ -306,7 +306,7 @@ _REFUSALS = RefusalMessages(
     ),
     output_not_folder="--output {path} não é uma pasta existente",
     run_too_large=(
-        "os relatórios somam mais de {limit} registros numa execução: "
+        "os relatórios de uma execução ocupariam mais de {limit} MB de memória: "
         "leia menos arquivos de cada vez"
     ),
 )

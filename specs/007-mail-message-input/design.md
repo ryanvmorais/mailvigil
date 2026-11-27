@@ -361,6 +361,26 @@ only caller is `ingest`, and the tests that call it are updated).
 - **Trade-off:** a mail with a header over 4 KiB is refused even when that header is not one the
   reader needs; the constant is the place to raise it, by a decision in this spec.
 
+### ADR-11 — The `compat32` policy, and RFC 2047 names decoded here (amendment of 2026-11-27)
+
+- **Decision:** `_BoundedHeaders` subclasses `Compat32` instead of `EmailPolicy`, with the same
+  length check in `header_fetch_parse`, and the part factory builds `Message`. `_filename` decodes
+  an RFC 2047 name (`=?utf-8?b?...?=`) with `email.header`, which `compat32` leaves as written; a
+  name that does not decode is kept as written, so the content type still decides (ADR-9).
+- **Alternatives:** keep the default policy and lower `MAX_HEADER_CHARS`; keep it and cache each
+  parsed header; a time budget per message.
+- **Why:** ADR-10 kept the default policy on the belief that `compat32` reads parameters at the same
+  kind of cost. Measured, it does not: under the 4 KiB cap the structured parser still takes up to
+  a tenth of a second for one value, in time that grows much faster than the value, and runs again
+  on every read, about nine times per part. A message of 48 parts with two long headers each took
+  23 to 65 seconds; with `compat32` the same message takes 0.02 to 0.7 seconds, and the time grows
+  with the header. A lower cap would also refuse a long name split by RFC 2231; a cache leaves the
+  cost of the first read; a time budget makes the answer depend on the machine. `compat32` never
+  descends into a header, so a deeply nested comment no longer raises `RecursionError`, which stays
+  in `_MESSAGE_ERRORS` as defense in depth.
+- **Trade-off:** the module now decodes RFC 2047 names itself, a dozen lines; the four bounds of
+  ADR-1 and ADR-2 and the cap of ADR-10 are unchanged.
+
 ## Impact on existing code
 
 - **Changed signatures:** `discover` (its return type), `SkippedFile` (a last field with a default),

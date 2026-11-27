@@ -10,7 +10,6 @@ stops at ``MAX_BYTES``; it never consults a size an archive declares, because a 
 
 from __future__ import annotations
 
-import gzip
 import io
 import lzma
 import stat
@@ -30,6 +29,15 @@ from mailvigil.reports.errors import Reason, ReportRefused
 # edit.
 MAX_BYTES = 5 * 1024 * 1024
 
+# The most members a gzip file may hold. A provider writes one; the format allows any number, each
+# with its own header to read and decompressor to start, so a file of empty members kept the CPU
+# busy for seconds per megabyte without producing a byte for ``MAX_BYTES`` to count.
+MAX_GZIP_MEMBERS = 8
+
+# ``zlib`` reads one gzip member, header and trailer included, with this window size: 15 bits of
+# window, plus 16 for the gzip framing.
+_GZIP_WBITS = 16 + zlib.MAX_WBITS
+
 # Only the three forms a provider sends a report in, so a mail attachment of any other kind is
 # never opened as an archive.
 type Kind = Literal["xml", "gz", "zip"]
@@ -42,14 +50,14 @@ KIND_BY_SUFFIX: dict[str, Kind] = {".xml": "xml", ".gz": "gz", ".zip": "zip"}
 # asks for before ``_read_capped`` counts a byte, and their errors are not all in the list below.
 _ZIP_METHODS = frozenset({zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED})
 
-# What the standard library raises for an archive it cannot read. ``BadGzipFile`` is an ``OSError``,
-# so this tuple must be caught before ``OSError``. ``NotImplementedError`` is a compression method
-# it lacks and ``RuntimeError`` is an encrypted member. ``ValueError`` is what ``zipfile`` raises
+# What the standard library raises for an archive it cannot read. ``zlib.error`` is a corrupt gzip
+# member or header, as well as a damaged deflate stream in a zip; the tuple is caught before
+# ``OSError``, which a read from disk raises. ``NotImplementedError`` is a compression method it
+# lacks and ``RuntimeError`` is an encrypted member. ``ValueError`` is what ``zipfile`` raises
 # for a damaged archive read from memory, where a file would give ``BadZipFile``. ``LZMAError`` is
 # defense in depth: ``_ZIP_METHODS`` already keeps LZMA members closed.
 _ARCHIVE_ERRORS = (
     zipfile.BadZipFile,
-    gzip.BadGzipFile,
     zlib.error,
     lzma.LZMAError,
     EOFError,
@@ -107,6 +115,52 @@ def _read_capped(stream: _Readable) -> bytes:
     return b"".join(chunks)
 
 
+def _read_gzip(source: Path | BinaryIO) -> bytes:
+    """
+    Read a gzip file one member at a time, in memory.
+
+    ``zlib`` does the work of ``gzip`` here because ``gzip`` gives no way to count the members it
+    reads. Each member is checked like ``gzip`` checks it (header, CRC and length in the trailer),
+    and zero bytes after the last one are padding, as ``gzip`` takes them.
+
+    Args:
+        source (Path | BinaryIO): The ``.gz`` file, or its bytes in a stream.
+
+    Returns:
+        bytes: The content of every member, joined, at most ``MAX_BYTES`` long.
+
+    Raises:
+        ReportRefused: ``NOT_AN_ARCHIVE`` for a member that is cut short or past
+            ``MAX_GZIP_MEMBERS``, and ``DECOMPRESSED_TOO_LARGE`` past ``MAX_BYTES``, on the
+            compressed bytes or on the content.
+        zlib.error: For a damaged member; the caller names the reason.
+    """
+    if isinstance(source, Path):
+        with source.open("rb") as stream:
+            data = _read_capped(stream)
+    else:
+        data = _read_capped(source)
+    produced: list[bytes] = []
+    total = 0
+    members = 0
+    # An empty file holds no member, and ``gzip`` reads it as an empty document.
+    while data.strip(b"\x00"):
+        members += 1
+        if members > MAX_GZIP_MEMBERS:
+            raise ReportRefused(Reason.NOT_AN_ARCHIVE, f"more than {MAX_GZIP_MEMBERS} gzip members")
+        member = zlib.decompressobj(wbits=_GZIP_WBITS)
+        # One more byte than the room left, so a member that fills it is told from one that ends.
+        chunk = member.decompress(data, MAX_BYTES + 1 - total)
+        total += len(chunk)
+        if total > MAX_BYTES:
+            raise ReportRefused(Reason.DECOMPRESSED_TOO_LARGE, f"more than {MAX_BYTES} bytes")
+        if not member.eof:
+            raise ReportRefused(Reason.NOT_AN_ARCHIVE, "a gzip member is cut short")
+        produced.append(chunk)
+        data = member.unused_data
+    return b"".join(produced)
+
+
 def _read_zip(source: Path | BinaryIO) -> bytes:
     """
     Read the one ``.xml`` member of a zip, in memory.
@@ -160,8 +214,7 @@ def _read_kind(kind: Kind, source: Path | BinaryIO) -> bytes:
         if kind == "zip":
             return _read_zip(source)
         if kind == "gz":
-            with gzip.open(source, "rb") as gz_stream:
-                return _read_capped(gz_stream)
+            return _read_gzip(source)
         if isinstance(source, Path):
             with source.open("rb") as stream:
                 return _read_capped(stream)

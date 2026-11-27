@@ -16,12 +16,12 @@ import re
 import stat
 from collections.abc import Iterator
 from dataclasses import dataclass
-from email import policy
-from email.message import EmailMessage, Message
+from email.header import Header, decode_header, make_header
+from email.message import Message
 from email.parser import BytesFeedParser
-from email.policy import EmailPolicy
+from email.policy import Compat32, Policy
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, BinaryIO, cast
+from typing import BinaryIO, cast
 
 from mailvigil.reports.errors import Reason, ReportRefused
 from mailvigil.reports.reader import KIND_BY_SUFFIX, Kind
@@ -41,8 +41,8 @@ MAX_PARTS = 50
 # Mixed, related, alternative and a signature wrapper make 4. The message itself is depth 0.
 MAX_DEPTH = 10
 # One header, folded lines joined, in characters. A report's ``Content-Type`` or
-# ``Content-Disposition`` is under 200; a line may hold 998 (RFC 5322). The parser of the
-# standard library spends time that grows faster than the header, so the length is checked first.
+# ``Content-Disposition`` is under 200; a line may hold 998 (RFC 5322), and a long name split by
+# RFC 2231 takes a few lines. The length is checked before any header is read.
 MAX_HEADER_CHARS = 4 * 1024
 
 # How much of the message the parser is given at a time, so a refusal in the middle stops the work.
@@ -72,8 +72,9 @@ _KIND_BY_TYPE: dict[str, Kind] = {
 }
 
 # What the ``email`` package raises of its own on a message it cannot make sense of. A refusal of
-# ours (``ReportRefused``) is not in the list, so it passes through. ``RecursionError`` is the
-# header parser, which descends once per nested comment or group.
+# ours (``ReportRefused``) is not in the list, so it passes through. ``RecursionError`` was the
+# structured header parser, which descends once per nested comment or group; it stays as defense in
+# depth. ``LookupError`` is also the charset of an RFC 2047 name that Python does not know.
 _MESSAGE_ERRORS = (
     email.errors.MessageError,
     ValueError,
@@ -123,15 +124,15 @@ class _PartCounter:
         """Start a count at zero."""
         self._count = 0
 
-    def __call__(self, policy: policy.Policy[EmailMessage]) -> EmailMessage:
+    def __call__(self, policy: Policy[Message[str, str]]) -> Message[str, str]:
         """
         Create the next part.
 
         Args:
-            policy (policy.Policy[EmailMessage]): The policy of the parser, handed to the part.
+            policy (Policy[Message[str, str]]): The policy of the parser, handed to the part.
 
         Returns:
-            EmailMessage: An empty part.
+            Message[str, str]: An empty part.
 
         Raises:
             ReportRefused: ``MESSAGE_TOO_COMPLEX`` when this part is past ``MAX_PARTS``.
@@ -139,35 +140,38 @@ class _PartCounter:
         self._count += 1
         if self._count > MAX_PARTS:
             raise ReportRefused(Reason.MESSAGE_TOO_COMPLEX, f"more than {MAX_PARTS} parts")
-        return EmailMessage(policy=policy)
+        return Message(policy=policy)
 
 
-# The standard library's stubs make the policy generic, the class itself is not.
-if TYPE_CHECKING:
-    _EmailPolicy = EmailPolicy[EmailMessage]
-else:
-    _EmailPolicy = EmailPolicy
-
-
-class _BoundedHeaders(_EmailPolicy):
+class _BoundedHeaders(Compat32):
     """
-    The default policy, refusing a header too long to parse before the parser sees it.
+    The ``compat32`` policy, refusing a header too long before it is read.
 
-    ``email`` keeps a header as raw text and parses it each time it is read, through
+    ``email`` keeps a header as raw text and hands it out each time it is read, through
     ``header_fetch_parse``, during parsing (the content type of every part) as well as after. That
     is the one place every read goes through, so the check cannot be skipped.
+
+    ``compat32`` rather than the default policy: the default one parses a header into a structured
+    object on every read, in time that grows much faster than the header (a 4 KiB value took up to a
+    tenth of a second, read again about nine times per part), so a message under every cap could
+    take tens of seconds. ``compat32`` reads the parameters this module needs (``boundary``,
+    ``filename``) in time that grows with the header, and gives the name of an attachment undecoded,
+    which ``_filename`` decodes.
     """
 
-    def header_fetch_parse(self, name: str, value: str) -> Any:
+    # The stubs give ``Compat32`` the ``str | Header`` it really returns and its base ``Policy`` a
+    # plain ``str``, so the override is the stubs' own mismatch.
+    def header_fetch_parse(self, name: str, value: str) -> str | Header:  # type: ignore[override]
         """
-        Parse a header the way the default policy does, after checking its length.
+        Hand out a header the way ``compat32`` does, after checking its length.
 
         Args:
             name (str): The header name.
             value (str): The raw value, folded lines joined.
 
         Returns:
-            Any: What the default policy returns, a header object.
+            str | Header: What ``compat32`` returns: the value, or a ``Header`` for one holding
+                bytes that are not ASCII.
 
         Raises:
             ReportRefused: ``MESSAGE_TOO_COMPLEX`` for a value over ``MAX_HEADER_CHARS``.
@@ -192,7 +196,9 @@ def _parse(raw: bytes) -> Message[str, str]:
     Raises:
         ReportRefused: ``MESSAGE_TOO_COMPLEX`` past ``MAX_PARTS`` or ``MAX_HEADER_CHARS``.
     """
-    parser = BytesFeedParser(policy=_BoundedHeaders(message_factory=_PartCounter()))
+    parser: BytesFeedParser[Message[str, str]] = BytesFeedParser(
+        policy=_BoundedHeaders(message_factory=_PartCounter())
+    )
     for start in range(0, len(raw), _FEED_SIZE):
         parser.feed(raw[start : start + _FEED_SIZE])
     return parser.close()
@@ -216,6 +222,31 @@ def _kind_of(name: str, content_type: str) -> Kind | None:
     return _KIND_BY_TYPE.get(content_type)
 
 
+def _filename(part: Message[str, str]) -> str | None:
+    """
+    Read the file name of a part, decoded from RFC 2231 and from RFC 2047.
+
+    ``compat32`` undoes RFC 2231 (``filename*=utf-8''...``) but hands an RFC 2047 name
+    (``=?utf-8?b?...?=``) as written, which some senders use for an attachment; without this the
+    name would end in ``?=`` and the attachment would be ignored.
+
+    Args:
+        part (Message[str, str]): A part that holds no other parts.
+
+    Returns:
+        str | None: The name, or ``None`` when the part has none. A name that does not decode (a
+            charset Python does not know, a damaged word) is returned as written: the content type
+            still decides whether the part is a report, and one odd name does not cost the message.
+    """
+    name = part.get_filename()
+    if name is None or "=?" not in name:
+        return name
+    try:
+        return str(make_header(decode_header(name)))
+    except (email.errors.HeaderParseError, LookupError, UnicodeError):
+        return name
+
+
 def _candidate(part: Message[str, str]) -> Attachment | None:
     """
     Turn one leaf into an attachment, when it is a report candidate.
@@ -226,7 +257,7 @@ def _candidate(part: Message[str, str]) -> Attachment | None:
     Returns:
         Attachment | None: The attachment, or ``None`` for the body, an image, a signature…
     """
-    filename = part.get_filename()
+    filename = _filename(part)
     if filename is None and part.get_content_disposition() != "attachment":
         return None
     # The suffix is read from the whole cleaned name: cutting first would drop the ``.zip`` of a

@@ -264,8 +264,8 @@ for file in files:
     try:    report = parse_report(read_xml(file), source=file.name)
     except ReportRefused as refused:  skipped.append(SkippedFile(file, refused.reason, refused.detail)); continue
     if report.policy.domain != wanted:   other_domain += 1
-    elif (report.reporter, report.report_id) in seen:   duplicates += 1
-    else:   seen.add(key); reports.append(report)
+    elif _identity(report) in seen:   duplicates += 1   # organization, id and content (ADR-12)
+    else:   seen.add(_identity(report)); reports.append(report)
 ```
 
 The domain filter runs before the duplicate rule, as in the source script, so an other-domain
@@ -418,7 +418,7 @@ an `OSError` raised while an attachment is read from memory is `NOT_AN_ARCHIVE`.
 `LookupError` or `ValueError` from the parser (an encoding expat cannot use) is `MALFORMED_XML`.
 `ingest_many` counts the records of the reports it keeps, across domains, and past
 `MAX_RECORDS_PER_RUN = 1_000_000` raises `RunTooLarge`; the CLI refuses the run with one line and
-exit code `1`.
+exit code `1`. (The count of records became a count of memory in ADR-12.)
 **Alternatives.** (a) Catch every exception around the reader and the parser. (b) Accept every
 method the standard library supports and rely on `MAX_BYTES`. (c) Past the cap, skip the remaining
 files and answer on what was read. (d) A cap in bytes instead of records.
@@ -448,6 +448,39 @@ compares (003), so a comparison in ASCII loses nothing. (b) does the opposite of
 **Trade-off.** A report that writes a name outside ASCII in capitals keeps the capitals; such a
 name never equals a configured one anyway. Selectors written in the configuration file keep
 `str.lower`: the person who wrote them is the one being protected.
+
+### ADR-12 — The cap of a run counts memory, gzip members are capped, and a duplicate is a copy (amendment of 2026-11-27)
+
+**Decision.** (1) `ingest_many` adds up `_kept_bytes` of the reports it keeps, an estimate made of
+`sys.getsizeof` of every object and text a report holds, and past `MAX_KEPT_BYTES_PER_RUN =
+1_000_000_000` raises `RunTooLarge`, whose `limit` is now in megabytes; it replaces
+`MAX_RECORDS_PER_RUN`. (2) `xmlsafe.py` counts attributes and namespace declarations against
+`MAX_ELEMENTS`, with the elements. (3) A `.gz` is read one member at a time with `zlib`, at most
+`MAX_GZIP_MEMBERS = 8`; past them it is `NOT_AN_ARCHIVE`, and zero bytes after the last member are
+padding, as `gzip` takes them. (4) The duplicate key is the organization, the id, the period, the
+published policy and the records (`_identity`); only `source_file` is left out.
+**Alternatives.** (a) Keep counting records and cap the blocks a record may list. (b) A cap on the
+XML bytes of the reports kept. (c) Count the members by reading the file with `gzip` twice.
+(d) When two reports share an organization and an id but not their content, keep neither, or the
+first, as before.
+**Why.** (1) A record may list any number of authentication results and hold texts of up to 255
+characters outside ASCII, so a count of records did not bound memory: one small compressed file
+counted as one record could keep tens of megabytes, and a record of long texts keeps about 3 KB
+against 840 bytes for a real one. (a) still leaves the texts; (b) misses that an empty block of a
+few bytes keeps tens of bytes. The estimate follows `tracemalloc` (835 bytes a record against 799 on
+the reports of `scripts/benchmark_ingest.py`), errs high when texts are shared, and costs about 5 %
+of the reading. (2) An attribute costs memory like an element; one tag with hundreds of thousands
+of them is still built by expat before any handler runs (109 MB at 5 MiB, against 132 MB), but
+elements full of them no longer add up past the cap. (3) Each member costs a header and a new
+decompressor and may produce nothing, so a 5 MiB file of empty members kept the CPU busy for
+about 20 seconds; `gzip` gives no way to count them. (4) The organization and the id are written by
+the sender of the report: with them alone, a forged report read first under the name and id of a
+genuine one made the genuine one a duplicate and removed its records from the answer. (d) would
+let any report remove another.
+**Trade-off.** A provider that sends a corrected report under the same id is counted twice; a
+forged report could already add itself under a new id (the README limit "It trusts the numbers in
+the reports"), and now it can no longer take another report's place. A run of more than about a
+million real records has to be read in parts, as before; the constant is the place to raise it.
 
 ## Impact on existing code
 

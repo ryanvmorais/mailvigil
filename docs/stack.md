@@ -148,14 +148,15 @@ a large message of empty parts it spends hundreds of MiB before a check *after* 
 The module checks the size and the number of lines first, then counts parts as the parser creates
 them, through a message factory that raises past the limit
 (the policy's `message_factory` is the seam; ADR-1 and ADR-2 of spec 007). The header parser of the
-default policy costs more than linear time and descends once per nested comment, so the policy is a
-subclass whose `header_fetch_parse` refuses a header over 4 KiB before parsing it, and a
-`RecursionError` is a malformed message (ADR-10 of spec 007). A report that is not an attachment, or
-a message too big, costs one skipped entry and never the run.
+default policy costs more than linear time, so the policy is a subclass of `compat32`, whose cost
+grows with the header, and its `header_fetch_parse` refuses a header over 4 KiB before handing it
+out (ADR-10 and ADR-11 of spec 007); an RFC 2047 file name is decoded with `email.header`. A report
+that is not an attachment, or a message too big, costs one skipped entry and never the run.
 
-**Learn:** `BytesFeedParser` (`feed`, `close`), `email.policy.EmailPolicy`, `clone()` and
-`header_fetch_parse` (headers are kept raw and parsed each time they are read),
-`EmailMessage.get_filename()` and `get_payload(decode=True)`, how a `multipart/*` tree is shaped and
+**Learn:** `BytesFeedParser` (`feed`, `close`), `email.policy.Compat32` against `EmailPolicy`,
+`header_fetch_parse` (headers are kept raw and handed out each time they are read),
+`email.header.decode_header`,
+`Message.get_filename()` and `get_payload(decode=True)`, how a `multipart/*` tree is shaped and
 why walking it with a stack is safer than recursion, why a body can be larger than its own size on
 disk (base64 adds a third).
 

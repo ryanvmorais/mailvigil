@@ -32,6 +32,11 @@ _NAMESPACE_9990 = "urn:ietf:params:xml:ns:dmarc-2.0"
 # elements at 108 MB, against 30 MB for a real report of the same size. A report has about six
 # levels and, at the byte cap, about 230,000 elements, so these are five times and twice that
 # (ADR-8). Past either the document is refused while it is read, before the rest of the tree.
+# An attribute and a namespace declaration cost memory like an element and a report needs almost
+# none, so they count against ``MAX_ELEMENTS`` too, and elements full of attributes cannot add up
+# past it (25 MB at 5 MiB, against 48 MB before they counted). Expat builds the attributes of one
+# tag before any handler sees them, so a single tag holding a few hundred thousand still peaks near
+# the worst case of elements (109 MB, against 132 MB), and the document is refused right there.
 MAX_DEPTH = 32
 MAX_ELEMENTS = 500_000
 
@@ -93,7 +98,8 @@ def parse_xml(xml: bytes) -> Element:
 
     Raises:
         ReportRefused: ``FORBIDDEN_DECLARATION`` for a ``DOCTYPE`` or an ``ENTITY``,
-            ``XML_TOO_COMPLEX`` past ``MAX_DEPTH`` levels or ``MAX_ELEMENTS`` elements, and
+            ``XML_TOO_COMPLEX`` past ``MAX_DEPTH`` levels or ``MAX_ELEMENTS`` elements, attributes
+            and namespace declarations together, and
             ``MALFORMED_XML`` (detail ``line L, column C``) for a document that is not well formed,
             or with the error's name for one that declares an encoding the parser cannot use.
     """
@@ -101,17 +107,26 @@ def parse_xml(xml: bytes) -> Element:
     parser = expat.ParserCreate(namespace_separator=_SEPARATOR)
     # Counters the handlers share; one run of this function owns them, so nothing is global.
     open_elements = 0
-    seen_elements = 0
+    seen_items = 0
+
+    def count(items: int) -> None:
+        """Count elements, attributes or namespace declarations, refusing past the cap."""
+        nonlocal seen_items
+        seen_items += items
+        if seen_items > MAX_ELEMENTS:
+            raise ReportRefused(
+                Reason.XML_TOO_COMPLEX, f"more than {MAX_ELEMENTS} elements and attributes"
+            )
 
     def start(name: str, attrs: dict[str, str]) -> None:
         """Count the element, refuse the document past a limit, and hand it to the builder."""
-        nonlocal open_elements, seen_elements
+        nonlocal open_elements
         open_elements += 1
-        seen_elements += 1
         if open_elements > MAX_DEPTH:
             raise ReportRefused(Reason.XML_TOO_COMPLEX, f"deeper than {MAX_DEPTH} levels")
-        if seen_elements > MAX_ELEMENTS:
-            raise ReportRefused(Reason.XML_TOO_COMPLEX, f"more than {MAX_ELEMENTS} elements")
+        # Expat has already built ``attrs`` when this runs, so the count bounds the tree that is
+        # kept, and a document past the cap stops here, before the next element is read.
+        count(1 + len(attrs))
         builder.start(_local_name(name), {_local_name(key): value for key, value in attrs.items()})
 
     def end(name: str) -> None:
@@ -125,6 +140,8 @@ def parse_xml(xml: bytes) -> Element:
     parser.StartDoctypeDeclHandler = lambda *_: _refuse("DOCTYPE")
     # Defense in depth: a DOCTYPE already refused the document, so this one is not expected to fire.
     parser.EntityDeclHandler = lambda *_: _refuse("ENTITY")
+    # Expat keeps a binding for every declaration, and none of them reaches ``attrs``.
+    parser.StartNamespaceDeclHandler = lambda *_: count(1)
     parser.StartElementHandler = start
     parser.EndElementHandler = end
     parser.CharacterDataHandler = builder.data

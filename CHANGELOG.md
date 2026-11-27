@@ -19,6 +19,23 @@ first release and contains `v0.1` to `v0.9`, `v0.10` (several domains) arrived i
   the date of that check, and no longer shows the development-tool badges (deps, lint, style,
   types) at the top.
 
+### Fixed
+
+- **The memory a run may keep counts what its reports hold, not how many records they have.** A
+  report whose records list many authentication results, or hold long texts, could keep far more
+  memory than its number of records suggested. Past 1 GB of kept reports (about a million real
+  records) the run stops with one line and exit code `1`, as before, and the line now gives the
+  limit in megabytes. In an XML report, attributes and namespace declarations count against the
+  limit of elements.
+- **A mail with long `Content-Type` or `Content-Disposition` headers is read in time in line with
+  its size.** Mail is read with the `compat32` policy of the standard library, whose cost grows
+  with the header, and an attachment name encoded by RFC 2047 is still decoded. A `.gz` report with
+  more than 8 gzip members is refused as `not_an_archive`.
+- **Two reports with the same reporting organization and report id but a different content are
+  both kept.** Only a copy of a report already read (same organization, id, period, published
+  policy and records) counts as a duplicate, so a report can no longer take the place of another
+  that shares its name and id.
+
 ## [1.8.0] - 2026-11-14
 
 ### Added

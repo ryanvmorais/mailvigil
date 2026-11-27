@@ -13,6 +13,7 @@ from collections.abc import Callable
 
 import pytest
 
+from mailvigil.reports import xmlsafe
 from mailvigil.reports.errors import Reason, ReportRefused
 from mailvigil.reports.xmlsafe import MAX_DEPTH, MAX_ELEMENTS, parse_xml
 
@@ -269,3 +270,59 @@ def test_the_complexity_detail_does_not_echo_the_document() -> None:
         parse_xml(_nested(MAX_DEPTH + 1).replace(b"a", b"secret_tag"))
 
     assert "secret_tag" not in caught.value.detail
+
+
+# ---------------------------------------------------------------------------
+# Attributes and namespace declarations count like elements
+# ---------------------------------------------------------------------------
+
+
+def _attributes(count: int, shape: str) -> bytes:
+    """
+    Build a root element that holds ``count`` attributes or namespace declarations.
+
+    Args:
+        count (int): How many to put on the root.
+        shape (str): ``"a{n}"`` for plain attributes, ``"xmlns:p{n}"`` for declarations.
+
+    Returns:
+        bytes: The document, one empty root element.
+    """
+    pairs = " ".join(f'{shape.format(n=number)}="u"' for number in range(count))
+    return f"<feedback {pairs}/>".encode()
+
+
+@pytest.mark.parametrize("shape", ["a{n}", "xmlns:p{n}"])
+def test_attributes_at_the_cap_with_their_element_are_accepted(
+    shape: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The root and four attributes, or four declarations, are five items: exactly the cap."""
+    monkeypatch.setattr(xmlsafe, "MAX_ELEMENTS", 5)
+
+    assert parse_xml(_attributes(4, shape)).tag == "feedback"
+
+
+@pytest.mark.parametrize("shape", ["a{n}", "xmlns:p{n}"])
+def test_attributes_past_the_cap_refuse_the_document(
+    shape: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """One more is six items: the attributes count against ``MAX_ELEMENTS``, not only elements."""
+    monkeypatch.setattr(xmlsafe, "MAX_ELEMENTS", 5)
+
+    with pytest.raises(ReportRefused) as caught:
+        parse_xml(_attributes(5, shape))
+
+    assert caught.value.reason is Reason.XML_TOO_COMPLEX
+
+
+def test_attributes_spread_over_elements_add_up_to_the_cap(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Two elements of two attributes each are six items, so the count runs across the document."""
+    monkeypatch.setattr(xmlsafe, "MAX_ELEMENTS", 5)
+    document = b'<feedback a="" b=""><x c="" d=""/></feedback>'
+
+    with pytest.raises(ReportRefused) as caught:
+        parse_xml(document)
+
+    assert caught.value.reason is Reason.XML_TOO_COMPLEX

@@ -208,3 +208,26 @@ public entry point.
 - [x] Quality gate. — result recorded when run: ruff, black and mypy clean; pytest passed with
   coverage 100% (Python 3.12, 2026-10-30; the two tests that need a real symbolic link are skipped
   on Windows and run in the Linux CI).
+
+## Stage 11 — Memory and CPU of a run, and a duplicate that is a copy (amendment of 2026-11-27)
+
+- [x] `ingest.py`: `_kept_bytes` and `MAX_KEPT_BYTES_PER_RUN` (1 GB) in place of
+  `MAX_RECORDS_PER_RUN`; `errors.py`, `messages/`: `RunTooLarge.limit` and its line in megabytes.
+  Tests: past the cap and at it, a record full of results stopped by a cap a plain report passes,
+  the estimate against `tracemalloc` for five shapes, a large legitimate run under the cap, and the
+  line through `main(argv)`. — ADR-12
+- [x] `xmlsafe.py`: attributes and namespace declarations count against `MAX_ELEMENTS`. Tests at the
+  cap, one past it, and spread over elements. — ADR-12
+- [x] `reader.py`: `_read_gzip` with `zlib`, at most `MAX_GZIP_MEMBERS` (8). Tests: members up to the
+  cap read whole, one more refused (file and memory), padding, other bytes after a member, an empty
+  file, and the content cap across members. — ADR-12
+- [x] `mail.py`: the `compat32` policy and `_filename` (spec 007, ADR-11). Tests: no header parsed
+  into a structured object, the length checked before the policy hands a value out, a nested
+  header read without descending, and a name that does not decode. — ADR-11 of 007
+- [x] `ingest.py`: `_identity` as the duplicate key. Tests: a copy is one duplicate; the same
+  organization and id with other records (and with an empty id), another period or another policy
+  are both kept. — RF-08, ADR-12
+- [x] Quality gate. — result recorded when run: ruff, black and mypy clean; pytest passed with
+  coverage 100% (Python 3.12, 2026-11-27); `uv lock --check` passes. Every changed guard was
+  mutated (35 mutants, all killed, and each new test brought down by at least one). Measured after: a mail of 48 parts with long headers 23 to 65 s
+  to 0.02 to 0.7 s; a 5 MiB `.gz` of empty members 20.8 s to a refusal in 0.04 s.

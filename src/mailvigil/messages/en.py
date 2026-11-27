@@ -267,7 +267,8 @@ _REFUSALS = RefusalMessages(
     html_needs_folder="--html of {count} domains writes one page each: pass --output FOLDER",
     output_not_folder="--output {path} is not an existing folder",
     run_too_large=(
-        "the reports hold more than {limit} records in one run: read fewer files at a time"
+        "the reports of one run would keep more than {limit} MB in memory: "
+        "read fewer files at a time"
     ),
 )
 

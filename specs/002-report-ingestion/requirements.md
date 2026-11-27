@@ -259,14 +259,20 @@ adds the reading layer; it does not add a command (Resolved decision 5).
 
 ### RF-08 — Drop duplicate reports
 
-- **Given** two files holding the same report (same reporting organization and same report id),
-  for instance the same attachment downloaded twice
+- **Given** two files holding the same report (same reporting organization, same report id and the
+  same content: period, published policy and records), for instance the same attachment
+  downloaded twice
   **When** the reports are ingested
   **Then** the first (in discovery order) is kept, the second is counted as `duplicate`, and its
   records are not summed twice.
 - **Given** two reports with the same id from different organizations
   **When** the reports are ingested
   **Then** both are kept: the id is only unique per organization.
+- **Given** two reports with the same organization and id but a different content (amendment of
+  2026-11-27, ADR-12)
+  **When** the reports are ingested
+  **Then** both are kept and neither is a `duplicate`: the organization and the id are written by
+  the sender, so they alone do not make two reports the same one.
 
 ### RF-09 — One bad file never stops the others
 

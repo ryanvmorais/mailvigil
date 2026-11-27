@@ -605,3 +605,90 @@ def test_reading_bytes_writes_nothing_to_disk(
 
     assert read_xml_bytes(make_zip({"../escape.xml": _XML}), "zip") == _XML
     assert list(tmp_path.rglob("*")) == []
+
+
+# ---------------------------------------------------------------------------
+# Gzip members
+# ---------------------------------------------------------------------------
+
+
+def _members(count: int, make_gzip: _MakeGzip) -> tuple[bytes, bytes]:
+    """
+    Split the test document into ``count`` gzip members, one after the other.
+
+    Args:
+        count (int): How many members; the document is cut into that many pieces.
+        make_gzip (_MakeGzip): The builder of one member.
+
+    Returns:
+        tuple[bytes, bytes]: The file, and the document its members hold together.
+    """
+    document = _XML * count
+    pieces = [document[index * len(_XML) : (index + 1) * len(_XML)] for index in range(count)]
+    return b"".join(make_gzip(piece) for piece in pieces), document
+
+
+def test_gzip_members_up_to_the_cap_are_read_whole(tmp_path: Path, make_gzip: _MakeGzip) -> None:
+    """A file of ``MAX_GZIP_MEMBERS`` members gives the content of all of them, in order."""
+    content, document = _members(reader.MAX_GZIP_MEMBERS, make_gzip)
+
+    assert read_xml(_write(tmp_path, "r.gz", content)) == document
+
+
+def test_gzip_members_past_the_cap_are_refused(tmp_path: Path, make_gzip: _MakeGzip) -> None:
+    """One member more is refused before it is decompressed: each one costs a header and a start."""
+    content, _ = _members(reader.MAX_GZIP_MEMBERS + 1, make_gzip)
+
+    with pytest.raises(ReportRefused) as caught:
+        read_xml(_write(tmp_path, "r.gz", content))
+
+    assert caught.value.reason is Reason.NOT_AN_ARCHIVE
+
+
+def test_gzip_members_past_the_cap_are_refused_in_memory(make_gzip: _MakeGzip) -> None:
+    """An attachment of a mail gets the same cap as a file."""
+    content, _ = _members(reader.MAX_GZIP_MEMBERS + 1, make_gzip)
+
+    with pytest.raises(ReportRefused) as caught:
+        read_xml_bytes(content, "gz")
+
+    assert caught.value.reason is Reason.NOT_AN_ARCHIVE
+
+
+def test_zero_bytes_after_the_last_gzip_member_are_padding(
+    tmp_path: Path, make_gzip: _MakeGzip
+) -> None:
+    """Padding is read the way ``gzip`` reads it: the document, and no extra member."""
+    content = make_gzip(_XML) + bytes(64)
+
+    assert read_xml(_write(tmp_path, "r.gz", content)) == _XML
+
+
+def test_other_bytes_after_a_gzip_member_are_refused(tmp_path: Path, make_gzip: _MakeGzip) -> None:
+    """What follows a member must be another member; anything else is a damaged file."""
+    content = make_gzip(_XML) + b"not a gzip member"
+
+    with pytest.raises(ReportRefused) as caught:
+        read_xml(_write(tmp_path, "r.gz", content))
+
+    assert caught.value.reason is Reason.NOT_AN_ARCHIVE
+
+
+def test_an_empty_gzip_file_reads_as_an_empty_document(tmp_path: Path) -> None:
+    """No member at all is what ``gzip`` gives for an empty file: no content, and no error here."""
+    assert read_xml(_write(tmp_path, "r.gz", b"")) == b""
+
+
+def test_gzip_members_that_together_pass_the_cap_are_refused(
+    tmp_path: Path, make_gzip: _MakeGzip, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The cap counts every member's content together, not each member alone."""
+    # Each member is under the cap and so is the file; only the two contents together pass it.
+    piece = b"a" * 1_000
+    content = make_gzip(piece) + make_gzip(piece)
+    monkeypatch.setattr(reader, "MAX_BYTES", len(piece) * 2 - 1)
+
+    with pytest.raises(ReportRefused) as caught:
+        read_xml(_write(tmp_path, "r.gz", content))
+
+    assert caught.value.reason is Reason.DECOMPRESSED_TOO_LARGE
