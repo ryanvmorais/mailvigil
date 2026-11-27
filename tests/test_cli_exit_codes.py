@@ -225,6 +225,21 @@ def test_an_unknown_option_is_a_usage_error_with_code_two(
     assert capsys.readouterr().out == ""
 
 
+def test_a_usage_error_prints_what_was_typed_cleaned_and_cut(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Argparse quotes the unknown option; a control character in it never reaches the terminal."""
+    with pytest.raises(SystemExit) as raised:
+        main(["verdict", "reports", "--domain", "example.com", "--no-such\x1b[2J" + "y" * 500])
+
+    err = capsys.readouterr().err
+    error_line = err.splitlines()[-1]
+    assert raised.value.code == 2
+    assert error_line.startswith("mailvigil: error: unrecognized arguments: --no-such[2J")
+    assert "\x1b" not in err
+    assert len(error_line) < 300
+
+
 def test_the_bare_command_is_a_usage_error_with_code_two() -> None:
     """Without a command the help goes to standard error and the code is 2."""
     assert main([]) == 2

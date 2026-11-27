@@ -484,3 +484,19 @@ def test_an_unrecognized_source_lists_the_spf_domains_that_passed_under_the_owne
     named = ENGLISH.common.spf_domains_named.of(2, names="a.example.com, <b>.example.com")
     assert any(named in found for found in page.texts)
     assert "<b>" not in render_html(summary, judge(summary))
+
+
+def test_the_spf_domains_of_one_source_are_named_up_to_the_limit_and_the_rest_counted() -> None:
+    """A report decides how many domains a source has; the page names ten of them."""
+    domains = tuple(f"d{i:02}.example.com" for i in range(15))
+    summary = Summary(
+        **{
+            **vars_of(not_ready_summary()),
+            "failing": (FailingSource(Outcome.UNKNOWN, "198.51.100.1", 3, spf_domains=domains),),
+        }
+    )
+    page = Page(render_html(summary, judge(summary)))
+    names = ", ".join(domains[:10]) + " " + ENGLISH.summary.skipped_more.format(n=5)
+    named = ENGLISH.common.spf_domains_named.of(15, names=names)
+    assert any(named in found for found in page.texts)
+    assert not any("d10.example.com" in found for found in page.texts)

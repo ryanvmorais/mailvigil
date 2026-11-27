@@ -145,7 +145,8 @@ class SummaryMessages:
         key_other_domains (str): The label of the reports of other domains.
         key_passed_over (str): The label of the files a folder search passed over by name.
         reasons (Mapping[Reason, str]): One phrase per refusal of a file.
-        skipped_more (str): The line that counts the files a list left out; ``{n}``.
+        skipped_more (str): The words that count what a list left out (the files skipped, the SPF
+            domains of a source on the page); ``{n}``.
     """
 
     title: str

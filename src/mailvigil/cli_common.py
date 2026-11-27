@@ -2,15 +2,16 @@
 What the command line modules share: the exit codes and the two ways of printing.
 
 ``cli.py`` wires ``summary`` and ``verdict`` and assembles the parser; ``cli_fetch.py`` holds the
-``fetch`` command. Both need the exit codes and the printing helpers, and neither may import the
-other, so they live here. ``cli`` imports what it uses and the exit codes stay one table (spec 006
-RF-04).
+``fetch`` command. Both need the exit codes, the printing helpers and the parser class, and
+neither may import the other, so they live here. ``cli`` imports what it uses and the exit codes
+stay one table (spec 006 RF-04).
 """
 
 from __future__ import annotations
 
+import argparse
 from pathlib import Path
-from typing import TextIO
+from typing import NoReturn, TextIO
 
 from mailvigil.config import ConfigError
 from mailvigil.messages import Messages
@@ -99,3 +100,31 @@ def config_line(error: ConfigError, messages: Messages) -> str:
     if error.detail and error.reason in refusals.config_detail:
         line += f": {error.detail}"
     return line
+
+
+# ---------------------------------------------------------------------------
+# Parser
+# ---------------------------------------------------------------------------
+
+
+class UsageParser(argparse.ArgumentParser):
+    """
+    The argument parser of the ``mailvigil`` command, whose usage errors are printed clean.
+
+    A usage error quotes what was typed (an unknown option, a bad value), and argparse writes it to
+    standard error as it is; here it passes through ``echo`` first, as every other line that echoes
+    the command line does. ``cli.py`` builds the main parser and the parents with it, and the
+    subcommands get the same class from ``add_subparsers``.
+    """
+
+    def error(self, message: str) -> NoReturn:
+        """
+        End the run with a usage error, its message cleaned and cut.
+
+        Args:
+            message (str): The message argparse built.
+
+        Raises:
+            SystemExit: Always, with the usage exit code, as ``argparse`` does.
+        """
+        super().error(echo(message))

@@ -47,6 +47,10 @@ MAX_SERVICE_NAME = 100
 # The longest key kept in a ``ConfigError``: a mistyped key is arbitrary text from the file.
 _MAX_KEY = 100
 
+# The longest detail kept in a ``ConfigError``: it can quote the TOML parser, whose message is about
+# the file's own text, so it is cleaned and cut like the key.
+_MAX_DETAIL = 200
+
 # The top-level keys of the format. Anything else is a typo or a feature from the future.
 _ALLOWED_KEYS = ("domain", "senders", "spf", "ips", "fetch", "domains")
 
@@ -158,7 +162,7 @@ class ConfigError(Exception):
         reason (ConfigReason): The machine-readable cause.
         key (str): The key it concerns, cleaned and cut; empty for a file-level reason. It comes
             straight from the file, so it is never kept raw.
-        detail (str): A short English explanation, for logs.
+        detail (str): A short English explanation, for logs; cleaned and cut, as the key is.
     """
 
     def __init__(self, reason: ConfigReason, key: str = "", detail: str = "") -> None:
@@ -173,7 +177,7 @@ class ConfigError(Exception):
         super().__init__(reason, key, detail)
         self.reason = reason
         self.key = clean_text(key, _MAX_KEY)
-        self.detail = detail
+        self.detail = clean_text(detail, _MAX_DETAIL)
 
     def __str__(self) -> str:
         """
